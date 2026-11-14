@@ -322,6 +322,11 @@ export async function addTrip(profileId: string, _: FormState, form: FormData): 
   const parsed = readTrip(form);
   if ("error" in parsed) return { error: parsed.error };
   const sql = await getDb();
+  const { countryCode, departureDate, returnDate } = parsed.values;
+  const dup = await sql`
+    select 1 from trips where profile_id = ${profileId} and trim(country_code) = ${countryCode}
+      and departure_date = ${departureDate} and return_date is not distinct from ${returnDate}`;
+  if (dup.length) return { error: "This visit is already in the record." };
   await sql`insert into trips ${sql({ ...parsed.values, profileId })}`;
   refresh();
   return { ok: "Trip added." };
@@ -542,8 +547,19 @@ export async function saveImport(
       await sql`update profiles set ${sql(updates)}, updated_at = now() where id = ${target}`;
     }
   }
-  if (trips.length) {
-    await sql`insert into trips ${sql(trips.map((t) => ({ ...t, profileId })))}`;
+  // Skip visits that are already in the record (same country, departure and return date),
+  // so importing the same document twice doesn't create duplicates.
+  const existing = await sql<{ countryCode: string; departureDate: string; returnDate: string | null }[]>`
+    select trim(country_code) as country_code, departure_date, return_date from trips where profile_id = ${profileId}`;
+  const seen = new Set(existing.map((e) => `${e.countryCode}|${e.departureDate}|${e.returnDate ?? ""}`));
+  const fresh = trips.filter((t) => {
+    const key = `${t.countryCode}|${t.departureDate}|${t.returnDate ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (fresh.length) {
+    await sql`insert into trips ${sql(fresh.map((t) => ({ ...t, profileId })))}`;
   }
   return { profileId };
 }
