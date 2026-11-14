@@ -38,10 +38,15 @@ export function CountrySelect({
   return (
     <div className="relative">
       <input type="hidden" name={name} value={value} />
-      <div className="field flex items-center gap-2 !py-0">
-        {value && (
+      <div className="field flex cursor-pointer items-center gap-2 !py-0" onClick={() => inputRef.current?.focus()}>
+        {value ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={flagSvg(value)} alt="" className="h-4 w-6 rounded-[2px] object-cover" />
+          <img src={flagSvg(value)} alt="" className="h-5 w-7 shrink-0 rounded-[3px] object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.08)]" />
+        ) : (
+          <svg viewBox="0 0 24 24" className="size-5 shrink-0 text-ink-soft" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+            <circle cx="12" cy="12" r="9" />
+            <path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z" />
+          </svg>
         )}
         <input
           ref={inputRef}
@@ -50,7 +55,7 @@ export function CountrySelect({
           aria-controls={listId}
           aria-autocomplete="list"
           className="w-full bg-transparent py-2.5 outline-none"
-          placeholder={value ? countryName(value) : "Search country…"}
+          placeholder={value ? countryName(value) : "Choose a country (type to search)"}
           value={open ? query : value ? countryName(value) : ""}
           onFocus={() => {
             setOpen(true);
@@ -77,12 +82,15 @@ export function CountrySelect({
             }
           }}
         />
+        <svg viewBox="0 0 24 24" className={`size-4 shrink-0 text-ink-soft transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
       </div>
       {open && (
         <ul
           id={listId}
           role="listbox"
-          className="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-line bg-white p-1 shadow-xl"
+          className="absolute z-50 mt-1 max-h-72 w-full min-w-64 overflow-auto rounded-xl border border-line bg-white p-1 shadow-2xl"
         >
           {matches.length === 0 && <li className="px-3 py-2 text-sm text-ink-soft">No country found</li>}
           {matches.map((c, i) => (

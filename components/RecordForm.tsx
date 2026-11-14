@@ -207,18 +207,17 @@ export function RecordForm({
       )}
 
       {/* Immigration record, laid out like the paper form: one section per country, visits listed under it */}
-      <section className="panel overflow-hidden">
+      <section className="panel">
         <div className="border-b border-line px-6 py-5">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Immigration record</p>
           <h2 className="mt-1 font-serif text-2xl font-bold text-navy">Countries & visits</h2>
           <p className="mt-1 text-sm text-ink-soft">
-            Choose a country, then add every visit to it. The number of visits is counted automatically.
+            Choose a country, then use <b>+</b> / <b>−</b> next to “No. of visits” to add or remove visit rows.
           </p>
         </div>
 
         <div className="divide-y divide-line">
           {blocks.map((b, bi) => {
-            const filled = b.visits.filter((v) => v.departureDate).length;
             return (
               <div key={b.key} className={`p-5 sm:p-6 ${bi % 2 ? "bg-paper/50" : ""}`}>
                 <div className="flex flex-wrap items-end gap-4">
@@ -233,9 +232,31 @@ export function RecordForm({
                   </label>
                   <div className="text-center">
                     <span className="field-label">No. of visits</span>
-                    <span className="inline-grid size-11 place-items-center rounded-full bg-navy font-serif text-lg font-bold text-gold-soft">
-                      {filled}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        aria-label="Remove last visit"
+                        title="Remove last visit"
+                        disabled={b.visits.length <= 1}
+                        onClick={() => setBlock(b.key, { visits: b.visits.slice(0, -1) })}
+                        className="grid size-9 place-items-center rounded-full border border-line bg-white text-lg font-bold text-navy hover:bg-paper-2 disabled:opacity-30"
+                      >
+                        −
+                      </button>
+                      <span className="inline-grid size-11 place-items-center rounded-full bg-navy font-serif text-lg font-bold text-gold-soft">
+                        {b.visits.length}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="Add a visit"
+                        title="Add a visit"
+                        disabled={b.visits.length >= 50}
+                        onClick={() => setBlock(b.key, { visits: [...b.visits, emptyVisit()] })}
+                        className="grid size-9 place-items-center rounded-full bg-gold text-lg font-bold text-navy hover:brightness-105 disabled:opacity-30"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
                   <button
                     type="button"
