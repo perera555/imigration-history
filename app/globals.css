@@ -1,26 +1,171 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #f5f2eb;
+  --paper-2: #ece6d8;
+  --ink: #0f1b2d;
+  --ink-soft: #4a5568;
+  --navy: #0b1f3a;
+  --navy-2: #13315c;
+  --gold: #c9a54c;
+  --gold-soft: #e8d49a;
+  --line: #ddd5c3;
+  --card: #fffdf8;
+  --danger: #b4232f;
+  --ok: #1d7a4e;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-navy: var(--navy);
+  --color-navy-2: var(--navy-2);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-line: var(--line);
+  --color-card: var(--card);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-serif: var(--font-serif);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(circle at 10% -10%, rgba(201, 165, 76, 0.16), transparent 40%),
+    radial-gradient(circle at 100% 0%, rgba(19, 49, 92, 0.1), transparent 45%);
+  background-attachment: fixed;
+  color: var(--ink);
+}
+
+/* ---------- Travel identity card ---------- */
+.id-card {
+  position: relative;
+  overflow: hidden;
+  color: #f6f1e3;
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(201, 165, 76, 0.28), transparent 55%),
+    radial-gradient(90% 80% at 0% 100%, rgba(52, 105, 170, 0.35), transparent 60%),
+    linear-gradient(135deg, #0a1a33 0%, #102a50 55%, #0b1f3a 100%);
+  box-shadow:
+    0 30px 60px -25px rgba(11, 31, 58, 0.65),
+    inset 0 0 0 1px rgba(232, 212, 154, 0.35);
+}
+.id-card::before {
+  /* guilloche-style security pattern */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.16;
+  background:
+    repeating-radial-gradient(circle at 78% 30%, transparent 0 9px, rgba(232, 212, 154, 0.7) 9px 10px),
+    repeating-radial-gradient(circle at 15% 95%, transparent 0 13px, rgba(160, 196, 240, 0.6) 13px 14px);
+  mask-image: linear-gradient(180deg, #000, rgba(0, 0, 0, 0.35));
+}
+.id-card::after {
+  /* holographic sheen */
+  content: "";
+  position: absolute;
+  inset: -40%;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.09) 50%, transparent 60%);
+  transform: translateX(-30%);
+  transition: transform 1.2s ease;
+}
+.id-card:hover::after {
+  transform: translateX(30%);
+}
+.gold-text {
+  background: linear-gradient(90deg, #f3e2a9, #c9a54c 50%, #f3e2a9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------- Forms ---------- */
+.field-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 0.35rem;
+}
+.field {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.95rem;
+  color: var(--ink);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(201, 165, 76, 0.25);
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.6rem 1.15rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: transform 0.15s, background 0.15s, box-shadow 0.15s, opacity 0.15s;
+  white-space: nowrap;
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.btn-primary {
+  background: var(--navy);
+  color: #fff;
+  box-shadow: 0 8px 20px -10px rgba(11, 31, 58, 0.8);
+}
+.btn-primary:hover {
+  background: var(--navy-2);
+}
+.btn-gold {
+  background: linear-gradient(180deg, #e2c574, #c9a54c);
+  color: #1c1405;
+  box-shadow: 0 8px 20px -10px rgba(140, 105, 20, 0.9);
+}
+.btn-gold:hover {
+  filter: brightness(1.05);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.btn-ghost:hover {
+  background: var(--paper-2);
+}
+.btn-danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid rgba(180, 35, 47, 0.3);
+}
+.btn-danger:hover {
+  background: rgba(180, 35, 47, 0.08);
+}
+.panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 20px 40px -30px rgba(15, 27, 45, 0.35);
 }
