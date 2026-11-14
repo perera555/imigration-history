@@ -477,7 +477,7 @@ function profileValuesFrom(p: ImportProfile) {
 export async function updateRecord(
   profileId: string,
   payload: { profile: ImportProfile; trips: ImportTrip[] },
-): Promise<{ error: string } | { profileId: string }> {
+): Promise<{ error: string } | { profileId: string; skipped?: number }> {
   if (!isUuid(profileId)) return { error: "Unknown record." };
   await requireProfileAccess(profileId);
   const values = profileValuesFrom(payload.profile);
@@ -486,16 +486,37 @@ export async function updateRecord(
     return { error: "Passport expiry date must be after the issue date." };
   }
   const trips: (ImportTrip & { id: string | null })[] = [];
+  const seen = new Set<string>();
+  let merged = 0;
   for (const trip of payload.trips.slice(0, 500)) {
     const cleaned = cleanTrip(trip);
     if ("error" in cleaned) return { error: cleaned.error };
+    const key = `${cleaned.values.countryCode}|${cleaned.values.departureDate}|${cleaned.values.returnDate ?? ""}`;
+    if (seen.has(key)) {
+      merged++; // the same visit twice in the form: keep one
+      continue;
+    }
+    seen.add(key);
     trips.push({ ...cleaned.values, id: trip.id && isUuid(trip.id) ? trip.id : null });
   }
 
   const sql = await getDb();
   await sql.begin(async (tx) => {
     await tx`update profiles set ${tx({ ...values, fullName: values.fullName! })}, updated_at = now() where id = ${profileId}`;
-    const existing = new Set((await tx<{ id: string }[]>`select id from trips where profile_id = ${profileId}`).map((r) => r.id));
+    const rows = await tx<{ id: string; countryCode: string; departureDate: string; returnDate: string | null }[]>`
+      select id, trim(country_code) as country_code, departure_date, return_date from trips where profile_id = ${profileId}`;
+    const existing = new Set(rows.map((r) => r.id));
+    // A row without an id that matches a saved visit (same country + dates) updates that visit instead of adding a copy.
+    const byKey = new Map(rows.map((r) => [`${r.countryCode}|${r.departureDate}|${r.returnDate ?? ""}`, r.id]));
+    const claimed = new Set(trips.map((t) => t.id).filter(Boolean));
+    for (const t of trips) {
+      if (t.id && existing.has(t.id)) continue;
+      const match = byKey.get(`${t.countryCode}|${t.departureDate}|${t.returnDate ?? ""}`);
+      if (match && !claimed.has(match)) {
+        t.id = match;
+        claimed.add(match);
+      }
+    }
     const keep = trips.filter((t) => t.id && existing.has(t.id)).map((t) => t.id!);
     if (keep.length) await tx`delete from trips where profile_id = ${profileId} and id not in ${tx(keep)}`;
     else await tx`delete from trips where profile_id = ${profileId}`;
@@ -505,14 +526,14 @@ export async function updateRecord(
     }
   });
   refresh();
-  return { profileId };
+  return { profileId, skipped: merged };
 }
 
 /** Saves reviewed data: creates a new profile (target "new") or fills an existing one, then adds the trips. */
 export async function saveImport(
   target: string,
   payload: { profile: ImportProfile; trips: ImportTrip[] },
-): Promise<{ error: string } | { profileId: string }> {
+): Promise<{ error: string } | { profileId: string; added?: number; skipped?: number }> {
   const session = await requireAuth();
   if (session.role !== "admin" && (target === "new" || target !== session.profileId)) {
     return { error: "You can only import into your own record." };
@@ -558,10 +579,14 @@ export async function saveImport(
     seen.add(key);
     return true;
   });
+  const skipped = trips.length - fresh.length;
+  if (trips.length && !fresh.length && target !== "new") {
+    return { error: "This document is already added. All these visits are already in the record, so nothing was added again." };
+  }
   if (fresh.length) {
     await sql`insert into trips ${sql(fresh.map((t) => ({ ...t, profileId })))}`;
   }
-  return { profileId };
+  return { profileId, added: fresh.length, skipped };
 }
 
 export async function deleteTrip(tripId: string) {

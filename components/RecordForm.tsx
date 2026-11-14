@@ -134,15 +134,26 @@ export function RecordForm({
       const result = updateId
         ? await updateRecord(updateId, { profile, trips })
         : await saveImport(saveTo, { profile, trips });
-      if ("error" in result) setError(result.error);
-      else if (updateId) {
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+      const skipped = result.skipped ?? 0;
+      const plural = (n: number) => `${n} visit${n === 1 ? " was" : "s were"}`;
+      if (updateId) {
+        if (skipped) window.alert(`${plural(skipped)} entered twice, so only one copy of each was kept.`);
         router.push(afterUpdateHref ?? `/profiles/${result.profileId}`);
         router.refresh();
       } else if (stayOnPage) {
+        const added = "added" in result ? (result.added ?? trips.length) : trips.length;
         setBlocks([emptyCountry()]);
-        setSaved(`✓ Saved ${trips.length} visit${trips.length === 1 ? "" : "s"}.`);
+        setSaved(
+          `✓ Saved ${added} new visit${added === 1 ? "" : "s"}.` +
+            (skipped ? ` ${plural(skipped)} already in the record and not added again.` : ""),
+        );
         router.refresh();
       } else {
+        if (skipped) window.alert(`${plural(skipped)} already in the record and not added again.`);
         router.push(`/profiles/${result.profileId}`);
       }
     });
