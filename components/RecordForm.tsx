@@ -141,8 +141,9 @@ export function RecordForm({
       const skipped = result.skipped ?? 0;
       const plural = (n: number) => `${n} visit${n === 1 ? " was" : "s were"}`;
       if (updateId) {
-        if (skipped) window.alert(`${plural(skipped)} entered twice, so only one copy of each was kept.`);
-        router.push(afterUpdateHref ?? `/profiles/${result.profileId}`);
+        // Save / Update record: travel card + all visits saved together; stay on the page.
+        // Reload the whole page with fresh data from the database.
+        router.replace(`?saved=all&visits=${trips.length - skipped}&merged=${skipped}`, { scroll: false });
         router.refresh();
       } else if (stayOnPage) {
         const added = "added" in result ? (result.added ?? trips.length) : trips.length;
@@ -196,12 +197,8 @@ export function RecordForm({
         setPartMsg((m) => ({ ...m, [part]: { error: result.error } }));
       } else {
         const skipped = result.skipped ?? 0;
-        const ok =
-          part === "card"
-            ? "✓ Travel card saved to the database."
-            : `✓ Immigration record saved (${trips.length - skipped} visits).` +
-              (skipped ? ` ${skipped} duplicate row${skipped === 1 ? " was" : "s were"} merged.` : "");
-        setPartMsg((m) => ({ ...m, [part]: { ok } }));
+        // Reload the whole page with fresh data from the database.
+        router.replace(`?saved=${part}&visits=${trips.length - skipped}&merged=${skipped}`, { scroll: false });
         router.refresh();
       }
     } finally {
@@ -449,7 +446,7 @@ export function RecordForm({
         ))}
       </datalist>
 
-      <div className={`sticky bottom-4 z-20 flex-wrap items-center gap-3 rounded-2xl border border-line bg-card/95 p-4 shadow-xl backdrop-blur ${updateId ? "hidden" : "flex"}`}>
+      <div className="sticky bottom-4 z-20 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-card/95 p-4 shadow-xl backdrop-blur">
         <button type="button" onClick={save} disabled={saving} className="btn btn-primary !px-6 !py-3">
           {saving ? "Saving…" : saveLabel}
         </button>
