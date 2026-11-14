@@ -43,3 +43,5 @@ next-env.d.ts
 # private seed data (personal details - never commit)
 /data/*.local.json
 !.env.example
+.vercel
+.env*

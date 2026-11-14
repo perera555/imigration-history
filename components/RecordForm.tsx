@@ -7,6 +7,7 @@ import { CountrySelect } from "./CountrySelect";
 import { PhotoInput } from "./PhotoInput";
 import { Flag } from "./Flag";
 import { EMPTY_PROFILE } from "@/lib/record";
+import { NationalitySelect } from "./NationalitySelect";
 
 type Visit = { key: number; departureDate: string; returnDate: string; purpose: string; passportNumber: string; notes: string };
 type CountryBlock = { key: number; countryCode: string; city: string; visits: Visit[] };
@@ -163,7 +164,12 @@ export function RecordForm({
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               {PROFILE_FIELDS.map((f) =>
-                f.key === "sex" ? (
+                f.key === "nationality" ? (
+                  <div key={f.key}>
+                    <span className="field-label">{f.label}</span>
+                    <NationalitySelect defaultValue={profile.nationality} onChange={(v) => setProfile((p) => ({ ...p, nationality: v || null }))} />
+                  </div>
+                ) : f.key === "sex" ? (
                   <label key={f.key}>
                     <span className="field-label">{f.label}</span>
                     <select value={profile.sex ?? ""} onChange={(e) => setProfile({ ...profile, sex: e.target.value || null })} className="field">

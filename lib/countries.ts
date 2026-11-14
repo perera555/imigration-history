@@ -1,5 +1,7 @@
 import isoCountries from "i18n-iso-countries";
 import en from "i18n-iso-countries/langs/en.json";
+import nationalities from "i18n-nationality";
+import nationalityEn from "i18n-nationality/langs/en.json";
 
 isoCountries.registerLocale(en);
 
@@ -33,6 +35,16 @@ const NAME_OVERRIDES: Record<string, string> = {
 };
 
 export type Country = { code: string; name: string };
+
+const NATIONALITY_OVERRIDES: Record<string, string> = { AE: "Emirati", GB: "British", US: "American" };
+
+/** Nationality names ("Sri Lankan", "Australian"...) with their country code, sorted. */
+export const NATIONALITIES: Country[] = Object.entries(
+  (nationalities.registerLocale(nationalityEn), nationalities.getNames("en")) as Record<string, string>,
+)
+  .map(([code, name]) => ({ code, name: NATIONALITY_OVERRIDES[code] ?? name }))
+  .filter((n) => n.name)
+  .sort((a, b) => a.name.localeCompare(b.name));
 
 export const COUNTRIES: Country[] = Object.entries(
   isoCountries.getNames("en", { select: "official" }),

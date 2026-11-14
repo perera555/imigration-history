@@ -6,6 +6,7 @@ import type { Profile } from "@/lib/data";
 import { PhotoInput } from "./PhotoInput";
 import { PassportListInput } from "./PassportListInput";
 import { SubmitButton } from "./SubmitButton";
+import { NationalitySelect } from "./NationalitySelect";
 
 export function ProfileForm({
   action,
@@ -64,7 +65,11 @@ export function ProfileForm({
         </label>
         <label>
           <span className="field-label">Nationality</span>
-          <input name="nationality" readOnly={locked(profile?.nationality)} defaultValue={profile?.nationality ?? ""} className={`field ${locked(profile?.nationality) ? lockClass : ""}`} placeholder="e.g. Sri Lankan" />
+          {locked(profile?.nationality) ? (
+            <input name="nationality" readOnly defaultValue={profile?.nationality ?? ""} className={`field ${lockClass}`} />
+          ) : (
+            <NationalitySelect name="nationality" defaultValue={profile?.nationality} />
+          )}
         </label>
         <label>
           <span className="field-label">Phone number</span>
