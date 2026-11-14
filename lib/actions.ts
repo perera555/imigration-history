@@ -233,6 +233,13 @@ function readProfile(form: FormData) {
   if (photo && (!photo.startsWith("data:image/") || photo.length > MAX_PHOTO_CHARS)) {
     return { error: "Photo must be an image under ~650 KB." } as const;
   }
+  const passportIssueDate = text(form, "passportIssueDate", 10);
+  const passportExpiryDate = text(form, "passportExpiryDate", 10);
+  if (passportIssueDate && !isDate(passportIssueDate)) return { error: "Passport issue date is not valid." } as const;
+  if (passportExpiryDate && !isDate(passportExpiryDate)) return { error: "Passport expiry date is not valid." } as const;
+  if (passportIssueDate && passportExpiryDate && passportExpiryDate <= passportIssueDate) {
+    return { error: "Passport expiry date must be after the issue date." } as const;
+  }
 
   return {
     values: {
@@ -240,10 +247,13 @@ function readProfile(form: FormData) {
       dateOfBirth,
       sex: text(form, "sex", 20),
       nationality: text(form, "nationality", 80),
+      nationalId: text(form, "nationalId", 40)?.toUpperCase() ?? null,
       address: text(form, "address", 400),
       phone: text(form, "phone", 40),
       email,
       passportNumber: text(form, "passportNumber", 30)?.toUpperCase() ?? null,
+      passportIssueDate,
+      passportExpiryDate,
       previousPassports,
       photo,
     },
@@ -370,6 +380,9 @@ export type ImportProfile = {
   passportNumber: string | null;
   previousPassports: string[];
   photo?: string | null;
+  nationalId?: string | null;
+  passportIssueDate?: string | null;
+  passportExpiryDate?: string | null;
 };
 export type ExtractState =
   | { error: string }
@@ -381,17 +394,35 @@ const MAX_DOC_BYTES = 10 * 1024 * 1024;
 
 export async function readDocument(_: ExtractState, form: FormData): Promise<ExtractState> {
   await requireAuth();
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return { error: "Automatic reading is not set up: add ANTHROPIC_API_KEY to the server settings. You can still enter data manually." };
-  }
   const file = form.get("document");
   if (!(file instanceof File) || file.size === 0) return { error: "Choose a PDF or image to upload." };
   if (!ALLOWED_DOC_TYPES.includes(file.type)) return { error: "Upload a PDF, PNG, JPG or WEBP file." };
   if (file.size > MAX_DOC_BYTES) return { error: "File is too large (max 10 MB)." };
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const isPdf = file.type === "application/pdf";
 
+  // 1. Table-style PDFs are read directly (free, no AI key needed).
+  if (isPdf) {
+    try {
+      const { parseHistoryPdf } = await import("./pdf-table");
+      const parsed = await parseHistoryPdf(new Uint8Array(bytes));
+      if (parsed.trips.length) return { ok: true, profile: parsed.profile, trips: parsed.trips, issues: parsed.issues };
+    } catch (error) {
+      if (!(error instanceof Error && error.message === "NO_TABLE")) console.error("PDF table reading failed:", error);
+    }
+  }
+
+  // 2. Other documents (photos, letters, scanned PDFs) need the optional AI reader.
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return {
+      error: isPdf
+        ? "Couldn't find a travel table in this PDF (it needs columns like Country, Departure Date, Return Date, Purpose). Please enter the data in the form below."
+        : "Photos can't be read automatically on this server yet. Upload the PDF version, or enter the data in the form below.",
+    };
+  }
   try {
     const { extractFromDocument } = await import("./extract");
-    const data = await extractFromDocument(Buffer.from(await file.arrayBuffer()), file.type);
+    const data = await extractFromDocument(bytes, file.type);
     const trips = data.trips.map((t) => ({ ...t, countryCode: t.countryCode.toUpperCase() }));
     return { ok: true, profile: data.profile, trips, issues: data.issues };
   } catch (error) {
@@ -449,6 +480,9 @@ export async function saveImport(
     phone: s(p.phone, 40),
     email: email && EMAIL_RE.test(email) ? email : null,
     passportNumber: s(p.passportNumber, 30)?.toUpperCase() ?? null,
+    nationalId: s(p.nationalId, 40)?.toUpperCase() ?? null,
+    passportIssueDate: p.passportIssueDate && isDate(p.passportIssueDate) ? p.passportIssueDate : null,
+    passportExpiryDate: p.passportExpiryDate && isDate(p.passportExpiryDate) ? p.passportExpiryDate : null,
     previousPassports: (p.previousPassports ?? [])
       .map((x) => String(x).trim().toUpperCase().slice(0, 30))
       .filter(Boolean)

@@ -8,6 +8,7 @@ import { TravelCard } from "@/components/TravelCard";
 import { HistoryTable, StatsBar } from "@/components/HistoryTable";
 import { logout } from "@/lib/actions";
 import { ProfileEditor } from "@/components/ProfileEditor";
+import { PdfButtons } from "@/components/PdfButtons";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 
 export const metadata: Metadata = { title: "My account" };
@@ -42,9 +43,7 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
               <Link href={`/profiles/${profile.id}`} className="btn btn-ghost">
                 View my card
               </Link>
-              <a href={`/api/profiles/${profile.id}/pdf`} className="btn btn-gold">
-                Download PDF
-              </a>
+              <PdfButtons profileId={profile.id} />
             </>
           )}
           <form action={logout}>

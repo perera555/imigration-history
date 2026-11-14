@@ -55,7 +55,10 @@ const PROFILE_FIELDS: { key: keyof Omit<ImportProfile, "previousPassports" | "ph
   { key: "phone", label: "Phone number", type: "tel" },
   { key: "email", label: "Email", type: "email", wide: true },
   { key: "address", label: "Address", wide: true },
+  { key: "nationalId", label: "ID number (NIC)" },
   { key: "passportNumber", label: "Current passport number" },
+  { key: "passportIssueDate", label: "Passport issue date", type: "date" },
+  { key: "passportExpiryDate", label: "Passport expiry date", type: "date" },
 ];
 
 export function RecordForm({
@@ -186,7 +189,7 @@ export function RecordForm({
                       type={f.type ?? "text"}
                       value={profile[f.key] ?? ""}
                       onChange={(e) =>
-                        setProfile({ ...profile, [f.key]: (f.key === "passportNumber" ? e.target.value.toUpperCase() : e.target.value) || null })
+                        setProfile({ ...profile, [f.key]: (f.key === "passportNumber" || f.key === "nationalId" ? e.target.value.toUpperCase() : e.target.value) || null })
                       }
                       className={`field ${f.key === "passportNumber" ? "font-mono uppercase" : ""}`}
                     />

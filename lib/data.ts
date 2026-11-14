@@ -12,6 +12,9 @@ export type Profile = {
   phone: string | null;
   email: string | null;
   passportNumber: string | null;
+  passportIssueDate: string | null;
+  passportExpiryDate: string | null;
+  nationalId: string | null;
   previousPassports: string[];
   photo: string | null;
   createdAt: Date;

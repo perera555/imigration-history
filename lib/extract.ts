@@ -13,6 +13,9 @@ const ExtractedSchema = z.object({
     phone: z.string().nullable(),
     email: z.string().nullable(),
     passportNumber: z.string().nullable().describe("Current passport number"),
+    nationalId: z.string().nullable().describe("National ID / NIC number"),
+    passportIssueDate: z.string().nullable().describe("YYYY-MM-DD"),
+    passportExpiryDate: z.string().nullable().describe("YYYY-MM-DD"),
     previousPassports: z.array(z.string()).describe("Older passport numbers"),
   }),
   trips: z.array(

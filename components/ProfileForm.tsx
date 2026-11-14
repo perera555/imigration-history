@@ -84,8 +84,20 @@ export function ProfileForm({
           <textarea name="address" rows={2} readOnly={locked(profile?.address)} defaultValue={profile?.address ?? ""} className={`field ${locked(profile?.address) ? lockClass : ""}`} />
         </label>
         <label>
+          <span className="field-label">ID number (NIC)</span>
+          <input name="nationalId" readOnly={locked(profile?.nationalId)} defaultValue={profile?.nationalId ?? ""} className={`field font-mono uppercase ${locked(profile?.nationalId) ? lockClass : ""}`} />
+        </label>
+        <label>
           <span className="field-label">Current passport number</span>
           <input name="passportNumber" readOnly={locked(profile?.passportNumber)} defaultValue={profile?.passportNumber ?? ""} className={`field font-mono uppercase ${locked(profile?.passportNumber) ? lockClass : ""}`} />
+        </label>
+        <label>
+          <span className="field-label">Passport issue date</span>
+          <input type="date" name="passportIssueDate" readOnly={locked(profile?.passportIssueDate)} defaultValue={profile?.passportIssueDate ?? ""} className={`field ${locked(profile?.passportIssueDate) ? lockClass : ""}`} />
+        </label>
+        <label>
+          <span className="field-label">Passport expiry date</span>
+          <input type="date" name="passportExpiryDate" readOnly={locked(profile?.passportExpiryDate)} defaultValue={profile?.passportExpiryDate ?? ""} className={`field ${locked(profile?.passportExpiryDate) ? lockClass : ""}`} />
         </label>
         <div className="sm:col-span-2">
           <span className="field-label">Previous passport numbers (up to 10)</span>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PdfButtons } from "./PdfButtons";
 import { travelStats, type Profile, type Trip } from "@/lib/data";
 import { TravelCard } from "./TravelCard";
 import { HistoryTable, StatsBar } from "./HistoryTable";
@@ -16,12 +17,7 @@ export function ProfileDetail({ profile, trips, showBack }: { profile: Profile; 
           <Link href={`/admin/profiles/${profile.id}#trips`} className="btn btn-ghost">
             + Add visits / edit details
           </Link>
-          <a href={`/api/profiles/${profile.id}/pdf`} className="btn btn-gold">
-            <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
-              <path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
-            </svg>
-            Download PDF
-          </a>
+          <PdfButtons profileId={profile.id} />
         </div>
       </div>
 

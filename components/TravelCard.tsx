@@ -69,7 +69,22 @@ export function TravelCard({ profile }: { profile: Profile }) {
               value={age !== null ? `${age} yrs · ${formatDate(profile.dateOfBirth)}` : null}
             />
             <Field label="Nationality" value={profile.nationality} />
+            <Field label="ID number (NIC)" value={profile.nationalId} mono />
             <Field label="Passport no." value={profile.passportNumber} mono />
+            <Field label="Passport issued" value={profile.passportIssueDate ? formatDate(profile.passportIssueDate) : null} />
+            <Field
+              label="Passport expires"
+              value={
+                profile.passportExpiryDate ? (
+                  <>
+                    {formatDate(profile.passportExpiryDate)}
+                    {profile.passportExpiryDate < new Date().toISOString().slice(0, 10) && (
+                      <span className="ml-2 rounded-full bg-red-500/90 px-2 py-0.5 text-[10px] font-bold uppercase text-white">Expired</span>
+                    )}
+                  </>
+                ) : null
+              }
+            />
             <Field
               label="Previous passports"
               value={profile.previousPassports.length ? profile.previousPassports.join(", ") : null}

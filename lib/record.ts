@@ -9,6 +9,9 @@ export const EMPTY_PROFILE: ImportProfile = {
   phone: null,
   email: null,
   passportNumber: null,
+  nationalId: null,
+  passportIssueDate: null,
+  passportExpiryDate: null,
   previousPassports: [],
   photo: null,
 };

@@ -14,7 +14,9 @@ async function loadFlag(code: string): Promise<string | null> {
   }
 }
 
-export async function GET(_request: Request, ctx: RouteContext<"/api/profiles/[id]/pdf">) {
+export async function GET(request: Request, ctx: RouteContext<"/api/profiles/[id]/pdf">) {
+  // ?view=1 opens the PDF in the browser; otherwise it downloads.
+  const inline = new URL(request.url).searchParams.get("view") === "1";
   const { id } = await ctx.params;
   const [profile, trips] = await Promise.all([getProfile(id), getTrips(id)]);
   if (!profile) return Response.json({ error: "Not found" }, { status: 404 });
@@ -31,7 +33,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/profiles/[i
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${fileName}"`,
+      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${fileName}"`,
       "Cache-Control": "private, no-store",
     },
   });

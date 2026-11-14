@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { requireProfileAccess } from "@/lib/session";
 import { getProfile, getTrips } from "@/lib/data";
 import { ProfileEditor } from "@/components/ProfileEditor";
+import { PdfButtons } from "@/components/PdfButtons";
 
 export default function EditProfilePage({ params }: PageProps<"/admin/profiles/[id]">) {
   return (
@@ -28,9 +29,7 @@ async function EditProfile({ params }: { params: PageProps<"/admin/profiles/[id]
         <Link href={`/profiles/${profile.id}`} className="btn btn-ghost ml-auto">
           View card & history
         </Link>
-        <a href={`/api/profiles/${profile.id}/pdf`} className="btn btn-gold">
-          Download PDF
-        </a>
+        <PdfButtons profileId={profile.id} />
       </div>
       <h1 className="font-serif text-3xl font-bold text-navy">{profile.fullName}</h1>
       <ProfileEditor profile={profile} trips={trips} isAdmin={session.role === "admin"} />
