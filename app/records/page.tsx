@@ -9,12 +9,19 @@ export const metadata: Metadata = { title: "Records" };
 export default function RecordsPage() {
   return (
     <div className="space-y-8">
-      <section>
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Records</p>
-        <h1 className="mt-1 font-serif text-3xl font-bold text-navy sm:text-4xl">Travellers</h1>
-        <p className="mt-2 max-w-2xl text-ink-soft">
-          Choose a traveller to view their travel identity card and full immigration history, or download it as a PDF.
-        </p>
+      <section className="flex flex-wrap items-end gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Records</p>
+          <h1 className="mt-1 font-serif text-3xl font-bold text-navy sm:text-4xl">Travellers</h1>
+          <p className="mt-2 max-w-2xl text-ink-soft">
+            Choose a traveller to view their travel identity card and full immigration history, or download it as a PDF.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 sm:ml-auto">
+          <Link href="/register" className="btn btn-gold">
+            + Add travel data
+          </Link>
+        </div>
       </section>
       <Suspense fallback={<GridSkeleton />}>
         <ProfileGrid />

@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   serverExternalPackages: ["@react-pdf/renderer"],
+  async redirects() {
+    return [{ source: "/guide", destination: "/admin/guide", permanent: false }];
+  },
   turbopack: {
     rules: {
       "*.css": {

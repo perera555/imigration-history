@@ -1,4 +1,4 @@
-import { ageFrom, formatDate, type Profile } from "@/lib/data";
+import { ageFrom, formatDate, recordNumber, type Profile } from "@/lib/data";
 
 function mrzLine(profile: Profile) {
   const name = profile.fullName.toUpperCase().replace(/[^A-Z ]/g, "").trim().split(/\s+/);
@@ -82,7 +82,22 @@ export function TravelCard({ profile }: { profile: Profile }) {
           </dl>
         </div>
 
-        <div className="mt-6 overflow-hidden rounded-xl bg-black/25 px-4 py-3 font-mono text-[10px] leading-relaxed tracking-[0.2em] text-white/70 sm:text-xs">
+        <dl className="mt-6 grid grid-cols-3 gap-3 border-t border-gold-soft/25 pt-4">
+          <div>
+            <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gold-soft/70">Record no.</dt>
+            <dd className="mt-0.5 font-mono text-sm tracking-wider text-white">{recordNumber(profile.id)}</dd>
+          </div>
+          <div>
+            <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gold-soft/70">Date issued</dt>
+            <dd className="mt-0.5 text-sm text-white">{formatDate(profile.issuedOn)}</dd>
+          </div>
+          <div>
+            <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gold-soft/70">Last updated</dt>
+            <dd className="mt-0.5 text-sm text-white">{formatDate(profile.lastUpdated)}</dd>
+          </div>
+        </dl>
+
+        <div className="mt-4 overflow-hidden rounded-xl bg-black/25 px-4 py-3 font-mono text-[10px] leading-relaxed tracking-[0.2em] text-white/70 sm:text-xs">
           <p className="truncate">{mrz1}</p>
           <p className="truncate">{mrz2}</p>
         </div>

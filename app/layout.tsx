@@ -2,7 +2,10 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
+import { Suspense } from "react";
 import { InstallButton } from "@/components/InstallButton";
+import { HeaderAccount } from "@/components/HeaderAccount";
+import { OfflineBanner, OnlinePill } from "@/components/OnlineDot";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -41,12 +44,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               </span>
             </Link>
             <nav className="ml-auto flex items-center gap-1.5 sm:gap-2">
+              <OnlinePill />
               <InstallButton />
-              <Link href="/records" className="rounded-full px-3 py-1.5 text-sm text-white/80 hover:bg-white/10 hover:text-white">
-                Records
-              </Link>
+              <Suspense fallback={<span className="size-9 animate-pulse rounded-full bg-white/10" />}>
+                <HeaderAccount />
+              </Suspense>
             </nav>
           </div>
+          <OfflineBanner />
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:py-10">{children}</main>
         <footer className="mt-8 border-t border-line bg-navy text-white">

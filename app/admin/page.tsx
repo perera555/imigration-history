@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { requireAuth } from "@/lib/session";
+import { requireAdmin } from "@/lib/session";
 import type { Metadata } from "next";
 import { listProfiles } from "@/lib/data";
 import { deleteProfile, logout } from "@/lib/actions";
@@ -22,13 +22,10 @@ export default function AdminPage() {
             How to use
           </Link>
           <Link href="/admin/admins" className="btn btn-ghost">
-            Manage admins
+            Admins & users
           </Link>
-          <Link href="/admin/import" className="btn btn-gold">
-            ⬆ Import from document
-          </Link>
-          <Link href="/admin/profiles/new" className="btn btn-primary">
-            + New profile
+          <Link href="/admin/import" className="btn btn-primary">
+            + New travel record
           </Link>
           <form action={logout}>
             <button className="btn btn-danger">Sign out</button>
@@ -43,7 +40,7 @@ export default function AdminPage() {
 }
 
 async function ProfileTable() {
-  await requireAuth();
+  await requireAdmin();
   const profiles = await listProfiles();
   if (!profiles.length) {
     return <div className="panel p-10 text-center text-ink-soft">No profiles yet — create one to get started.</div>;

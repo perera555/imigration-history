@@ -29,9 +29,9 @@ const FEATURES = [
 ];
 
 const STEPS = [
-  { n: "01", title: "Admin adds travellers", body: "Create a profile for each person and upload their photo." },
-  { n: "02", title: "Record every trip", body: "Pick the country from the flag list and enter dates and purpose." },
-  { n: "03", title: "View & download", body: "Open the record and download the PDF in one tap." },
+  { n: "01", title: "Create your account", body: "Sign up with your name, email and a password." },
+  { n: "02", title: "Add your travel data", body: "Fill in your travel card, then each country and its visits, or upload a document." },
+  { n: "03", title: "View & download", body: "See your record and download the PDF in one tap." },
 ];
 
 export default function LandingPage() {
@@ -51,11 +51,11 @@ export default function LandingPage() {
             professional PDF for visa and immigration applications in seconds.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/records" className="btn btn-primary !px-6 !py-3 text-base">
-              View records →
+            <Link href="/register" className="btn btn-gold !px-6 !py-3 text-base">
+              Create account →
             </Link>
-            <Link href="/admin" className="btn btn-ghost !px-6 !py-3 text-base">
-              Admin panel
+            <Link href="/login" className="btn btn-ghost !px-6 !py-3 text-base">
+              Sign in
             </Link>
           </div>
           <div className="mt-10 flex items-center gap-3">
@@ -151,8 +151,8 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
-          <Link href="/records" className="btn btn-gold mt-10 !px-6 !py-3">
-            Open the records →
+          <Link href="/register" className="btn btn-gold mt-10 !px-6 !py-3">
+            Create account →
           </Link>
         </div>
       </section>

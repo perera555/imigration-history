@@ -3,8 +3,20 @@
 import { useId, useMemo, useRef, useState } from "react";
 import { COUNTRIES, countryName, flagSvg } from "@/lib/countries";
 
-export function CountrySelect({ name, defaultValue }: { name: string; defaultValue?: string }) {
-  const [value, setValue] = useState(defaultValue ?? "");
+export function CountrySelect({
+  name,
+  defaultValue,
+  onChange,
+}: {
+  name: string;
+  defaultValue?: string;
+  onChange?: (code: string) => void;
+}) {
+  const [value, setValueState] = useState(defaultValue ?? "");
+  const setValue = (code: string) => {
+    setValueState(code);
+    onChange?.(code);
+  };
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);

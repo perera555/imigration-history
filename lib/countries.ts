@@ -6,6 +6,7 @@ isoCountries.registerLocale(en);
 // Friendlier names for the handful of countries whose ISO names are long or formal.
 const NAME_OVERRIDES: Record<string, string> = {
   US: "United States",
+  CN: "China",
   GB: "United Kingdom",
   AE: "United Arab Emirates",
   KR: "South Korea",

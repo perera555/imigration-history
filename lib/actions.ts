@@ -6,7 +6,14 @@ import { refresh } from "next/cache";
 import { ensureFirstAdmin, getDb } from "./db";
 import { isUuid } from "./data";
 import { isCountryCode } from "./countries";
-import { createSession, deleteSession, requireAuth } from "./session";
+import {
+  canAccessProfile,
+  createSession,
+  deleteSession,
+  requireAdmin,
+  requireAuth,
+  requireProfileAccess,
+} from "./session";
 import { hashPassword, newResetToken, sha256, validatePassword, verifyPassword } from "./password";
 import { sendEmail } from "./email";
 
@@ -27,7 +34,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DUMMY_HASH =
   "scrypt$00000000000000000000000000000000$" + "0".repeat(128);
 
-type AdminRow = { id: string; email: string; passwordHash: string };
+type AdminRow = { id: string; email: string; passwordHash: string; role: string };
 
 export async function login(_: FormState, form: FormData): Promise<FormState> {
   const email = String(form.get("email") ?? "").trim().toLowerCase();
@@ -35,13 +42,60 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
   if (!email || !password) return { error: "Enter your email and password." };
 
   const sql = await getDb();
-  await ensureFirstAdmin(sql); // recreates the owner account if the admins table is empty
-  const [admin] = await sql<AdminRow[]>`select id, email, password_hash from admins where email = ${email}`;
+  await ensureFirstAdmin(sql); // recreates the owner account if no admin exists
+  const [admin] = await sql<AdminRow[]>`select id, email, password_hash, role from admins where email = ${email}`;
   const ok = await verifyPassword(password, admin?.passwordHash ?? DUMMY_HASH);
   if (!admin || !ok) return { error: "Incorrect email or password." };
+  if (form.get("mode") === "admin" && admin.role !== "admin") {
+    return { error: "This is not an admin account. Use My account → Sign in instead." };
+  }
 
   await createSession({ adminId: admin.id, email: admin.email }, form.get("remember") === "on");
-  redirect("/admin");
+  redirect(admin.role === "admin" ? "/admin" : "/account");
+}
+
+/** Public sign-up: creates a user account plus their own empty travel record. */
+export async function register(_: FormState, form: FormData): Promise<FormState> {
+  const name = text(form, "name", 160);
+  const email = String(form.get("email") ?? "").trim().toLowerCase();
+  const password = String(form.get("password") ?? "");
+  const confirmPassword = String(form.get("confirmPassword") ?? "");
+  if (!name) return { error: "Enter your full name." };
+  if (!EMAIL_RE.test(email)) return { error: "Enter a valid email address." };
+  const problem = validatePassword(password);
+  if (problem) return { error: problem };
+  if (password !== confirmPassword) return { error: "Passwords do not match." };
+
+  const sql = await getDb();
+  const passwordHash = await hashPassword(password);
+  const accountId = await sql.begin(async (tx) => {
+    const exists = await tx`select 1 from admins where email = ${email}`;
+    if (exists.length) return null;
+    const [profile] = await tx<{ id: string }[]>`
+      insert into profiles (full_name, email) values (${name}, ${email}) returning id`;
+    const [account] = await tx<{ id: string }[]>`
+      insert into admins (email, name, password_hash, role, profile_id)
+      values (${email}, ${name}, ${passwordHash}, 'user', ${profile.id}) returning id`;
+    return account.id;
+  });
+  if (!accountId) return { error: "An account with that email already exists. Sign in instead." };
+
+  await createSession({ adminId: accountId, email }, true);
+  redirect("/account?welcome=1");
+}
+
+/** Change the signed-in account's own password. */
+export async function changeOwnPassword(_: FormState, form: FormData): Promise<FormState> {
+  const session = await requireAuth();
+  const current = String(form.get("currentPassword") ?? "");
+  const password = String(form.get("password") ?? "");
+  const problem = validatePassword(password);
+  if (problem) return { error: problem };
+  const sql = await getDb();
+  const [row] = await sql<{ passwordHash: string }[]>`select password_hash from admins where id = ${session.adminId}`;
+  if (!row || !(await verifyPassword(current, row.passwordHash))) return { error: "Current password is incorrect." };
+  await sql`update admins set password_hash = ${await hashPassword(password)} where id = ${session.adminId}`;
+  return { ok: "Password changed." };
 }
 
 export async function logout() {
@@ -52,7 +106,7 @@ export async function logout() {
 export async function forgotPassword(_: FormState, form: FormData): Promise<FormState> {
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   if (!EMAIL_RE.test(email)) return { error: "Enter a valid email address." };
-  const generic = { ok: "If that email belongs to an admin, a reset link has been sent. It expires in 1 hour." };
+  const generic = { ok: "If that email has an account, a reset link has been sent. It expires in 1 hour." };
 
   const sql = await getDb();
   const [admin] = await sql<{ id: string }[]>`select id from admins where email = ${email}`;
@@ -75,7 +129,7 @@ export async function forgotPassword(_: FormState, form: FormData): Promise<Form
     "Reset your Immigration History password",
     `<div style="font-family:system-ui,sans-serif;max-width:480px">
       <h2 style="color:#0b1f3a">Reset your password</h2>
-      <p>Someone asked to reset the password for your Immigration History admin account.</p>
+      <p>Someone asked to reset the password for your Immigration History account.</p>
       <p><a href="${link}" style="display:inline-block;background:#0b1f3a;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none">Choose a new password</a></p>
       <p style="color:#666;font-size:13px">This link expires in 1 hour. If you didn't ask for this, ignore this email.</p>
     </div>`,
@@ -84,7 +138,7 @@ export async function forgotPassword(_: FormState, form: FormData): Promise<Form
     if (process.env.NODE_ENV !== "production") console.log(`[dev] Password reset link for ${email}: ${link}`);
     return {
       error:
-        "Email sending is not set up on this server (RESEND_API_KEY missing). Ask another admin to reset your password from the admin panel.",
+        "Email sending is not set up on this server (RESEND_API_KEY missing). Ask an admin to reset your password from the admin panel.",
     };
   }
   return generic;
@@ -112,7 +166,7 @@ export async function resetPassword(token: string, _: FormState, form: FormData)
 // ---------------- admins ----------------
 
 export async function addAdmin(_: FormState, form: FormData): Promise<FormState> {
-  await requireAuth();
+  await requireAdmin();
   const name = text(form, "name", 100) ?? "";
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const password = String(form.get("password") ?? "");
@@ -122,16 +176,16 @@ export async function addAdmin(_: FormState, form: FormData): Promise<FormState>
 
   const sql = await getDb();
   const rows = await sql`
-    insert into admins (email, name, password_hash)
-    values (${email}, ${name}, ${await hashPassword(password)})
+    insert into admins (email, name, password_hash, role)
+    values (${email}, ${name}, ${await hashPassword(password)}, 'admin')
     on conflict (email) do nothing returning id`;
-  if (!rows.length) return { error: "An admin with that email already exists." };
+  if (!rows.length) return { error: "An account with that email already exists." };
   refresh();
   return { ok: `Admin ${email} added.` };
 }
 
 export async function setAdminPassword(adminId: string, _: FormState, form: FormData): Promise<FormState> {
-  await requireAuth();
+  await requireAdmin();
   if (!isUuid(adminId)) return { error: "Unknown admin." };
   const password = String(form.get("password") ?? "");
   const problem = validatePassword(password);
@@ -143,13 +197,16 @@ export async function setAdminPassword(adminId: string, _: FormState, form: Form
 }
 
 export async function deleteAdmin(adminId: string) {
-  const session = await requireAuth();
+  const session = await requireAdmin();
   if (!isUuid(adminId) || adminId === session.adminId) return; // can't remove yourself
   const sql = await getDb();
   await sql.begin(async (tx) => {
     await tx`select pg_advisory_xact_lock(724520)`;
-    const [{ count }] = await tx<{ count: number }[]>`select count(*)::int as count from admins`;
-    if (count > 1) await tx`delete from admins where id = ${adminId}`;
+    const [target] = await tx<{ role: string }[]>`select role from admins where id = ${adminId}`;
+    if (!target) return;
+    const [{ count }] = await tx<{ count: number }[]>`select count(*)::int as count from admins where role = 'admin'`;
+    // Users can always be removed; an admin only while another admin remains.
+    if (target.role !== "admin" || count > 1) await tx`delete from admins where id = ${adminId}`;
   });
   refresh();
 }
@@ -194,7 +251,7 @@ function readProfile(form: FormData) {
 }
 
 export async function createProfile(_: FormState, form: FormData): Promise<FormState> {
-  await requireAuth();
+  await requireAdmin();
   const parsed = readProfile(form);
   if ("error" in parsed) return { error: parsed.error };
   const sql = await getDb();
@@ -203,18 +260,35 @@ export async function createProfile(_: FormState, form: FormData): Promise<FormS
 }
 
 export async function updateProfile(id: string, _: FormState, form: FormData): Promise<FormState> {
-  await requireAuth();
   if (!isUuid(id)) return { error: "Unknown profile." };
+  const session = await requireProfileAccess(id);
   const parsed = readProfile(form);
   if ("error" in parsed) return { error: parsed.error };
   const sql = await getDb();
-  await sql`update profiles set ${sql(parsed.values)}, updated_at = now() where id = ${id}`;
+  let values: Record<string, unknown> = parsed.values;
+  if (session.role !== "admin") {
+    // Users may only fill in empty fields (and add passports); changing saved data is admin-only.
+    const [existing] = await sql<Record<string, unknown>[]>`select * from profiles where id = ${id}`;
+    if (!existing) return { error: "Unknown profile." };
+    values = {};
+    for (const [key, value] of Object.entries(parsed.values)) {
+      const current = existing[key];
+      if (key === "previousPassports") {
+        const merged = [...new Set([...((current as string[]) ?? []), ...(value as string[])])].slice(0, MAX_PREVIOUS_PASSPORTS);
+        values[key] = merged;
+      } else if (current == null || current === "") {
+        if (value != null && value !== "") values[key] = value;
+      }
+    }
+    if (!Object.keys(values).length) return { ok: "Nothing new to save. Ask an admin to change saved details." };
+  }
+  await sql`update profiles set ${sql(values)}, updated_at = now() where id = ${id}`;
   refresh();
   return { ok: "Profile saved." };
 }
 
 export async function deleteProfile(id: string) {
-  await requireAuth();
+  await requireAdmin();
   if (!isUuid(id)) return;
   const sql = await getDb();
   await sql`delete from profiles where id = ${id}`;
@@ -249,8 +323,8 @@ function readTrip(form: FormData) {
 }
 
 export async function addTrip(profileId: string, _: FormState, form: FormData): Promise<FormState> {
-  await requireAuth();
   if (!isUuid(profileId)) return { error: "Unknown profile." };
+  await requireProfileAccess(profileId);
   const parsed = readTrip(form);
   if ("error" in parsed) return { error: parsed.error };
   const sql = await getDb();
@@ -260,14 +334,17 @@ export async function addTrip(profileId: string, _: FormState, form: FormData): 
 }
 
 export async function updateTrip(tripId: string, _: FormState, form: FormData): Promise<FormState> {
-  await requireAuth();
+  const session = await requireAdmin(); // editing saved trips is admin-only
   if (!isUuid(tripId)) return { error: "Unknown trip." };
   const parsed = readTrip(form);
   if ("error" in parsed) return { error: parsed.error };
   const sql = await getDb();
+  const [owner] = await sql<{ profileId: string }[]>`select profile_id from trips where id = ${tripId}`;
+  if (!owner || !canAccessProfile(session, owner.profileId)) return { error: "Trip not found." };
   const [row] = await sql<{ profileId: string }[]>`
     update trips set ${sql(parsed.values)} where id = ${tripId} returning profile_id`;
   if (!row) return { error: "Trip not found." };
+  await sql`update profiles set updated_at = now() where id = ${row.profileId}`;
   redirect(`/admin/profiles/${row.profileId}#trips`);
 }
 
@@ -292,6 +369,7 @@ export type ImportProfile = {
   email: string | null;
   passportNumber: string | null;
   previousPassports: string[];
+  photo?: string | null;
 };
 export type ExtractState =
   | { error: string }
@@ -348,7 +426,10 @@ export async function saveImport(
   target: string,
   payload: { profile: ImportProfile; trips: ImportTrip[] },
 ): Promise<{ error: string } | { profileId: string }> {
-  await requireAuth();
+  const session = await requireAuth();
+  if (session.role !== "admin" && (target === "new" || target !== session.profileId)) {
+    return { error: "You can only import into your own record." };
+  }
   const trips = [];
   for (const trip of payload.trips.slice(0, 500)) {
     const cleaned = cleanTrip(trip);
@@ -372,6 +453,10 @@ export async function saveImport(
       .map((x) => String(x).trim().toUpperCase().slice(0, 30))
       .filter(Boolean)
       .slice(0, MAX_PREVIOUS_PASSPORTS),
+    photo:
+      typeof p.photo === "string" && p.photo.startsWith("data:image/") && p.photo.length <= MAX_PHOTO_CHARS
+        ? p.photo
+        : null,
   };
 
   const sql = await getDb();
@@ -403,9 +488,12 @@ export async function saveImport(
 }
 
 export async function deleteTrip(tripId: string) {
-  await requireAuth();
+  const session = await requireAdmin(); // deleting trips is admin-only
   if (!isUuid(tripId)) return;
   const sql = await getDb();
-  await sql`delete from trips where id = ${tripId}`;
+  const [owner] = await sql<{ profileId: string }[]>`select profile_id from trips where id = ${tripId}`;
+  if (!owner || !canAccessProfile(session, owner.profileId)) return;
+  const [row] = await sql<{ profileId: string }[]>`delete from trips where id = ${tripId} returning profile_id`;
+  if (row) await sql`update profiles set updated_at = now() where id = ${row.profileId}`;
   refresh();
 }

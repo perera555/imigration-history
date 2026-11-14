@@ -16,6 +16,10 @@ export type Profile = {
   photo: string | null;
   createdAt: Date;
   updatedAt: Date;
+  /** Issue date of the record (YYYY-MM-DD). */
+  issuedOn: string;
+  /** Latest change to the profile or any of its trips (YYYY-MM-DD). */
+  lastUpdated: string;
 };
 
 export type Trip = {
@@ -33,7 +37,13 @@ export type Trip = {
 export type ProfileSummary = Pick<
   Profile,
   "id" | "fullName" | "photo" | "passportNumber" | "nationality"
-> & { tripCount: number; countryCount: number; lastTrip: string | null };
+> & {
+  tripCount: number;
+  countryCount: number;
+  firstTrip: string | null;
+  lastTrip: string | null;
+  lastUpdated: string;
+};
 
 export type CountryGroup = {
   countryCode: string;
@@ -50,7 +60,9 @@ export async function listProfiles(): Promise<ProfileSummary[]> {
     select p.id, p.full_name, p.photo, p.passport_number, p.nationality,
            count(t.id)::int as trip_count,
            count(distinct t.country_code)::int as country_count,
-           max(t.departure_date)::text as last_trip
+           min(t.departure_date)::text as first_trip,
+           max(t.departure_date)::text as last_trip,
+           greatest(p.updated_at, max(t.created_at))::date::text as last_updated
     from profiles p
     left join trips t on t.profile_id = p.id
     group by p.id
@@ -60,7 +72,12 @@ export async function listProfiles(): Promise<ProfileSummary[]> {
 export async function getProfile(id: string): Promise<Profile | null> {
   if (!isUuid(id)) return null;
   const sql = await getDb();
-  const rows = await sql<Profile[]>`select * from profiles where id = ${id}`;
+  const rows = await sql<Profile[]>`
+    select p.*,
+           p.created_at::date::text as issued_on,
+           greatest(p.updated_at, (select max(t.created_at) from trips t where t.profile_id = p.id))::date::text
+             as last_updated
+    from profiles p where p.id = ${id}`;
   return rows[0] ?? null;
 }
 
@@ -163,6 +180,11 @@ export function ageFrom(dateOfBirth: string | null, today = new Date()): number 
   let age = today.getFullYear() - y;
   if (today.getMonth() + 1 < m || (today.getMonth() + 1 === m && today.getDate() < d)) age--;
   return age >= 0 ? age : null;
+}
+
+/** Short, stable record number derived from the profile id, e.g. "IH-353DFA0D". */
+export function recordNumber(id: string): string {
+  return `IH-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 }
 
 export function formatDate(value: string | null): string {

@@ -3,8 +3,20 @@
 import { useState } from "react";
 
 /** Picks an image, resizes it in the browser to ≤600px JPEG, and submits it as a data URL. */
-export function PhotoInput({ name, defaultValue }: { name: string; defaultValue?: string | null }) {
-  const [photo, setPhoto] = useState(defaultValue ?? "");
+export function PhotoInput({
+  name,
+  defaultValue,
+  onChange,
+}: {
+  name: string;
+  defaultValue?: string | null;
+  onChange?: (dataUrl: string) => void;
+}) {
+  const [photo, setPhotoState] = useState(defaultValue ?? "");
+  const setPhoto = (value: string) => {
+    setPhotoState(value);
+    onChange?.(value);
+  };
   const [error, setError] = useState("");
 
   async function onFile(file: File | undefined) {

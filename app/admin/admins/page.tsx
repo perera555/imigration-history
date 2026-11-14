@@ -2,12 +2,12 @@ import { Suspense } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getDb } from "@/lib/db";
-import { requireAuth } from "@/lib/session";
+import { requireAdmin } from "@/lib/session";
 import { deleteAdmin, setAdminPassword } from "@/lib/actions";
 import { ConfirmButton } from "@/components/SubmitButton";
 import { AddAdminForm, PasswordForm } from "./forms";
 
-export const metadata: Metadata = { title: "Admins" };
+export const metadata: Metadata = { title: "Admins & users" };
 
 export default function AdminsPage() {
   return (
@@ -17,8 +17,8 @@ export default function AdminsPage() {
       </Link>
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Access</p>
-        <h1 className="mt-1 font-serif text-3xl font-bold text-navy">Admins</h1>
-        <p className="mt-1 text-ink-soft">Everyone listed here can sign in, view and edit all records.</p>
+        <h1 className="mt-1 font-serif text-3xl font-bold text-navy">Admins & users</h1>
+        <p className="mt-1 text-ink-soft">Admins manage every record. Users sign up themselves and manage only their own record.</p>
       </div>
       <Suspense fallback={<div className="panel h-48 animate-pulse" />}>
         <AdminList />
@@ -32,10 +32,10 @@ export default function AdminsPage() {
 }
 
 async function AdminList() {
-  const session = await requireAuth();
+  const session = await requireAdmin();
   const sql = await getDb();
-  const admins = await sql<{ id: string; email: string; name: string; createdAt: Date }[]>`
-    select id, email, name, created_at from admins order by created_at`;
+  const admins = await sql<{ id: string; email: string; name: string; role: string; profileId: string | null; createdAt: Date }[]>`
+    select id, email, name, role, profile_id, created_at from admins order by role, created_at`;
 
   return (
     <div className="panel divide-y divide-line">
@@ -49,13 +49,13 @@ async function AdminList() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="font-semibold">
-                  {a.name || "Admin"} {isMe && <span className="ml-1 rounded-full bg-gold/20 px-2 py-0.5 text-xs text-navy">You</span>}
+                  {a.name || "Account"}{" "}<span className={`ml-1 rounded-full px-2 py-0.5 text-xs ${a.role === "admin" ? "bg-navy text-gold-soft" : "bg-paper-2 text-ink-soft"}`}>{a.role === "admin" ? "Admin" : "User"}</span>{isMe && <span className="ml-1 rounded-full bg-gold/20 px-2 py-0.5 text-xs text-navy">You</span>}
                 </p>
                 <p className="truncate text-sm text-ink-soft">{a.email}</p>
               </div>
-              {!isMe && admins.length > 1 && (
+              {a.profileId && (<Link href={`/profiles/${a.profileId}`} className="btn btn-ghost py-1.5!">View record</Link>)}{!isMe && (a.role !== "admin" || admins.filter((x) => x.role === "admin").length > 1) && (
                 <form action={deleteAdmin.bind(null, a.id)}>
-                  <ConfirmButton message={`Remove ${a.email} as an admin?`} className="btn btn-danger py-1.5!">
+                  <ConfirmButton message={`Remove the account ${a.email}? (Their travel record is kept.)`} className="btn btn-danger py-1.5!">
                     Remove
                   </ConfirmButton>
                 </form>
@@ -63,7 +63,7 @@ async function AdminList() {
             </div>
             <details className="group rounded-xl bg-paper/60 px-4 py-2 text-sm">
               <summary className="cursor-pointer font-medium text-navy-2">
-                {isMe ? "Change my password" : "Reset this admin's password"}
+                {isMe ? "Change my password" : "Reset this account's password"}
               </summary>
               <div className="pt-3">
                 <PasswordForm action={setAdminPassword.bind(null, a.id)} />

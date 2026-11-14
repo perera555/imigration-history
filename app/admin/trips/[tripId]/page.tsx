@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireAuth } from "@/lib/session";
+import { requireAdmin } from "@/lib/session";
 import { getProfile, getTrip } from "@/lib/data";
 import { updateTrip } from "@/lib/actions";
 import { TripForm } from "@/components/TripForm";
@@ -15,10 +15,10 @@ export default function EditTripPage({ params }: PageProps<"/admin/trips/[tripId
 }
 
 async function EditTrip({ params }: { params: PageProps<"/admin/trips/[tripId]">["params"] }) {
-  await requireAuth();
   const { tripId } = await params;
   const trip = await getTrip(tripId);
   if (!trip) notFound();
+  await requireAdmin();
   const profile = await getProfile(trip.profileId);
   const passports = profile
     ? [profile.passportNumber, ...profile.previousPassports].filter((p): p is string => !!p)

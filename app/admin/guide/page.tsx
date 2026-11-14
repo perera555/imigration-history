@@ -60,7 +60,8 @@ const ADMIN_STEPS: Step[] = [
     title: "Open the admin panel",
     body: (
       <>
-        Scroll to the bottom of any page and tap <b>Admin panel</b>, then sign in with your admin email and
+        Tap <b>+ Add travel data</b> on the home page, <b>+ Add trip / edit details</b> on a traveller&apos;s
+        page, or <b>Admin panel</b> at the bottom of any page, then sign in with your admin email and
         password. Use <b>Sign out</b> in the admin panel when you finish. From here you can create, edit and delete
         traveller profiles and their trips.
       </>
