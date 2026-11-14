@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { listProfiles } from "@/lib/data";
 import { deleteProfile, logout } from "@/lib/actions";
 import { ConfirmButton } from "@/components/SubmitButton";
+import { UpdateButton } from "@/components/UpdateButton";
 
 export const metadata: Metadata = { title: "Admin" };
 
@@ -69,9 +70,10 @@ async function ProfileTable() {
             <a href={`/api/profiles/${p.id}/pdf?view=1`} target="_blank" rel="noopener" className="btn btn-ghost">
               View PDF
             </a>
-            <Link href={`/admin/profiles/${p.id}`} className="btn btn-primary">
-              Edit
+            <Link href={`/admin/profiles/${p.id}`} className="btn btn-ghost">
+              Open
             </Link>
+            <UpdateButton profileId={p.id} />
             <form action={deleteProfile.bind(null, p.id)}>
               <ConfirmButton message={`Delete ${p.fullName} and all trips? This cannot be undone.`}>Delete</ConfirmButton>
             </form>

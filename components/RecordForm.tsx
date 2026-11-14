@@ -2,14 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { saveImport, type ImportProfile, type ImportTrip } from "@/lib/actions";
+import { saveImport, updateRecord, type ImportProfile, type ImportTrip } from "@/lib/actions";
 import { CountrySelect } from "./CountrySelect";
 import { PhotoInput } from "./PhotoInput";
 import { Flag } from "./Flag";
 import { EMPTY_PROFILE } from "@/lib/record";
 import { NationalitySelect } from "./NationalitySelect";
 
-type Visit = { key: number; departureDate: string; returnDate: string; purpose: string; passportNumber: string; notes: string };
+type Visit = { key: number; id?: string | null; departureDate: string; returnDate: string; purpose: string; passportNumber: string; notes: string };
 type CountryBlock = { key: number; countryCode: string; city: string; visits: Visit[] };
 
 // Rows added by the user get keys from this counter (client-only, after hydration).
@@ -35,6 +35,7 @@ function toBlocks(trips: ImportTrip[]): CountryBlock[] {
     }
     block.visits.push({
       key: key(),
+      id: t.id ?? null,
       departureDate: t.departureDate ?? "",
       returnDate: t.returnDate ?? "",
       purpose: t.purpose ?? "",
@@ -69,7 +70,12 @@ export function RecordForm({
   showProfile = true,
   saveLabel = "Save record",
   stayOnPage = false,
+  updateId,
+  afterUpdateHref,
 }: {
+  /** Update mode: replace this record (card + all visits) with the form contents. */
+  updateId?: string;
+  afterUpdateHref?: string;
   /** Clear the form and refresh in place after saving (used on an existing record's page). */
   stayOnPage?: boolean;
   /** "new" to create a traveller, or an existing profile id */
@@ -112,6 +118,7 @@ export function RecordForm({
         if (!b.countryCode) return setError("Choose a country for every section that has visits.");
         if (!v.departureDate) return setError("Every visit needs a departure date.");
         trips.push({
+          id: v.id ?? null,
           countryCode: b.countryCode,
           city: b.city || null,
           departureDate: v.departureDate,
@@ -124,9 +131,14 @@ export function RecordForm({
     }
     if (saveTo === "new" && !profile.fullName?.trim()) return setError("Full name is required.");
     startSaving(async () => {
-      const result = await saveImport(saveTo, { profile, trips });
+      const result = updateId
+        ? await updateRecord(updateId, { profile, trips })
+        : await saveImport(saveTo, { profile, trips });
       if ("error" in result) setError(result.error);
-      else if (stayOnPage) {
+      else if (updateId) {
+        router.push(afterUpdateHref ?? `/profiles/${result.profileId}`);
+        router.refresh();
+      } else if (stayOnPage) {
         setBlocks([emptyCountry()]);
         setSaved(`✓ Saved ${trips.length} visit${trips.length === 1 ? "" : "s"}.`);
         router.refresh();
@@ -157,7 +169,7 @@ export function RecordForm({
         <section className="panel p-6 sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Travel card</p>
           <h2 className="mt-1 font-serif text-2xl font-bold text-navy">Personal details</h2>
-          {saveTo !== "new" && (
+          {saveTo !== "new" && !updateId && (
             <p className="mt-1 text-sm text-ink-soft">Only empty fields of the existing record will be filled.</p>
           )}
           <div className="mt-6 grid gap-6 lg:grid-cols-[auto_1fr]">

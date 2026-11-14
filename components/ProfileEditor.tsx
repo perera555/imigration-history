@@ -12,12 +12,12 @@ import { ConfirmButton } from "./SubmitButton";
 export function ProfileEditor({
   profile,
   trips,
-  isAdmin = true,
+  canDelete = true,
 }: {
   profile: Profile;
   trips: Trip[];
-  /** Users can add data but only admins can update or delete it. */
-  isAdmin?: boolean;
+  /** Users and admins can add and update; only admins can delete. */
+  canDelete?: boolean;
 }) {
   const newestFirst = [...trips].reverse();
 
@@ -26,7 +26,7 @@ export function ProfileEditor({
       <section className="panel p-6 sm:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Step 1</p>
         <h2 className="mb-6 mt-1 font-serif text-2xl font-bold text-navy">Travel card details</h2>
-        <ProfileForm action={updateProfile.bind(null, profile.id)} profile={profile} submitLabel="Save details" lockFilled={!isAdmin} />
+        <ProfileForm action={updateProfile.bind(null, profile.id)} profile={profile} submitLabel="Save details" />
       </section>
 
       <section id="trips" className="space-y-4">
@@ -71,17 +71,15 @@ export function ProfileEditor({
                   {trip.passportNumber && <span className="font-mono"> · {trip.passportNumber}</span>}
                 </p>
               </div>
-              {isAdmin && (
-                <>
-                  <Link href={`/admin/trips/${trip.id}`} className="btn btn-ghost !py-1.5">
-                    Edit
-                  </Link>
-                  <form action={deleteTrip.bind(null, trip.id)}>
-                    <ConfirmButton message="Delete this trip?" className="btn btn-danger !py-1.5">
-                      Delete
-                    </ConfirmButton>
-                  </form>
-                </>
+              <Link href={`/admin/trips/${trip.id}`} className="btn btn-ghost !py-1.5">
+                Edit
+              </Link>
+              {canDelete && (
+                <form action={deleteTrip.bind(null, trip.id)}>
+                  <ConfirmButton message="Delete this trip?" className="btn btn-danger !py-1.5">
+                    Delete
+                  </ConfirmButton>
+                </form>
               )}
             </li>
           ))}

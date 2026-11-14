@@ -9,6 +9,7 @@ import { HistoryTable, StatsBar } from "@/components/HistoryTable";
 import { logout } from "@/lib/actions";
 import { ProfileEditor } from "@/components/ProfileEditor";
 import { PdfButtons } from "@/components/PdfButtons";
+import { UpdateButton } from "@/components/UpdateButton";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 
 export const metadata: Metadata = { title: "My account" };
@@ -43,6 +44,7 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
               <Link href={`/profiles/${profile.id}`} className="btn btn-ghost">
                 View my card
               </Link>
+              <UpdateButton profileId={profile.id} />
               <PdfButtons profileId={profile.id} />
             </>
           )}
@@ -65,7 +67,7 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
             <TravelCard profile={profile} />
             <StatsBar stats={travelStats(trips)} />
           </section>
-          <ProfileEditor profile={profile} trips={trips} isAdmin={false} />
+          <ProfileEditor profile={profile} trips={trips} canDelete={false} />
           <section className="space-y-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">My immigration record</p>

@@ -271,27 +271,11 @@ export async function createProfile(_: FormState, form: FormData): Promise<FormS
 
 export async function updateProfile(id: string, _: FormState, form: FormData): Promise<FormState> {
   if (!isUuid(id)) return { error: "Unknown profile." };
-  const session = await requireProfileAccess(id);
+  await requireProfileAccess(id);
   const parsed = readProfile(form);
   if ("error" in parsed) return { error: parsed.error };
   const sql = await getDb();
-  let values: Record<string, unknown> = parsed.values;
-  if (session.role !== "admin") {
-    // Users may only fill in empty fields (and add passports); changing saved data is admin-only.
-    const [existing] = await sql<Record<string, unknown>[]>`select * from profiles where id = ${id}`;
-    if (!existing) return { error: "Unknown profile." };
-    values = {};
-    for (const [key, value] of Object.entries(parsed.values)) {
-      const current = existing[key];
-      if (key === "previousPassports") {
-        const merged = [...new Set([...((current as string[]) ?? []), ...(value as string[])])].slice(0, MAX_PREVIOUS_PASSPORTS);
-        values[key] = merged;
-      } else if (current == null || current === "") {
-        if (value != null && value !== "") values[key] = value;
-      }
-    }
-    if (!Object.keys(values).length) return { ok: "Nothing new to save. Ask an admin to change saved details." };
-  }
+  const values = parsed.values;
   await sql`update profiles set ${sql(values)}, updated_at = now() where id = ${id}`;
   refresh();
   return { ok: "Profile saved." };
@@ -344,7 +328,7 @@ export async function addTrip(profileId: string, _: FormState, form: FormData): 
 }
 
 export async function updateTrip(tripId: string, _: FormState, form: FormData): Promise<FormState> {
-  const session = await requireAdmin(); // editing saved trips is admin-only
+  const session = await requireAuth(); // users: own record only (checked below)
   if (!isUuid(tripId)) return { error: "Unknown trip." };
   const parsed = readTrip(form);
   if ("error" in parsed) return { error: parsed.error };
@@ -361,6 +345,8 @@ export async function updateTrip(tripId: string, _: FormState, form: FormData): 
 // ---------------- import from document ----------------
 
 export type ImportTrip = {
+  /** Existing trip id when editing (Update form); absent for new visits. */
+  id?: string | null;
   countryCode: string;
   city: string | null;
   departureDate: string;
@@ -452,26 +438,11 @@ function cleanTrip(t: ImportTrip): { error: string } | { values: ImportTrip } {
   };
 }
 
-/** Saves reviewed data: creates a new profile (target "new") or fills an existing one, then adds the trips. */
-export async function saveImport(
-  target: string,
-  payload: { profile: ImportProfile; trips: ImportTrip[] },
-): Promise<{ error: string } | { profileId: string }> {
-  const session = await requireAuth();
-  if (session.role !== "admin" && (target === "new" || target !== session.profileId)) {
-    return { error: "You can only import into your own record." };
-  }
-  const trips = [];
-  for (const trip of payload.trips.slice(0, 500)) {
-    const cleaned = cleanTrip(trip);
-    if ("error" in cleaned) return { error: cleaned.error };
-    trips.push(cleaned.values);
-  }
-  const p = payload.profile;
+function profileValuesFrom(p: ImportProfile) {
   const s = (v: unknown, max: number) => (v ? String(v).trim().slice(0, max) || null : null);
   const dob = s(p.dateOfBirth, 10);
   const email = s(p.email, 200);
-  const profileValues = {
+  return {
     fullName: s(p.fullName, 160),
     dateOfBirth: dob && isDate(dob) ? dob : null,
     sex: s(p.sex, 20),
@@ -492,6 +463,62 @@ export async function saveImport(
         ? p.photo
         : null,
   };
+}
+
+/**
+ * Update button: replaces the whole record with the edited form (card details + every visit).
+ * Visits keep their id when edited; visits removed from the form are deleted. Users: own record only.
+ */
+export async function updateRecord(
+  profileId: string,
+  payload: { profile: ImportProfile; trips: ImportTrip[] },
+): Promise<{ error: string } | { profileId: string }> {
+  if (!isUuid(profileId)) return { error: "Unknown record." };
+  await requireProfileAccess(profileId);
+  const values = profileValuesFrom(payload.profile);
+  if (!values.fullName) return { error: "Full name is required." };
+  if (values.passportIssueDate && values.passportExpiryDate && values.passportExpiryDate <= values.passportIssueDate) {
+    return { error: "Passport expiry date must be after the issue date." };
+  }
+  const trips: (ImportTrip & { id: string | null })[] = [];
+  for (const trip of payload.trips.slice(0, 500)) {
+    const cleaned = cleanTrip(trip);
+    if ("error" in cleaned) return { error: cleaned.error };
+    trips.push({ ...cleaned.values, id: trip.id && isUuid(trip.id) ? trip.id : null });
+  }
+
+  const sql = await getDb();
+  await sql.begin(async (tx) => {
+    await tx`update profiles set ${tx({ ...values, fullName: values.fullName! })}, updated_at = now() where id = ${profileId}`;
+    const existing = new Set((await tx<{ id: string }[]>`select id from trips where profile_id = ${profileId}`).map((r) => r.id));
+    const keep = trips.filter((t) => t.id && existing.has(t.id)).map((t) => t.id!);
+    if (keep.length) await tx`delete from trips where profile_id = ${profileId} and id not in ${tx(keep)}`;
+    else await tx`delete from trips where profile_id = ${profileId}`;
+    for (const { id, ...t } of trips) {
+      if (id && existing.has(id)) await tx`update trips set ${tx(t)} where id = ${id} and profile_id = ${profileId}`;
+      else await tx`insert into trips ${tx({ ...t, profileId })}`;
+    }
+  });
+  refresh();
+  return { profileId };
+}
+
+/** Saves reviewed data: creates a new profile (target "new") or fills an existing one, then adds the trips. */
+export async function saveImport(
+  target: string,
+  payload: { profile: ImportProfile; trips: ImportTrip[] },
+): Promise<{ error: string } | { profileId: string }> {
+  const session = await requireAuth();
+  if (session.role !== "admin" && (target === "new" || target !== session.profileId)) {
+    return { error: "You can only import into your own record." };
+  }
+  const trips = [];
+  for (const trip of payload.trips.slice(0, 500)) {
+    const cleaned = cleanTrip(trip);
+    if ("error" in cleaned) return { error: cleaned.error };
+    trips.push(cleaned.values);
+  }
+  const profileValues = profileValuesFrom(payload.profile);
 
   const sql = await getDb();
   let profileId = target;

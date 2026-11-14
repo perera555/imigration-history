@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PdfButtons } from "./PdfButtons";
+import { UpdateButton } from "./UpdateButton";
 import { travelStats, type Profile, type Trip } from "@/lib/data";
 import { TravelCard } from "./TravelCard";
 import { HistoryTable, StatsBar } from "./HistoryTable";
@@ -14,9 +15,7 @@ export function ProfileDetail({ profile, trips, showBack }: { profile: Profile; 
           </Link>
         )}
         <div className="ml-auto flex flex-wrap gap-2">
-          <Link href={`/admin/profiles/${profile.id}#trips`} className="btn btn-ghost">
-            + Add visits / edit details
-          </Link>
+          <UpdateButton profileId={profile.id} className="btn btn-ghost" />
           <PdfButtons profileId={profile.id} />
         </div>
       </div>
