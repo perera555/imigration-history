@@ -477,11 +477,13 @@ function profileValuesFrom(p: ImportProfile) {
 export async function updateRecord(
   profileId: string,
   payload: { profile: ImportProfile; trips: ImportTrip[] },
+  /** "card" saves only the travel card, "record" only the visits, "all" both. */
+  part: "card" | "record" | "all" = "all",
 ): Promise<{ error: string } | { profileId: string; skipped?: number }> {
   if (!isUuid(profileId)) return { error: "Unknown record." };
   await requireProfileAccess(profileId);
   const values = profileValuesFrom(payload.profile);
-  if (!values.fullName) return { error: "Full name is required." };
+  if (part !== "record" && !values.fullName) return { error: "Full name is required." };
   if (values.passportIssueDate && values.passportExpiryDate && values.passportExpiryDate <= values.passportIssueDate) {
     return { error: "Passport expiry date must be after the issue date." };
   }
@@ -502,7 +504,12 @@ export async function updateRecord(
 
   const sql = await getDb();
   await sql.begin(async (tx) => {
-    await tx`update profiles set ${tx({ ...values, fullName: values.fullName! })}, updated_at = now() where id = ${profileId}`;
+    if (part !== "record") {
+      await tx`update profiles set ${tx({ ...values, fullName: values.fullName! })}, updated_at = now() where id = ${profileId}`;
+    } else {
+      await tx`update profiles set updated_at = now() where id = ${profileId}`;
+    }
+    if (part === "card") return;
     const rows = await tx<{ id: string; countryCode: string; departureDate: string; returnDate: string | null }[]>`
       select id, trim(country_code) as country_code, departure_date, return_date from trips where profile_id = ${profileId}`;
     const existing = new Set(rows.map((r) => r.id));

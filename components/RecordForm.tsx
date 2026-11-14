@@ -159,6 +159,66 @@ export function RecordForm({
     });
   }
 
+  // Update mode: save the travel card and the immigration record separately.
+  const [partMsg, setPartMsg] = useState<{ card?: { ok?: string; error?: string }; record?: { ok?: string; error?: string } }>({});
+  const [partSaving, setPartSaving] = useState<"card" | "record" | null>(null);
+
+  async function savePart(part: "card" | "record") {
+    if (!updateId) return;
+    setPartMsg((m) => ({ ...m, [part]: undefined }));
+    const trips: ImportTrip[] = [];
+    if (part === "record") {
+      for (const b of blocks) {
+        for (const v of b.visits) {
+          const empty = !v.departureDate && !v.returnDate && !v.purpose && !v.passportNumber && !v.notes;
+          if (empty) continue;
+          if (!b.countryCode) return setPartMsg((m) => ({ ...m, record: { error: "Choose a country for every section that has visits." } }));
+          if (!v.departureDate) return setPartMsg((m) => ({ ...m, record: { error: "Every visit needs a departure date." } }));
+          trips.push({
+            id: v.id ?? null,
+            countryCode: b.countryCode,
+            city: b.city || null,
+            departureDate: v.departureDate,
+            returnDate: v.returnDate || null,
+            purpose: v.purpose,
+            passportNumber: v.passportNumber || null,
+            notes: v.notes || null,
+          });
+        }
+      }
+    } else if (!profile.fullName?.trim()) {
+      return setPartMsg((m) => ({ ...m, card: { error: "Full name is required." } }));
+    }
+    setPartSaving(part);
+    try {
+      const result = await updateRecord(updateId, { profile, trips }, part);
+      if ("error" in result) {
+        setPartMsg((m) => ({ ...m, [part]: { error: result.error } }));
+      } else {
+        const skipped = result.skipped ?? 0;
+        const ok =
+          part === "card"
+            ? "✓ Travel card saved to the database."
+            : `✓ Immigration record saved (${trips.length - skipped} visits).` +
+              (skipped ? ` ${skipped} duplicate row${skipped === 1 ? " was" : "s were"} merged.` : "");
+        setPartMsg((m) => ({ ...m, [part]: { ok } }));
+        router.refresh();
+      }
+    } finally {
+      setPartSaving(null);
+    }
+  }
+
+  const PartButton = ({ part, label }: { part: "card" | "record"; label: string }) => (
+    <div className="flex flex-wrap items-center gap-3 border-t border-line pt-5">
+      <button type="button" onClick={() => savePart(part)} disabled={partSaving !== null} className="btn btn-primary !px-6 !py-3">
+        {partSaving === part ? "Saving…" : label}
+      </button>
+      {partMsg[part]?.ok && <p className="text-sm font-medium text-ok">{partMsg[part]!.ok}</p>}
+      {partMsg[part]?.error && <p className="text-sm font-medium text-danger">{partMsg[part]!.error}</p>}
+    </div>
+  );
+
   const visitCount = blocks.reduce((n, b) => n + b.visits.filter((v) => v.departureDate).length, 0);
 
   return (
@@ -235,6 +295,11 @@ export function RecordForm({
               </label>
             </div>
           </div>
+          {updateId && (
+            <div className="mt-6">
+              <PartButton part="card" label="Save travel card" />
+            </div>
+          )}
         </section>
       )}
 
@@ -366,6 +431,11 @@ export function RecordForm({
             + Add country
           </button>
         </div>
+        {updateId && (
+          <div className="px-6 pb-6">
+            <PartButton part="record" label="Save immigration record" />
+          </div>
+        )}
       </section>
 
       <datalist id="purpose-options">
@@ -379,7 +449,7 @@ export function RecordForm({
         ))}
       </datalist>
 
-      <div className="sticky bottom-4 z-20 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-card/95 p-4 shadow-xl backdrop-blur">
+      <div className={`sticky bottom-4 z-20 flex-wrap items-center gap-3 rounded-2xl border border-line bg-card/95 p-4 shadow-xl backdrop-blur ${updateId ? "hidden" : "flex"}`}>
         <button type="button" onClick={save} disabled={saving} className="btn btn-primary !px-6 !py-3">
           {saving ? "Saving…" : saveLabel}
         </button>
