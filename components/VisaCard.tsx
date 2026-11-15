@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { countryName } from "@/lib/countries";
 import { formatDate, formatShortDate, visaState, type Profile, type Trip, type Visa } from "@/lib/data";
 import { Flag } from "./Flag";
@@ -131,6 +132,11 @@ export function VisaCard({
           ) : (
             <p className="mt-1 text-xs text-ink-soft">No recorded trips to {name} in this visa&apos;s dates.</p>
           )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/admin/profiles/${visa.profileId}/update#visa-${visa.id}`} className="btn btn-primary !py-1.5 text-xs">
+            ✏️ Update visa
+          </Link>
         </div>
         {canViewDocument && visa.hasDocument && (
           <div className="flex flex-wrap gap-2">

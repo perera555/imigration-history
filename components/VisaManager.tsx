@@ -65,7 +65,7 @@ export function VisaManager({
     return (
       <div className="space-y-6">
         {visas.map((v, i) => (
-          <div key={v.id} className="rounded-2xl border border-line bg-white p-5">
+          <div key={v.id} id={`visa-${v.id}`} className="rounded-2xl border border-line bg-white p-5 transition-shadow">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-gold">
               Visa {i + 1} of {visas.length} · update
             </p>

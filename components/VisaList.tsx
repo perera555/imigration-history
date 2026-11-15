@@ -1,4 +1,5 @@
 import { visaState, type Profile, type Trip, type Visa } from "@/lib/data";
+import Link from "next/link";
 import { VisaCard } from "./VisaCard";
 
 /** "Visas" section: totals and one visa card per visa, newest first. */
@@ -37,6 +38,9 @@ export function VisaList({
         </div>
         {profileId && visas.length > 0 && (
           <div className="ml-auto flex flex-wrap gap-2">
+            <Link href={`/admin/profiles/${profileId}/update#visas`} className="btn btn-primary">
+              ✏️ Update visas
+            </Link>
             <a href={`/api/profiles/${profileId}/pdf?only=visas&view=1`} target="_blank" rel="noopener" className="btn btn-ghost">
               View visas PDF
             </a>

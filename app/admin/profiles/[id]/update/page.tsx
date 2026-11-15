@@ -8,6 +8,7 @@ import { VisaManager } from "@/components/VisaManager";
 import { VisaList } from "@/components/VisaList";
 import { RecordForm } from "@/components/RecordForm";
 import { JumpNav } from "@/components/JumpNav";
+import { HashScroll } from "@/components/HashScroll";
 
 export const metadata: Metadata = { title: "Update record" };
 
@@ -118,6 +119,7 @@ async function UpdateRecord({
       </section>
 
       <VisaList profileId={id} holder={profile} visas={visas} trips={trips} canViewDocument />
+      <HashScroll />
     </div>
   );
 }
