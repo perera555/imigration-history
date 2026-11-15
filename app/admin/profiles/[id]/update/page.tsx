@@ -97,7 +97,7 @@ async function UpdateRecord({
         <h2 className="mt-1 font-serif text-2xl font-bold text-navy">Add / edit visas</h2>
         <p className="mb-5 mt-1 text-sm text-ink-soft">
           Upload a visa (e-Visa PDF, or a photo of a paper visa) and press <b>Read details from document</b> to fill the
-          form, or type the details in. Each visa saves on its own with <b>Add visa</b> / <b>Save visa</b>.
+          form, or type the details in. Every saved visa is shown below with all its details, ready to change; press <b>Save visa</b> on the one you changed.
         </p>
         <VisaManager
           profileId={id}
@@ -105,6 +105,7 @@ async function UpdateRecord({
           passports={[profile.passportNumber, ...profile.previousPassports].filter((p): p is string => !!p)}
           defaultPassport={profile.passportNumber}
           canDelete={session.role === "admin"}
+          expanded
         />
       </section>
 
