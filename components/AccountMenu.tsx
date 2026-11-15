@@ -96,7 +96,7 @@ export function AccountMenu({ name, email, role, photo, profileId }: Props) {
               <>
                 <Link href={`/profiles/${profileId}`} className={item}>🪪 View my travel card</Link>
                 <Link href={`/admin/profiles/${profileId}/update`} className={item}>✏️ Update record</Link>
-                <Link href={`/admin/profiles/${profileId}/update#visas`} className={item}>🛂 Add / edit visas</Link>
+                <Link href={`/admin/profiles/${profileId}/visas`} className={item}>🛂 Visas</Link>
                 <a href={`/api/profiles/${profileId}/pdf?view=1`} target="_blank" rel="noopener" className={item}>📄 View PDF</a>
               </>
             )}

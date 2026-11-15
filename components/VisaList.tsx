@@ -9,6 +9,7 @@ export function VisaList({
   visas,
   trips,
   canViewDocument = false,
+  editPage = "update",
   emptyHint = "No visas recorded yet.",
 }: {
   /** Shows "View / Download visas PDF" when given. */
@@ -18,6 +19,8 @@ export function VisaList({
   visas: Visa[];
   trips: Trip[];
   canViewDocument?: boolean;
+  /** Where the Update visa buttons go: the Update record page or the Visas page. */
+  editPage?: "update" | "visas";
   emptyHint?: string;
 }) {
   const states = visas.map((v) => visaState(v).tone);
@@ -38,7 +41,7 @@ export function VisaList({
         </div>
         {profileId && visas.length > 0 && (
           <div className="ml-auto flex flex-wrap gap-2">
-            <Link href={`/admin/profiles/${profileId}/update#visas`} className="btn btn-primary">
+            <Link href={`/admin/profiles/${profileId}/${editPage}#visas`} className="btn btn-primary">
               ✏️ Update visas
             </Link>
             <a href={`/api/profiles/${profileId}/pdf?only=visas&view=1`} target="_blank" rel="noopener" className="btn btn-ghost">
@@ -62,7 +65,7 @@ export function VisaList({
           </div>
           <div className="grid gap-5 lg:grid-cols-2">
             {visas.map((v) => (
-              <VisaCard key={v.id} visa={v} holder={holder} trips={trips} canViewDocument={canViewDocument} />
+              <VisaCard key={v.id} visa={v} holder={holder} trips={trips} canViewDocument={canViewDocument} editPage={editPage} />
             ))}
           </div>
         </>

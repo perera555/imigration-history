@@ -39,11 +39,13 @@ export function VisaCard({
   holder,
   trips,
   canViewDocument,
+  editPage = "update",
 }: {
   visa: Visa;
   holder?: Profile;
   trips: Trip[];
   canViewDocument?: boolean;
+  editPage?: "update" | "visas";
 }) {
   const state = visaState(visa);
   const linked = tripsOnVisa(visa, trips);
@@ -134,7 +136,7 @@ export function VisaCard({
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href={`/admin/profiles/${visa.profileId}/update#visa-${visa.id}`} className="btn btn-primary !py-1.5 text-xs">
+          <Link href={`/admin/profiles/${visa.profileId}/${editPage}#visa-${visa.id}`} className="btn btn-primary !py-1.5 text-xs">
             ✏️ Update visa
           </Link>
         </div>

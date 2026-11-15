@@ -67,6 +67,9 @@ async function ProfileTable() {
             <Link href={`/profiles/${p.id}`} className="btn btn-ghost">
               View
             </Link>
+            <Link href={`/admin/profiles/${p.id}/visas`} className="btn btn-ghost">
+              🛂 Visas
+            </Link>
             <a href={`/api/profiles/${p.id}/pdf?view=1`} target="_blank" rel="noopener" className="btn btn-ghost">
               View PDF
             </a>
