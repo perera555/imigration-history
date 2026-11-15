@@ -1,18 +1,20 @@
 import Link from "next/link";
 import { PdfButtons } from "./PdfButtons";
 import { UpdateButton } from "./UpdateButton";
-import { travelStats, type Profile, type Trip } from "@/lib/data";
-import { VisasButton } from "./VisasButton";
+import { travelStats, type Profile, type Trip, type Visa } from "@/lib/data";
+import { VisaList } from "./VisaList";
 import { TravelCard } from "./TravelCard";
 import { HistoryTable, StatsBar } from "./HistoryTable";
 
 export function ProfileDetail({
   profile,
   trips,
+  visas = [],
   showBack,
 }: {
   profile: Profile;
   trips: Trip[];
+  visas?: Visa[];
   showBack?: boolean;
 }) {
   return (
@@ -25,7 +27,6 @@ export function ProfileDetail({
         )}
         <div className="ml-auto flex flex-wrap gap-2">
           <UpdateButton profileId={profile.id} className="btn btn-ghost" />
-          <VisasButton profileId={profile.id} />
           <PdfButtons profileId={profile.id} />
         </div>
       </div>
@@ -41,6 +42,8 @@ export function ProfileDetail({
         <HistoryTable trips={trips} />
       </section>
 
+      {/* Visas: shown below the immigration record */}
+      <VisaList profileId={profile.id} holder={profile} visas={visas} trips={trips} />
     </div>
   );
 }

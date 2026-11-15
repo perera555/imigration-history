@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { formatShortDate, tripDuration, type Profile, type Trip } from "@/lib/data";
+import { formatShortDate, tripDuration, type Profile, type Trip, type Visa } from "@/lib/data";
+import { VisaManager } from "./VisaManager";
 import { countryName } from "@/lib/countries";
 import { deleteTrip, updateProfile } from "@/lib/actions";
 import { ProfileForm } from "./ProfileForm";
@@ -12,10 +13,12 @@ import { ConfirmButton } from "./SubmitButton";
 export function ProfileEditor({
   profile,
   trips,
+  visas = [],
   canDelete = true,
 }: {
   profile: Profile;
   trips: Trip[];
+  visas?: Visa[];
   /** Users and admins can add and update; only admins can delete. */
   canDelete?: boolean;
 }) {
@@ -85,6 +88,22 @@ export function ProfileEditor({
           ))}
         </ul>
       </section>
-   </div>
+
+      <section id="visas" className="panel p-6 sm:p-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Step 3</p>
+        <h2 className="mt-1 font-serif text-2xl font-bold text-navy">Add / edit visas</h2>
+        <p className="mb-5 mt-1 text-sm text-ink-soft">
+          Upload a visa (e-Visa PDF, or a photo of a paper visa) and press <b>Read details from document</b> to fill the
+          form, or type the details in. The document is saved with the visa.
+        </p>
+        <VisaManager
+          profileId={profile.id}
+          visas={visas}
+          passports={[profile.passportNumber, ...profile.previousPassports].filter((p): p is string => !!p)}
+          defaultPassport={profile.passportNumber}
+          canDelete={canDelete}
+        />
+      </section>
+    </div>
   );
 }

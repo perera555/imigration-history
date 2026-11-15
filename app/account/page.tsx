@@ -3,8 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { requireAuth } from "@/lib/session";
-import { getProfile, getTrips, travelStats } from "@/lib/data";
-import { VisasButton } from "@/components/VisasButton";
+import { getProfile, getTrips, getVisas, travelStats } from "@/lib/data";
+import { VisaList } from "@/components/VisaList";
 import { TravelCard } from "@/components/TravelCard";
 import { HistoryTable, StatsBar } from "@/components/HistoryTable";
 import { logout } from "@/lib/actions";
@@ -27,9 +27,9 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
   const session = await requireAuth();
   if (session.role === "admin") redirect("/admin");
   const { welcome } = await searchParams;
-  const [profile, trips] = session.profileId
-    ? await Promise.all([getProfile(session.profileId), getTrips(session.profileId)])
-    : [null, []];
+  const [profile, trips, visas] = session.profileId
+    ? await Promise.all([getProfile(session.profileId), getTrips(session.profileId), getVisas(session.profileId)])
+    : [null, [], []];
 
   return (
     <div className="space-y-8">
@@ -46,7 +46,6 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
                 View my card
               </Link>
               <UpdateButton profileId={profile.id} />
-              <VisasButton profileId={profile.id} />
               <PdfButtons profileId={profile.id} />
             </>
           )}
@@ -69,7 +68,7 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
             <TravelCard profile={profile} />
             <StatsBar stats={travelStats(trips)} />
           </section>
-          <ProfileEditor profile={profile} trips={trips} canDelete={false} />
+          <ProfileEditor profile={profile} trips={trips} visas={visas} canDelete={false} />
           <section className="space-y-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">My immigration record</p>
@@ -77,6 +76,7 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
             </div>
             <HistoryTable trips={trips} />
           </section>
+          <VisaList profileId={profile.id} holder={profile} visas={visas} trips={trips} canViewDocument emptyHint="No visas yet. Add one in Step 3 above." />
         </>
       ) : (
         <div className="panel p-10 text-center text-ink-soft">

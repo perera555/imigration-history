@@ -2,8 +2,8 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireProfileAccess } from "@/lib/session";
-import { getProfile, getTrips } from "@/lib/data";
-import { VisasButton } from "@/components/VisasButton";
+import { getProfile, getTrips, getVisas } from "@/lib/data";
+import { VisaList } from "@/components/VisaList";
 import { ProfileEditor } from "@/components/ProfileEditor";
 import { PdfButtons } from "@/components/PdfButtons";
 import { UpdateButton } from "@/components/UpdateButton";
@@ -19,7 +19,7 @@ export default function EditProfilePage({ params }: PageProps<"/admin/profiles/[
 async function EditProfile({ params }: { params: PageProps<"/admin/profiles/[id]">["params"] }) {
   const { id } = await params;
   const session = await requireProfileAccess(id);
-  const [profile, trips] = await Promise.all([getProfile(id), getTrips(id)]);
+  const [profile, trips, visas] = await Promise.all([getProfile(id), getTrips(id), getVisas(id)]);
   if (!profile) notFound();
 
   return (
@@ -32,11 +32,11 @@ async function EditProfile({ params }: { params: PageProps<"/admin/profiles/[id]
           View card & history
         </Link>
         <UpdateButton profileId={profile.id} />
-        <VisasButton profileId={profile.id} />
         <PdfButtons profileId={profile.id} />
       </div>
       <h1 className="font-serif text-3xl font-bold text-navy">{profile.fullName}</h1>
-      <ProfileEditor profile={profile} trips={trips} canDelete={session.role === "admin"} />
+      <ProfileEditor profile={profile} trips={trips} visas={visas} canDelete={session.role === "admin"} />
+      <VisaList profileId={profile.id} holder={profile} visas={visas} trips={trips} canViewDocument />
     </div>
   );
 }
