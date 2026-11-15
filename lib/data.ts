@@ -125,13 +125,15 @@ export type Visa = {
   passportNumber: string | null;
   status: string | null;
   notes: string | null;
+  /** Countries travelled on this visa (e.g. the Schengen countries visited). */
+  countriesTravelled: string[];
   hasDocument: boolean;
   documentName: string | null;
 };
 
 const VISA_COLUMNS = (sql: Awaited<ReturnType<typeof getDb>>) => sql`
   v.id, v.profile_id, trim(v.country_code) as country_code, v.visa_type, v.visa_format, v.visa_number, v.issue_date,
-  v.expiry_date, v.travel_from, v.travel_to, v.purpose, v.entries, v.stay_days, v.issued_at, v.passport_number, v.status, v.notes,
+  v.expiry_date, v.travel_from, v.travel_to, v.purpose, v.entries, v.stay_days, v.issued_at, v.passport_number, v.status, v.notes, v.countries_travelled,
   (d.visa_id is not null) as has_document, d.file_name as document_name`;
 
 export async function getVisas(profileId: string): Promise<Visa[]> {

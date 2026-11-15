@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef, useState, useTransition } from "reac
 import { readVisaDocument, saveVisa, type VisaSaveState } from "@/lib/visa-actions";
 import type { Visa } from "@/lib/data";
 import { CountrySelect } from "./CountrySelect";
-import { countryName, flagSvg } from "@/lib/countries";
+import { isSchengen } from "@/lib/countries";
 import { SubmitButton } from "./SubmitButton";
 
 const PURPOSES = [
@@ -86,6 +86,15 @@ export function VisaForm({
   const [state, action] = useActionState<VisaSaveState, FormData>(saveVisa.bind(null, profileId, visa?.id ?? null), undefined);
   const [f, setF] = useState<Fields>(() => fromVisa(visa, defaultPassport, defaultCountry, defaultType));
   const [countryKey, setCountryKey] = useState(0);
+  // Countries travelled on this visa: saved list, or (new Schengen visa) the Schengen countries from the record.
+  const [travelled, setTravelled] = useState<{ key: number; code: string }[]>(() =>
+    (visa?.countriesTravelled.length ? visa.countriesTravelled : (schengenCountries ?? []).map((c) => c.code)).map((code, i) => ({
+      key: i,
+      code,
+    })),
+  );
+  const visitsBy = new Map((schengenCountries ?? []).map((c) => [c.code, c.visits]));
+  const showTravelled = isSchengen(f.countryCode) || /schengen/i.test(f.visaType) || travelled.length > 0;
   const [readMsg, setReadMsg] = useState<{ ok?: string; error?: string }>({});
   const [reading, startReading] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -159,23 +168,46 @@ export function VisaForm({
         {readMsg.error && <p className="mt-2 text-sm font-medium text-danger">{readMsg.error}</p>}
       </div>
 
-      {/* Schengen visa: the Schengen countries travelled (from the immigration record) */}
-      {schengenCountries && schengenCountries.length > 0 && (
-        <div>
-          <span className="field-label">Schengen countries travelled</span>
+      {/* Countries travelled on this visa (Schengen: any number of countries) */}
+      {showTravelled && (
+        <div className="rounded-2xl border border-sky-200 bg-sky-50/50 p-4">
+          <span className="field-label">Countries travelled on this visa</span>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {schengenCountries.map((c) => (
-              <div key={c.code} className="field flex items-center gap-2 bg-paper/60">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={flagSvg(c.code)} alt="" className="h-5 w-7 shrink-0 rounded-[3px] object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.08)]" />
-                <span className="font-medium">{countryName(c.code)}</span>
-                <span className="ml-auto text-xs text-ink-soft">
-                  {c.visits ? `${c.visits} visit${c.visits === 1 ? "" : "s"}` : "no visits"}
-                </span>
+            {travelled.map((t) => (
+              <div key={t.key} className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <CountrySelect
+                    name="countriesTravelled"
+                    defaultValue={t.code}
+                    onChange={(code) => setTravelled((list) => list.map((x) => (x.key === t.key ? { ...x, code } : x)))}
+                  />
+                </div>
+                {visitsBy.get(t.code) ? (
+                  <span className="shrink-0 text-[11px] text-ink-soft">
+                    {visitsBy.get(t.code)} visit{visitsBy.get(t.code) === 1 ? "" : "s"}
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  aria-label="Remove country"
+                  onClick={() => setTravelled((list) => list.filter((x) => x.key !== t.key))}
+                  className="grid size-8 shrink-0 place-items-center rounded-full text-ink-soft hover:bg-white hover:text-danger"
+                >
+                  ×
+                </button>
               </div>
             ))}
           </div>
-          <p className="mt-1 text-xs text-ink-soft">One Schengen visa covers all of these. Countries come from the immigration record.</p>
+          <button
+            type="button"
+            onClick={() => setTravelled((list) => [...list, { key: Date.now(), code: "" }])}
+            className="mt-3 text-sm font-semibold text-navy-2 hover:underline"
+          >
+            + Add country
+          </button>
+          <p className="mt-1 text-xs text-ink-soft">
+            Add every country you travelled to on this visa. For a Schengen visa, list each Schengen country visited.
+          </p>
         </div>
       )}
 

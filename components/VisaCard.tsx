@@ -118,6 +118,9 @@ export function VisaCard({
               : null
           }
         />
+        {visa.countriesTravelled.length > 0 && (
+          <Item label="Countries travelled" value={visa.countriesTravelled.map(countryName).join(", ")} wide />
+        )}
         {visa.issuedAt && <Item label="Issued at" value={visa.issuedAt} wide />}
         {visa.notes && <Item label="Notes" value={visa.notes} wide />}
       </dl>

@@ -146,6 +146,9 @@ export function ImmigrationPdf({
                     )}
                     <Text style={s.countryName}>{countryName(v.countryCode)}</Text>
                     {isSchengen(v.countryCode) ? <Text style={s.note}>Schengen visa (all Schengen countries)</Text> : null}
+                    {v.countriesTravelled.length ? (
+                      <Text style={s.note}>Travelled: {v.countriesTravelled.map(countryName).join(", ")}</Text>
+                    ) : null}
                   </View>
                   <View style={[s.cell, { width: "17%" }]}>
                     <Text>{v.visaType || "Visa"}</Text>

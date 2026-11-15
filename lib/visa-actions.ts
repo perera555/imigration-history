@@ -98,6 +98,14 @@ export async function saveVisa(profileId: string, visaId: string | null, _: Visa
     passportNumber: text(form, "passportNumber", 30)?.toUpperCase() ?? null,
     status: text(form, "status", 30),
     notes: text(form, "notes", 1000),
+    countriesTravelled: [
+      ...new Set(
+        form
+          .getAll("countriesTravelled")
+          .map((v) => String(v).trim().toUpperCase())
+          .filter((v) => isCountryCode(v)),
+      ),
+    ].slice(0, 40),
   };
 
   const file = form.get("document");
