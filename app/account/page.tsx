@@ -84,7 +84,7 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
         </div>
       )}
 
-      <section className="panel p-6 sm:p-8">
+      <section id="password" className="panel scroll-mt-24 p-6 sm:p-8">
         <h2 className="mb-4 font-serif text-xl font-bold text-navy">Change password</h2>
         <ChangePasswordForm />
       </section>

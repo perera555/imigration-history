@@ -46,9 +46,6 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
   const [admin] = await sql<AdminRow[]>`select id, email, password_hash, role from admins where email = ${email}`;
   const ok = await verifyPassword(password, admin?.passwordHash ?? DUMMY_HASH);
   if (!admin || !ok) return { error: "Incorrect email or password." };
-  if (form.get("mode") === "admin" && admin.role !== "admin") {
-    return { error: "This is not an admin account. Use My account → Sign in instead." };
-  }
 
   await createSession({ adminId: admin.id, email: admin.email }, form.get("remember") === "on");
   redirect(admin.role === "admin" ? "/admin" : "/account");

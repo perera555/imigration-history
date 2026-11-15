@@ -3,7 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { requireProfileAccess } from "@/lib/session";
-import { getProfile, getTrips } from "@/lib/data";
+import { getProfile, getTrips, getVisas } from "@/lib/data";
+import { VisaManager } from "@/components/VisaManager";
+import { VisaList } from "@/components/VisaList";
 import { RecordForm } from "@/components/RecordForm";
 
 export const metadata: Metadata = { title: "Update record" };
@@ -32,7 +34,7 @@ async function UpdateRecord({
 }) {
   const { id } = await params;
   const session = await requireProfileAccess(id);
-  const [profile, trips, query] = await Promise.all([getProfile(id), getTrips(id), searchParams]);
+  const [profile, trips, visas, query] = await Promise.all([getProfile(id), getTrips(id), getVisas(id), searchParams]);
   if (!profile) notFound();
   const back = session.role === "admin" ? `/admin/profiles/${id}` : "/account";
   const saved = typeof query.saved === "string" ? SAVED_TEXT[query.saved] : undefined;
@@ -89,6 +91,24 @@ async function UpdateRecord({
           notes: t.notes,
         }))}
       />
+      {/* Visas: added and edited here, under the immigration record */}
+      <section id="visas" className="panel scroll-mt-24 p-6 sm:p-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Visas</p>
+        <h2 className="mt-1 font-serif text-2xl font-bold text-navy">Add / edit visas</h2>
+        <p className="mb-5 mt-1 text-sm text-ink-soft">
+          Upload a visa (e-Visa PDF, or a photo of a paper visa) and press <b>Read details from document</b> to fill the
+          form, or type the details in. Each visa saves on its own with <b>Add visa</b> / <b>Save visa</b>.
+        </p>
+        <VisaManager
+          profileId={id}
+          visas={visas}
+          passports={[profile.passportNumber, ...profile.previousPassports].filter((p): p is string => !!p)}
+          defaultPassport={profile.passportNumber}
+          canDelete={session.role === "admin"}
+        />
+      </section>
+
+      <VisaList profileId={id} holder={profile} visas={visas} trips={trips} canViewDocument />
     </div>
   );
 }
