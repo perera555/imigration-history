@@ -3,10 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { requireProfileAccess } from "@/lib/session";
-import { getProfile, getTrips, getVisas } from "@/lib/data";
+import { getProfile, getTrips, getVisas, groupByCountry } from "@/lib/data";
 import { TravelCard } from "@/components/TravelCard";
 import { VisaList } from "@/components/VisaList";
-import { VisaManager } from "@/components/VisaManager";
+import { VisaCountryManager } from "@/components/VisaCountryManager";
 import { JumpNav } from "@/components/JumpNav";
 import { HashScroll } from "@/components/HashScroll";
 
@@ -80,15 +80,15 @@ async function Visas({ params }: { params: PageProps<"/admin/profiles/[id]/visas
         <h2 className="mt-1 font-serif text-2xl font-bold text-navy">Visa details</h2>
         <p className="mb-5 mt-1 text-sm text-ink-soft">
           Upload a visa (e-Visa PDF, or a photo of a paper visa) and press <b>Read details from document</b> to fill the
-          form, or type the details in. Every saved visa is shown below filled in, ready to change.
+          form, or type the details in. Visas are arranged by the countries in your immigration record; press <b>+ Add … visa</b> on a country.
         </p>
-        <VisaManager
+        <VisaCountryManager
           profileId={id}
           visas={visas}
+          countries={groupByCountry(trips).map((g) => ({ code: g.countryCode, visits: g.visits.length }))}
           passports={[profile.passportNumber, ...profile.previousPassports].filter((p): p is string => !!p)}
           defaultPassport={profile.passportNumber}
           canDelete={isAdmin}
-          expanded
         />
       </section>
       <HashScroll />

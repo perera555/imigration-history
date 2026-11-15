@@ -55,7 +55,7 @@ function guessCountry(text: string, exclude: string | null): string | null {
   };
   for (const c of COUNTRIES) add(c.code, c.name);
   for (const n of NATIONALITIES) add(n.code, n.name);
-  for (const [alias, code] of [["uae", "AE"], ["dubai", "AE"], ["usa", "US"], ["u.s.", "US"], ["uk visas", "GB"], ["schengen", "FR"]] as const) {
+  for (const [alias, code] of [["uae", "AE"], ["dubai", "AE"], ["usa", "US"], ["u.s.", "US"], ["uk visas", "GB"]] as const) {
     if (lower.includes(alias) && code !== exclude) counts.set(code, (counts.get(code) ?? 0) + 3);
   }
   let best: string | null = null;
@@ -84,7 +84,9 @@ export async function readVisaPdf(bytes: Uint8Array, holderNationalityCode: stri
 
   return {
     countryCode: guessCountry(t, holderNationalityCode),
-    visaType: visaTypeRaw ? visaTypeRaw.trim().replace(/\s+/g, " ") : null,
+    visaType: visaTypeRaw
+      ? visaTypeRaw.trim().replace(/\s+/g, " ")
+      : /schengen/i.test(t) ? (/type\s*d\b|national visa/i.test(t) ? "Schengen visa (national, type D)" : "Schengen visa (short stay)") : null,
     visaFormat: /\b(e-?visa|electronic visa|evisa|grant notice|visa grant|electronic travel authori[sz]ation|eta\b)/i.test(t)
       ? /electronic travel authori[sz]ation|\beta\b/i.test(t) ? "ETA" : "e-Visa"
       : /visa on arrival/i.test(t) ? "Visa on arrival" : null,

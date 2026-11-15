@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { formatShortDate, tripDuration, type Profile, type Trip, type Visa } from "@/lib/data";
-import { VisaManager } from "./VisaManager";
+import { formatShortDate, groupByCountry, tripDuration, type Profile, type Trip, type Visa } from "@/lib/data";
+import { VisaCountryManager } from "./VisaCountryManager";
 import { JumpNav } from "./JumpNav";
 import { countryName } from "@/lib/countries";
 import { deleteTrip, updateProfile } from "@/lib/actions";
@@ -105,9 +105,10 @@ export function ProfileEditor({
           Upload a visa (e-Visa PDF, or a photo of a paper visa) and press <b>Read details from document</b> to fill the
           form, or type the details in. The document is saved with the visa.
         </p>
-        <VisaManager
+        <VisaCountryManager
           profileId={profile.id}
           visas={visas}
+          countries={groupByCountry(trips).map((g) => ({ code: g.countryCode, visits: g.visits.length }))}
           passports={[profile.passportNumber, ...profile.previousPassports].filter((p): p is string => !!p)}
           defaultPassport={profile.passportNumber}
           canDelete={canDelete}

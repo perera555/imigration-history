@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState, useTransition } from "reac
 import { readVisaDocument, saveVisa, type VisaSaveState } from "@/lib/visa-actions";
 import type { Visa } from "@/lib/data";
 import { CountrySelect } from "./CountrySelect";
+import { countryName, flagSvg } from "@/lib/countries";
 import { SubmitButton } from "./SubmitButton";
 
 const PURPOSES = [
@@ -22,7 +23,7 @@ const PURPOSES = [
   "Working holiday",
 ];
 
-const TYPES = ["Tourist", "Visit", "Business", "Student", "Work", "Transit", "Family", "Medical", "Working Holiday", "Resident", "e-Visa", "Visa on arrival", "ETA"];
+const TYPES = ["Schengen visa (short stay)", "Schengen visa (national, type D)", "Tourist", "Visit", "Business", "Student", "Work", "Transit", "Family", "Medical", "Working Holiday", "Resident", "e-Visa", "Visa on arrival", "ETA"];
 
 type Fields = {
   countryCode: string;
@@ -42,9 +43,9 @@ type Fields = {
   notes: string;
 };
 
-const fromVisa = (v?: Visa, defaultPassport?: string | null): Fields => ({
-  countryCode: v?.countryCode ?? "",
-  visaType: v?.visaType ?? "",
+const fromVisa = (v?: Visa, defaultPassport?: string | null, defaultCountry?: string, defaultType?: string): Fields => ({
+  countryCode: v?.countryCode ?? defaultCountry ?? "",
+  visaType: v?.visaType ?? defaultType ?? "",
   visaFormat: v?.visaFormat ?? "",
   visaNumber: v?.visaNumber ?? "",
   issueDate: v?.issueDate ?? "",
@@ -65,8 +66,17 @@ export function VisaForm({
   visa,
   passports,
   defaultPassport,
+  defaultCountry,
+  defaultType,
+  schengenCountries,
   onDone,
 }: {
+  /** Schengen section: the Schengen countries travelled, shown as fields with their flags. */
+  schengenCountries?: { code: string; visits: number }[];
+  /** Pre-filled visa type for a new visa (e.g. Schengen). */
+  defaultType?: string;
+  /** Pre-selected country for a new visa (e.g. "+ Add Thailand visa"). */
+  defaultCountry?: string;
   profileId: string;
   visa?: Visa;
   passports: string[];
@@ -74,7 +84,7 @@ export function VisaForm({
   onDone?: () => void;
 }) {
   const [state, action] = useActionState<VisaSaveState, FormData>(saveVisa.bind(null, profileId, visa?.id ?? null), undefined);
-  const [f, setF] = useState<Fields>(() => fromVisa(visa, defaultPassport));
+  const [f, setF] = useState<Fields>(() => fromVisa(visa, defaultPassport, defaultCountry, defaultType));
   const [countryKey, setCountryKey] = useState(0);
   const [readMsg, setReadMsg] = useState<{ ok?: string; error?: string }>({});
   const [reading, startReading] = useTransition();
@@ -149,8 +159,27 @@ export function VisaForm({
         {readMsg.error && <p className="mt-2 text-sm font-medium text-danger">{readMsg.error}</p>}
       </div>
 
-      {/* 2. Details */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Schengen visa: the Schengen countries travelled (from the immigration record) */}
+      {schengenCountries && schengenCountries.length > 0 && (
+        <div>
+          <span className="field-label">Schengen countries travelled</span>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {schengenCountries.map((c) => (
+              <div key={c.code} className="field flex items-center gap-2 bg-paper/60">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={flagSvg(c.code)} alt="" className="h-5 w-7 shrink-0 rounded-[3px] object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.08)]" />
+                <span className="font-medium">{countryName(c.code)}</span>
+                <span className="ml-auto text-xs text-ink-soft">
+                  {c.visits ? `${c.visits} visit${c.visits === 1 ? "" : "s"}` : "no visits"}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-ink-soft">One Schengen visa covers all of these. Countries come from the immigration record.</p>
+        </div>
+      )}
+
+      {/* 2. Details */}      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className="sm:col-span-2 lg:col-span-1">
           <span className="field-label">Country *</span>
           <CountrySelect key={countryKey} name="countryCode" defaultValue={f.countryCode} onChange={(c) => setF((x) => ({ ...x, countryCode: c }))} />

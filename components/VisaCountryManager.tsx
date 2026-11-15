@@ -1,0 +1,203 @@
+"use client";
+
+import { useState } from "react";
+import { deleteVisa } from "@/lib/visa-actions";
+import { countryName, flagSvg, isSchengen } from "@/lib/countries";
+import type { Visa } from "@/lib/data";
+import { VisaForm } from "./VisaForm";
+import { ConfirmButton } from "./SubmitButton";
+
+type Group = {
+  key: string;
+  title: string;
+  flag: string;
+  subtitle: string | null;
+  visits: number;
+  codes: string[];
+  /** Visits per country (shown as chips for the Schengen section). */
+  perCountry: Record<string, number>;
+  /** Country pre-selected when adding a visa from this section. */
+  addCountry: string | null;
+  addType?: string;
+  addLabel: string;
+};
+
+/**
+ * Visas arranged like the immigration record: one section per visited country
+ * (e.g. Thailand · 8 visits) with its visas as filled forms and "+ Add Thailand visa".
+ * Schengen countries (e.g. Belgium, France, Netherlands) share one "Schengen Area" section,
+ * because one Schengen visa covers them all.
+ */
+export function VisaCountryManager({
+  profileId,
+  visas,
+  countries,
+  passports,
+  defaultPassport,
+  canDelete,
+}: {
+  profileId: string;
+  visas: Visa[];
+  /** Visited countries in record order, with the number of visits. */
+  countries: { code: string; visits: number }[];
+  passports: string[];
+  defaultPassport?: string | null;
+  canDelete: boolean;
+}) {
+  const [adding, setAdding] = useState<string | null>(null);
+  const [addKey, setAddKey] = useState(0);
+
+  // Build sections: Schengen countries together, every other country on its own.
+  const groups: Group[] = [];
+  let schengen: Group | null = null;
+  const touch = (code: string, visits: number) => {
+    if (isSchengen(code)) {
+      if (!schengen) {
+        schengen = {
+          key: "schengen",
+          title: "Schengen Area",
+          flag: "eu",
+          subtitle: null,
+          visits: 0,
+          codes: [],
+          perCountry: {},
+          addCountry: code,
+          addType: "Schengen visa (short stay)",
+          addLabel: "+ Add Schengen visa",
+        };
+        groups.push(schengen);
+      }
+      const g = schengen as Group;
+      if (!g.codes.includes(code)) g.codes.push(code);
+      g.visits += visits;
+      g.perCountry[code] = (g.perCountry[code] ?? 0) + visits;
+    } else if (!groups.some((g) => g.key === code)) {
+      groups.push({
+        key: code,
+        title: countryName(code),
+        flag: code,
+        subtitle: null,
+        visits,
+        codes: [code],
+        perCountry: { [code]: visits },
+        addCountry: code,
+        addLabel: `+ Add ${countryName(code)} visa`,
+      });
+    }
+  };
+  for (const c of countries) touch(c.code, c.visits);
+  for (const v of visas) touch(v.countryCode, 0);
+  for (const g of groups) {
+    if (g.key === "schengen") g.subtitle = "One Schengen visa covers all Schengen countries.";
+  }
+
+  const addForm = (g: Group | null) => (
+    <div className="mt-4 rounded-2xl border-2 border-dashed border-gold/50 bg-white p-5">
+      <div className="mb-4 flex items-center gap-3">
+        <h4 className="font-serif text-lg font-bold text-navy">
+          {g ? (g.key === "schengen" ? "Add Schengen visa" : `Add ${g.title} visa`) : "Add a visa for another country"}
+        </h4>
+        <button type="button" onClick={() => setAdding(null)} className="ml-auto text-sm text-ink-soft hover:underline">
+          Cancel
+        </button>
+      </div>
+      {g?.key === "schengen" && (
+        <p className="mb-3 text-sm text-ink-soft">
+          Choose the country that <b>issued</b> the Schengen visa (the embassy you applied to). It is valid for every
+          Schengen country.
+        </p>
+      )}
+      <VisaForm
+        key={`${g?.key ?? "other"}-${addKey}`}
+        profileId={profileId}
+        passports={passports}
+        defaultPassport={defaultPassport}
+        defaultCountry={g?.addCountry ?? undefined}
+        defaultType={g?.addType}
+        schengenCountries={g?.key === "schengen" ? g.codes.map((code) => ({ code, visits: g.perCountry[code] ?? 0 })) : undefined}
+        onDone={() => {
+          setAdding(null);
+          setAddKey((k) => k + 1);
+        }}
+      />
+    </div>
+  );
+
+  return (
+    <div className="divide-y divide-line rounded-2xl border border-line bg-white">
+      {groups.map((g, i) => {
+        const own = visas.filter((v) => g.codes.includes(v.countryCode));
+        return (
+          <section key={g.key} id={`visa-country-${g.key}`} className={`p-5 sm:p-6 ${i % 2 ? "bg-paper/40" : ""}`}>
+            <header className="flex flex-wrap items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={flagSvg(g.flag)} alt="" className="h-9 w-14 rounded-md object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.08)]" />
+              <div className="min-w-0">
+                <h3 className="font-serif text-xl font-bold text-navy">
+                  {g.title}
+                  {g.key === "schengen" && (
+                    <span className="ml-2 rounded-full bg-sky-100 px-2 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wide text-sky-900">
+                      Schengen visa category
+                    </span>
+                  )}
+                </h3>
+                {g.subtitle && <p className="text-xs text-ink-soft">{g.subtitle}</p>}
+                <p className="text-sm text-ink-soft">
+                  {g.visits ? `${g.visits} visit${g.visits === 1 ? "" : "s"}` : "No recorded visits"} ·{" "}
+                  <b className="text-navy">
+                    {own.length} visa{own.length === 1 ? "" : "s"}
+                  </b>
+                </p>
+              </div>
+              {adding !== g.key && (
+                <button type="button" onClick={() => setAdding(g.key)} className="btn btn-gold ml-auto !py-1.5">
+                  {g.addLabel}
+                </button>
+              )}
+            </header>
+
+            {own.map((v, n) => (
+              <div key={v.id} id={`visa-${v.id}`} className="mt-4 rounded-2xl border border-line bg-white p-5 transition-shadow">
+                <div className="mb-3 flex flex-wrap items-center gap-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gold">
+                    {g.key === "schengen" ? `Schengen visa (issued by ${countryName(v.countryCode)})` : `${g.title} visa`}
+                    {own.length > 1 ? ` ${n + 1} of ${own.length}` : ""} · update
+                  </p>
+                  <span className="text-sm text-ink-soft">
+                    {v.visaType || "Visa"}
+                    {v.visaNumber && <span className="font-mono"> · {v.visaNumber}</span>}
+                  </span>
+                  {canDelete && (
+                    <form action={deleteVisa.bind(null, v.id)} className="ml-auto">
+                      <ConfirmButton message="Delete this visa and its document?" className="btn btn-danger !py-1">
+                        Delete
+                      </ConfirmButton>
+                    </form>
+                  )}
+                </div>
+                <VisaForm
+                  profileId={profileId}
+                  visa={v}
+                  passports={passports}
+                  schengenCountries={g.key === "schengen" ? g.codes.map((code) => ({ code, visits: g.perCountry[code] ?? 0 })) : undefined}
+                />
+              </div>
+            ))}
+
+            {adding === g.key && addForm(g)}
+          </section>
+        );
+      })}
+
+      <section className="p-5 sm:p-6">
+        {adding === "__other" ? (
+          addForm(null)
+        ) : (
+          <button type="button" onClick={() => setAdding("__other")} className="btn btn-ghost">
+            🌍 + Add visa for another country
+          </button>
+        )}
+      </section>
+    </div>
+  );
+}

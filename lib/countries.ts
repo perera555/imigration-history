@@ -62,6 +62,13 @@ export function isCountryCode(code: string): boolean {
   return BY_CODE.has(code.toUpperCase());
 }
 
+/** Schengen Area members: one Schengen visa covers all of them. */
+export const SCHENGEN = new Set([
+  "AT", "BE", "BG", "HR", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IS", "IT", "LV",
+  "LI", "LT", "LU", "MT", "NL", "NO", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "CH",
+]);
+export const isSchengen = (code: string) => SCHENGEN.has(code.toUpperCase());
+
 /** SVG flag (sharp at any size) for the web UI. */
 export function flagSvg(code: string): string {
   return `https://flagcdn.com/${code.toLowerCase()}.svg`;

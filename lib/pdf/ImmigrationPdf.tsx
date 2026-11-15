@@ -15,7 +15,7 @@ import {
   type Trip,
   type Visa,
 } from "@/lib/data";
-import { countryName } from "@/lib/countries";
+import { countryName, isSchengen } from "@/lib/countries";
 
 const NAVY = "#0b1f3a";
 const NAVY_2 = "#13315c";
@@ -119,11 +119,12 @@ export function ImmigrationPdf({
   const groups = groupByCountry(trips);
   const [mrz1, mrz2] = mrz(profile);
   const visasOnly = only === "visas";
-  // Visas held: own page in the full PDF, or the whole content of the visas-only PDF.
+  // Visa Record: always the last part of the full PDF (travel card -> immigration record -> visa record),
+  // or the whole content of the visas-only PDF.
   const visasSection = visas.length > 0 ? (
           <View style={{ marginTop: 18 }}>
             <Text style={s.sectionTitle} minPresenceAhead={60}>
-              Visas
+              Visa Record
             </Text>
             <View style={s.thead}>
               <Text style={[s.th, { width: "20%" }]}>COUNTRY</Text>
@@ -144,6 +145,7 @@ export function ImmigrationPdf({
                       <Image src={flags[v.countryCode]!} style={s.flag} />
                     )}
                     <Text style={s.countryName}>{countryName(v.countryCode)}</Text>
+                    {isSchengen(v.countryCode) ? <Text style={s.note}>Schengen visa (all Schengen countries)</Text> : null}
                   </View>
                   <View style={[s.cell, { width: "17%" }]}>
                     <Text>{v.visaType || "Visa"}</Text>
@@ -173,7 +175,12 @@ export function ImmigrationPdf({
             })}
           </View>
   ) : (
-    <Text style={{ color: MUTED, marginTop: 12 }}>No visas recorded.</Text>
+    <View style={{ marginTop: 18 }}>
+      <Text style={s.sectionTitle}>Visa Record</Text>
+      <View style={[s.group, { padding: 12, borderTopWidth: 0.6, borderTopColor: LINE }]}>
+        <Text style={{ color: MUTED }}>No visas recorded yet.</Text>
+      </View>
+    </View>
   );
   const footer = (
     <View style={s.footer} fixed>
@@ -237,8 +244,17 @@ export function ImmigrationPdf({
           </View>
         </View>
 
-        {!visasOnly && (
-        <>
+
+        {visasOnly && visasSection}
+
+        <View style={s.footer} fixed>
+          <Text>{profile.fullName} · Private &amp; confidential</Text>
+          <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
+        </View>
+      </Page>
+      {/* Page 2+: immigration record (its table header repeats only on these pages) */}
+      {!visasOnly && (
+        <Page size="A4" style={s.page}>
         <View style={s.stats}>
           {[
             ["COUNTRIES", stats.countries],
@@ -254,7 +270,7 @@ export function ImmigrationPdf({
         </View>
 
         {/* Immigration history */}
-        <Text style={s.sectionTitle}>Immigration History</Text>
+        <Text style={s.sectionTitle}>Immigration Record</Text>
         <View style={s.thead} fixed>
           <Text style={[s.th, { width: W.country }]}>COUNTRY</Text>
           <Text style={[s.th, { width: W.visits, textAlign: "center" }]}>VISITS</Text>
@@ -303,17 +319,11 @@ export function ImmigrationPdf({
           </View>
         ))}
 
-        </>
-        )}
-
-        {visasOnly && visasSection}
-
-        <View style={s.footer} fixed>
-          <Text>{profile.fullName} · Private &amp; confidential</Text>
-          <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
-        </View>
-      </Page>
-      {!visasOnly && visas.length > 0 && (
+          {footer}
+        </Page>
+      )}
+      {/* Last part: visa record */}
+      {!visasOnly && (
         <Page size="A4" style={s.page}>
           {visasSection}
           {footer}

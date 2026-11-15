@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { countryName } from "@/lib/countries";
+import { countryName, isSchengen } from "@/lib/countries";
 import { formatDate, formatShortDate, visaState, type Profile, type Trip, type Visa } from "@/lib/data";
 import { Flag } from "./Flag";
 
@@ -17,7 +17,7 @@ export function tripsOnVisa(visa: Visa, trips: Trip[]) {
   if (!from && !to) return [];
   return trips.filter(
     (t) =>
-      t.countryCode === visa.countryCode &&
+      (t.countryCode === visa.countryCode || (isSchengen(visa.countryCode) && isSchengen(t.countryCode))) &&
       (!from || t.departureDate >= from) &&
       (!to || t.departureDate <= to),
   );
@@ -50,6 +50,7 @@ export function VisaCard({
   const state = visaState(visa);
   const linked = tripsOnVisa(visa, trips);
   const name = countryName(visa.countryCode);
+  const schengen = isSchengen(visa.countryCode);
   const mrz = `V<${visa.countryCode}${(visa.visaType || "VISA").toUpperCase().replace(/[^A-Z0-9]/g, "<")}<<${(visa.visaNumber ?? "").replace(/[^A-Z0-9]/gi, "")}`
     .padEnd(44, "<")
     .slice(0, 44);
@@ -59,7 +60,10 @@ export function VisaCard({
       <header className="flex items-start gap-4 border-b border-[#e3d6b4] p-5">
         <Flag code={visa.countryCode} className="h-11 w-16 rounded-md" />
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold">Visa · {name}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold">
+            {schengen ? `🇪🇺 Schengen visa · issued by ${name}` : `Visa · ${name}`}
+          </p>
+          {schengen && <p className="text-[11px] text-sky-800">Valid in all 29 Schengen countries</p>}
           <h3 className="truncate font-serif text-xl font-bold text-navy">{visa.visaType || "Visa"}</h3>
           {visa.visaFormat && (
             <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${visa.visaFormat === "Paper visa" ? "bg-amber-100 text-amber-900" : "bg-sky-100 text-sky-900"}`}>
@@ -132,7 +136,7 @@ export function VisaCard({
               ))}
             </div>
           ) : (
-            <p className="mt-1 text-xs text-ink-soft">No recorded trips to {name} in this visa&apos;s dates.</p>
+            <p className="mt-1 text-xs text-ink-soft">No recorded trips to {schengen ? "the Schengen Area" : name} in this visa&apos;s dates.</p>
           )}
         </div>
         <div className="flex flex-wrap gap-2">

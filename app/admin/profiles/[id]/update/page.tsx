@@ -3,8 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { requireProfileAccess } from "@/lib/session";
-import { getProfile, getTrips, getVisas } from "@/lib/data";
-import { VisaManager } from "@/components/VisaManager";
+import { getProfile, getTrips, getVisas, groupByCountry } from "@/lib/data";
+import { VisaCountryManager } from "@/components/VisaCountryManager";
 import { VisaList } from "@/components/VisaList";
 import { RecordForm } from "@/components/RecordForm";
 import { JumpNav } from "@/components/JumpNav";
@@ -106,15 +106,15 @@ async function UpdateRecord({
         <h2 className="mt-1 font-serif text-2xl font-bold text-navy">Add / edit visas</h2>
         <p className="mb-5 mt-1 text-sm text-ink-soft">
           Upload a visa (e-Visa PDF, or a photo of a paper visa) and press <b>Read details from document</b> to fill the
-          form, or type the details in. Every saved visa is shown below with all its details, ready to change; press <b>Save visa</b> on the one you changed.
+          form, or type the details in. Visas are arranged by the countries in your immigration record; press <b>+ Add … visa</b> on a country, or change a saved visa and press <b>Save visa</b>.
         </p>
-        <VisaManager
+        <VisaCountryManager
           profileId={id}
           visas={visas}
+          countries={groupByCountry(trips).map((g) => ({ code: g.countryCode, visits: g.visits.length }))}
           passports={[profile.passportNumber, ...profile.previousPassports].filter((p): p is string => !!p)}
           defaultPassport={profile.passportNumber}
           canDelete={session.role === "admin"}
-          expanded
         />
       </section>
 
