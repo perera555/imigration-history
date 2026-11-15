@@ -39,8 +39,13 @@ export function VisaList({
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Visas</p>
           <h2 className="mt-1 font-serif text-2xl font-bold text-navy">Visas held</h2>
         </div>
+        {profileId && editPage === "update" && (
+          <Link href={`/admin/profiles/${profileId}/visas`} className="btn btn-gold sm:ml-auto">
+            🛂 Open Visas page
+          </Link>
+        )}
         {profileId && visas.length > 0 && (
-          <div className="ml-auto flex flex-wrap gap-2">
+          <div className={`flex flex-wrap gap-2 ${editPage === "update" ? "" : "ml-auto"}`}>
             <Link href={`/admin/profiles/${profileId}/${editPage}#visas`} className="btn btn-primary">
               ✏️ Update visas
             </Link>
