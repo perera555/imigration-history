@@ -20,7 +20,7 @@ function Field({ label, value, mono, wide }: { label: string; value: React.React
   );
 }
 
-export function TravelCard({ profile }: { profile: Profile }) {
+export function TravelCard({ profile, title = "Previous Immigration History" }: { profile: Profile; title?: string }) {
   const age = ageFrom(profile.dateOfBirth);
   const [mrz1, mrz2] = mrzLine(profile);
 
@@ -32,7 +32,7 @@ export function TravelCard({ profile }: { profile: Profile }) {
             <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-gold-soft/80">
               Travel identity card
             </p>
-            <h2 className="gold-text mt-1 font-serif text-xl font-bold sm:text-2xl">Previous Immigration History</h2>
+            <h2 className="gold-text mt-1 font-serif text-xl font-bold sm:text-2xl">{title}</h2>
           </div>
           <div className="grid size-12 shrink-0 place-items-center rounded-full border border-gold-soft/50 bg-white/5 text-gold-soft">
             <svg viewBox="0 0 24 24" className="size-7" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden>

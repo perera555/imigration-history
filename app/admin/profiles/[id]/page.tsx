@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireProfileAccess } from "@/lib/session";
 import { getProfile, getTrips } from "@/lib/data";
+import { VisasButton } from "@/components/VisasButton";
 import { ProfileEditor } from "@/components/ProfileEditor";
 import { PdfButtons } from "@/components/PdfButtons";
 import { UpdateButton } from "@/components/UpdateButton";
@@ -31,6 +32,7 @@ async function EditProfile({ params }: { params: PageProps<"/admin/profiles/[id]
           View card & history
         </Link>
         <UpdateButton profileId={profile.id} />
+        <VisasButton profileId={profile.id} />
         <PdfButtons profileId={profile.id} />
       </div>
       <h1 className="font-serif text-3xl font-bold text-navy">{profile.fullName}</h1>

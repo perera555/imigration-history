@@ -87,6 +87,32 @@ body {
   color: transparent;
 }
 
+/* ---------- Visa card (sticker style) ---------- */
+.visa-card {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(201, 165, 76, 0.18), transparent 55%),
+    linear-gradient(160deg, #fffdf6 0%, #f6efdd 100%);
+  border: 1px solid #e3d6b4;
+  box-shadow: 0 18px 40px -28px rgba(15, 27, 45, 0.55);
+}
+.visa-card::before {
+  /* fine security lines */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  background:
+    repeating-radial-gradient(circle at 85% 110%, transparent 0 7px, rgba(29, 122, 78, 0.18) 7px 8px),
+    repeating-linear-gradient(115deg, transparent 0 14px, rgba(201, 165, 76, 0.12) 14px 15px);
+  mask-image: linear-gradient(90deg, transparent, #000 30%);
+}
+.visa-card > * {
+  position: relative;
+}
+
 /* ---------- Forms ---------- */
 .field-label {
   display: block;

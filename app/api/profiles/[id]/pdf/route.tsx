@@ -1,5 +1,5 @@
 import { renderToBuffer } from "@react-pdf/renderer";
-import { getProfile, getTrips } from "@/lib/data";
+import { getProfile, getTrips, getVisas } from "@/lib/data";
 import { flagPng } from "@/lib/countries";
 import { ImmigrationPdf } from "@/lib/pdf/ImmigrationPdf";
 
@@ -16,20 +16,23 @@ async function loadFlag(code: string): Promise<string | null> {
 
 export async function GET(request: Request, ctx: RouteContext<"/api/profiles/[id]/pdf">) {
   // ?view=1 opens the PDF in the browser; otherwise it downloads.
-  const inline = new URL(request.url).searchParams.get("view") === "1";
+  const url = new URL(request.url);
+  const inline = url.searchParams.get("view") === "1";
+  // ?only=visas = travel card + visas only.
+  const only = url.searchParams.get("only") === "visas" ? ("visas" as const) : undefined;
   const { id } = await ctx.params;
-  const [profile, trips] = await Promise.all([getProfile(id), getTrips(id)]);
+  const [profile, trips, visas] = await Promise.all([getProfile(id), getTrips(id), getVisas(id)]);
   if (!profile) return Response.json({ error: "Not found" }, { status: 404 });
 
-  const codes = [...new Set(trips.map((t) => t.countryCode))];
+  const codes = [...new Set([...(only ? [] : trips.map((t) => t.countryCode)), ...visas.map((v) => v.countryCode)])];
   const flags = Object.fromEntries(await Promise.all(codes.map(async (c) => [c, await loadFlag(c)] as const)));
 
   const generatedOn = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
   const buffer = await renderToBuffer(
-    <ImmigrationPdf profile={profile} trips={trips} flags={flags} generatedOn={generatedOn} />,
+    <ImmigrationPdf profile={profile} trips={trips} visas={visas} only={only} flags={flags} generatedOn={generatedOn} />,
   );
 
-  const fileName = `Immigration-History-${profile.fullName.replace(/[^A-Za-z0-9]+/g, "-")}.pdf`;
+  const fileName = `${only ? "Visas" : "Immigration-History"}-${profile.fullName.replace(/[^A-Za-z0-9]+/g, "-")}.pdf`;
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",

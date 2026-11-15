@@ -46,6 +46,54 @@ Rules:
 - Passport numbers in upper case without spaces. If the document lists several passport numbers without saying which is current, treat the first as current and the rest as previous, and mention that in issues.
 - Use null for anything not in the document. Never invent personal details.`;
 
+const VisaSchema = z.object({
+  countryCode: z.string().nullable().describe("ISO 3166-1 alpha-2 code of the country that issued the visa"),
+  visaType: z.string().nullable().describe("e.g. Tourist, Business, Student (subclass 500), Work, Transit"),
+  visaFormat: z.string().nullable().describe("e-Visa, Paper visa (sticker/stamp in passport), Visa on arrival, or ETA"),
+  visaNumber: z.string().nullable(),
+  issueDate: z.string().nullable().describe("YYYY-MM-DD"),
+  expiryDate: z.string().nullable().describe("YYYY-MM-DD"),
+  travelFrom: z.string().nullable().describe("YYYY-MM-DD: first date travel/entry is allowed, if shown"),
+  travelTo: z.string().nullable().describe("YYYY-MM-DD: last date travel/entry is allowed, if shown"),
+  purpose: z.string().nullable().describe("Purpose of visit, e.g. Tourism, Business, Study"),
+  entries: z.string().nullable().describe("Single, Double or Multiple"),
+  stayDays: z.number().nullable().describe("Maximum days per stay"),
+  issuedAt: z.string().nullable().describe("Place, embassy or authority that issued it"),
+  passportNumber: z.string().nullable(),
+});
+
+/** Reads a visa (sticker photo, e-visa, grant letter) with Claude. Needs ANTHROPIC_API_KEY. */
+export async function extractVisa(bytes: Buffer, mediaType: string): Promise<z.infer<typeof VisaSchema>> {
+  const client = new Anthropic();
+  const data = bytes.toString("base64");
+  const source =
+    mediaType === "application/pdf"
+      ? ({ type: "document", source: { type: "base64", media_type: "application/pdf", data } } as const)
+      : ({
+          type: "image",
+          source: { type: "base64", media_type: mediaType as "image/png" | "image/jpeg" | "image/webp" | "image/gif", data },
+        } as const);
+  const response = await client.messages.parse({
+    model: "claude-opus-5-5",
+    max_tokens: 4000,
+    output_config: { effort: "low", format: zodOutputFormat(VisaSchema) },
+    messages: [
+      {
+        role: "user",
+        content: [
+          source,
+          {
+            type: "text",
+            text: "This is a visa (sticker, e-visa or grant notice). Extract its details. Dates as YYYY-MM-DD. Use null for anything not shown; never guess.",
+          },
+        ],
+      },
+    ],
+  });
+  if (response.stop_reason === "refusal" || !response.parsed_output) throw new Error("Could not read the visa.");
+  return response.parsed_output;
+}
+
 export async function extractFromDocument(bytes: Buffer, mediaType: string): Promise<Extracted> {
   const client = new Anthropic(); // reads ANTHROPIC_API_KEY
   const data = bytes.toString("base64");

@@ -9,9 +9,13 @@ import {
   travelStats,
   tripDuration,
   daysToYmd,
+  formatShortDate,
+  visaState,
   type Profile,
   type Trip,
+  type Visa,
 } from "@/lib/data";
+import { countryName } from "@/lib/countries";
 
 const NAVY = "#0b1f3a";
 const NAVY_2 = "#13315c";
@@ -99,9 +103,14 @@ export function ImmigrationPdf({
   trips,
   flags,
   generatedOn,
+  visas = [],
+  only,
 }: {
+  /** "visas" = travel card + visas only. */
+  only?: "visas";
   profile: Profile;
   trips: Trip[];
+  visas?: Visa[];
   flags: Record<string, string | null>;
   generatedOn: string;
 }) {
@@ -109,14 +118,78 @@ export function ImmigrationPdf({
   const stats = travelStats(trips);
   const groups = groupByCountry(trips);
   const [mrz1, mrz2] = mrz(profile);
+  const visasOnly = only === "visas";
+  // Visas held: own page in the full PDF, or the whole content of the visas-only PDF.
+  const visasSection = visas.length > 0 ? (
+          <View style={{ marginTop: 18 }}>
+            <Text style={s.sectionTitle} minPresenceAhead={60}>
+              Visas
+            </Text>
+            <View style={s.thead}>
+              <Text style={[s.th, { width: "20%" }]}>COUNTRY</Text>
+              <Text style={[s.th, { width: "17%" }]}>TYPE / NO.</Text>
+              <Text style={[s.th, { width: "14%" }]}>ISSUED</Text>
+              <Text style={[s.th, { width: "14%" }]}>EXPIRES</Text>
+              <Text style={[s.th, { width: "17%" }]}>TRAVEL FROM - TO</Text>
+              <Text style={[s.th, { width: "9%" }]}>ENTRIES</Text>
+              <Text style={[s.th, { width: "9%" }]}>STATUS</Text>
+            </View>
+            {visas.map((v, i) => {
+              const st = visaState(v);
+              return (
+                <View key={v.id} style={[s.group, i % 2 ? { backgroundColor: PAPER } : {}]} wrap={false}>
+                  <View style={[s.countryCell, { width: "20%" }]}>
+                    {flags[v.countryCode] && (
+                      // eslint-disable-next-line jsx-a11y/alt-text
+                      <Image src={flags[v.countryCode]!} style={s.flag} />
+                    )}
+                    <Text style={s.countryName}>{countryName(v.countryCode)}</Text>
+                  </View>
+                  <View style={[s.cell, { width: "17%" }]}>
+                    <Text>{v.visaType || "Visa"}</Text>
+                    {v.visaFormat ? <Text style={s.note}>{v.visaFormat}</Text> : null}
+                    {v.visaNumber ? <Text style={[s.note, { fontFamily: "Courier" }]}>{v.visaNumber}</Text> : null}
+                    {v.purpose ? <Text style={s.note}>{v.purpose}</Text> : null}
+                  </View>
+                  <Text style={[s.cell, { width: "14%" }]}>{v.issueDate ? formatDate(v.issueDate) : "—"}</Text>
+                  <Text style={[s.cell, { width: "14%" }]}>{v.expiryDate ? formatDate(v.expiryDate) : "—"}</Text>
+                  <Text style={[s.cell, { width: "17%" }]}>
+                    {v.travelFrom || v.travelTo ? `${formatShortDate(v.travelFrom)} to ${formatShortDate(v.travelTo)}` : "—"}
+                  </Text>
+                  <Text style={[s.cell, { width: "9%" }]}>
+                    {v.entries ?? "—"}
+                    {v.stayDays ? `\n${v.stayDays} days` : ""}
+                  </Text>
+                  <Text
+                    style={[
+                      s.cell,
+                      { width: "9%", fontFamily: "Helvetica-Bold", color: st.tone === "valid" ? "#1d7a4e" : st.tone === "expired" ? "#b4232f" : MUTED },
+                    ]}
+                  >
+                    {st.label}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+  ) : (
+    <Text style={{ color: MUTED, marginTop: 12 }}>No visas recorded.</Text>
+  );
+  const footer = (
+    <View style={s.footer} fixed>
+      <Text>{profile.fullName} · Private &amp; confidential</Text>
+      <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
+    </View>
+  );
+
 
   return (
-    <Document title={`Previous Immigration History - ${profile.fullName}`} author={profile.fullName}>
+    <Document title={` - ${profile.fullName}`} author={profile.fullName}>
       <Page size="A4" style={s.page}>
         <View style={s.titleRow}>
           <View>
             <Text style={s.eyebrow}>PERSONAL TRAVEL RECORD</Text>
-            <Text style={s.title}>Previous Immigration History</Text>
+            <Text style={s.title}>{visasOnly ? "Visas Held" : "Previous Immigration History"}</Text>
           </View>
           <Text style={s.generated}>Generated {generatedOn}</Text>
         </View>
@@ -164,6 +237,8 @@ export function ImmigrationPdf({
           </View>
         </View>
 
+        {!visasOnly && (
+        <>
         <View style={s.stats}>
           {[
             ["COUNTRIES", stats.countries],
@@ -228,11 +303,22 @@ export function ImmigrationPdf({
           </View>
         ))}
 
+        </>
+        )}
+
+        {visasOnly && visasSection}
+
         <View style={s.footer} fixed>
           <Text>{profile.fullName} · Private &amp; confidential</Text>
           <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>
       </Page>
+      {!visasOnly && visas.length > 0 && (
+        <Page size="A4" style={s.page}>
+          {visasSection}
+          {footer}
+        </Page>
+      )}
     </Document>
   );
 }

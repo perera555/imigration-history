@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { requireAuth } from "@/lib/session";
 import { getProfile, getTrips, travelStats } from "@/lib/data";
+import { VisasButton } from "@/components/VisasButton";
 import { TravelCard } from "@/components/TravelCard";
 import { HistoryTable, StatsBar } from "@/components/HistoryTable";
 import { logout } from "@/lib/actions";
@@ -45,6 +46,7 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
                 View my card
               </Link>
               <UpdateButton profileId={profile.id} />
+              <VisasButton profileId={profile.id} />
               <PdfButtons profileId={profile.id} />
             </>
           )}

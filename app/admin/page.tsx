@@ -6,6 +6,7 @@ import { listProfiles } from "@/lib/data";
 import { deleteProfile, logout } from "@/lib/actions";
 import { ConfirmButton } from "@/components/SubmitButton";
 import { UpdateButton } from "@/components/UpdateButton";
+import { VisasButton } from "@/components/VisasButton";
 
 export const metadata: Metadata = { title: "Admin" };
 
@@ -74,6 +75,7 @@ async function ProfileTable() {
               Open
             </Link>
             <UpdateButton profileId={p.id} />
+            <VisasButton profileId={p.id} />
             <form action={deleteProfile.bind(null, p.id)}>
               <ConfirmButton message={`Delete ${p.fullName} and all trips? This cannot be undone.`}>Delete</ConfirmButton>
             </form>

@@ -85,6 +85,6 @@ export function ProfileEditor({
           ))}
         </ul>
       </section>
-    </div>
+   </div>
   );
 }

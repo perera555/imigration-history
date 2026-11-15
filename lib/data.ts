@@ -104,6 +104,71 @@ export async function getTrip(id: string): Promise<Trip | null> {
   return rows[0] ?? null;
 }
 
+// ---------- visas ----------
+
+export type Visa = {
+  id: string;
+  profileId: string;
+  countryCode: string;
+  visaType: string;
+  /** e-Visa, Paper visa, Visa on arrival, ETA */
+  visaFormat: string | null;
+  visaNumber: string | null;
+  issueDate: string | null;
+  expiryDate: string | null;
+  travelFrom: string | null;
+  travelTo: string | null;
+  purpose: string | null;
+  entries: string | null;
+  stayDays: number | null;
+  issuedAt: string | null;
+  passportNumber: string | null;
+  status: string | null;
+  notes: string | null;
+  hasDocument: boolean;
+  documentName: string | null;
+};
+
+const VISA_COLUMNS = (sql: Awaited<ReturnType<typeof getDb>>) => sql`
+  v.id, v.profile_id, trim(v.country_code) as country_code, v.visa_type, v.visa_format, v.visa_number, v.issue_date,
+  v.expiry_date, v.travel_from, v.travel_to, v.purpose, v.entries, v.stay_days, v.issued_at, v.passport_number, v.status, v.notes,
+  (d.visa_id is not null) as has_document, d.file_name as document_name`;
+
+export async function getVisas(profileId: string): Promise<Visa[]> {
+  if (!isUuid(profileId)) return [];
+  const sql = await getDb();
+  return sql<Visa[]>`
+    select ${VISA_COLUMNS(sql)}
+    from visas v left join visa_documents d on d.visa_id = v.id
+    where v.profile_id = ${profileId}
+    order by v.issue_date desc nulls last, v.created_at desc`;
+}
+
+export async function getVisa(id: string): Promise<Visa | null> {
+  if (!isUuid(id)) return null;
+  const sql = await getDb();
+  const rows = await sql<Visa[]>`
+    select ${VISA_COLUMNS(sql)}
+    from visas v left join visa_documents d on d.visa_id = v.id
+    where v.id = ${id}`;
+  return rows[0] ?? null;
+}
+
+export type VisaState = { label: string; tone: "valid" | "expired" | "upcoming" | "closed"; detail: string | null };
+
+/** Valid / Expired / Not yet valid, or a manual status like "Used" or "Cancelled". */
+export function visaState(visa: Pick<Visa, "issueDate" | "expiryDate" | "status">, today = new Date()): VisaState {
+  const t = today.toISOString().slice(0, 10);
+  if (visa.status) return { label: visa.status, tone: "closed", detail: null };
+  if (visa.expiryDate && visa.expiryDate < t) return { label: "Expired", tone: "expired", detail: null };
+  if (visa.issueDate && visa.issueDate > t) return { label: "Not yet valid", tone: "upcoming", detail: null };
+  if (visa.expiryDate) {
+    const days = Math.round((Date.parse(visa.expiryDate) - Date.parse(t)) / 86_400_000);
+    return { label: "Valid", tone: "valid", detail: `${days} day${days === 1 ? "" : "s"} left` };
+  }
+  return { label: "Valid", tone: "valid", detail: null };
+}
+
 // ---------- pure helpers (also used by the PDF) ----------
 
 /** Groups trips by country, ordered by each country's first visit — like the original document. */
