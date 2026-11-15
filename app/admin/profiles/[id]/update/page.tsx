@@ -7,6 +7,7 @@ import { getProfile, getTrips, getVisas } from "@/lib/data";
 import { VisaManager } from "@/components/VisaManager";
 import { VisaList } from "@/components/VisaList";
 import { RecordForm } from "@/components/RecordForm";
+import { JumpNav } from "@/components/JumpNav";
 
 export const metadata: Metadata = { title: "Update record" };
 
@@ -58,11 +59,13 @@ async function UpdateRecord({
           Everything saved for this record is filled in below. Change any detail, add or remove visits, then save the
           travel card, the immigration record, or both with <b>Save / Update record</b>.
         </p>
-        <nav className="mt-4 flex flex-wrap gap-2" aria-label="Jump to section">
-          <a href="#card" className="btn btn-ghost !py-1.5">🪪 Travel card</a>
-          <a href="#record" className="btn btn-ghost !py-1.5">🌍 Immigration record</a>
-          <a href="#visas" className="btn btn-gold !py-1.5">🛂 Visas</a>
-        </nav>
+        <JumpNav
+          items={[
+            { id: "card", label: "🪪 Travel card" },
+            { id: "record", label: "🌍 Immigration record" },
+            { id: "visas", label: "🛂 Visas", primary: true },
+          ]}
+        />
       </div>
       <RecordForm
         // Remount with fresh database data after every save.

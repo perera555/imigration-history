@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatShortDate, tripDuration, type Profile, type Trip, type Visa } from "@/lib/data";
 import { VisaManager } from "./VisaManager";
+import { JumpNav } from "./JumpNav";
 import { countryName } from "@/lib/countries";
 import { deleteTrip, updateProfile } from "@/lib/actions";
 import { ProfileForm } from "./ProfileForm";
@@ -26,7 +27,15 @@ export function ProfileEditor({
 
   return (
     <div className="space-y-8">
-      <section className="panel p-6 sm:p-8">
+      <JumpNav
+        items={[
+          { id: "details", label: "🪪 Travel card details" },
+          { id: "trips", label: "🌍 Immigration record" },
+          { id: "recorded", label: "🧾 Recorded trips" },
+          { id: "visas", label: "🛂 Visas", primary: true },
+        ]}
+      />
+      <section id="details" className="panel p-6 sm:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Step 1</p>
         <h2 className="mb-6 mt-1 font-serif text-2xl font-bold text-navy">Travel card details</h2>
         <ProfileForm action={updateProfile.bind(null, profile.id)} profile={profile} submitLabel="Save details" />
@@ -54,7 +63,7 @@ export function ProfileEditor({
         />
       </section>
 
-      <section className="panel overflow-hidden">
+      <section id="recorded" className="panel overflow-hidden">
         <h2 className="border-b border-line px-6 py-4 font-serif text-xl font-bold text-navy">
           Recorded trips <span className="text-base font-normal text-ink-soft">({trips.length})</span>
         </h2>
