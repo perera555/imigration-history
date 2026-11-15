@@ -234,7 +234,7 @@ export function RecordForm({
       )}
 
       {showProfile && (
-        <section className="panel p-6 sm:p-8">
+        <section id="card" className="panel scroll-mt-24 p-6 sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Travel card</p>
           <h2 className="mt-1 font-serif text-2xl font-bold text-navy">Personal details</h2>
           {saveTo !== "new" && !updateId && (
@@ -301,7 +301,7 @@ export function RecordForm({
       )}
 
       {/* Immigration record, laid out like the paper form: one section per country, visits listed under it */}
-      <section className="panel">
+      <section id="record" className="panel scroll-mt-24">
         <div className="border-b border-line px-6 py-5">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Immigration record</p>
           <h2 className="mt-1 font-serif text-2xl font-bold text-navy">Countries & visits</h2>

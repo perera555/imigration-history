@@ -6,6 +6,22 @@ import type { Visa } from "@/lib/data";
 import { CountrySelect } from "./CountrySelect";
 import { SubmitButton } from "./SubmitButton";
 
+const PURPOSES = [
+  "Tourism",
+  "Business",
+  "Study",
+  "Work",
+  "Family visit",
+  "Medical",
+  "Transit",
+  "Conference / Training",
+  "Religious",
+  "Sports",
+  "Official / Diplomatic",
+  "Residence",
+  "Working holiday",
+];
+
 const TYPES = ["Tourist", "Visit", "Business", "Student", "Work", "Transit", "Family", "Medical", "Working Holiday", "Resident", "e-Visa", "Visa on arrival", "ETA"];
 
 type Fields = {
@@ -172,7 +188,14 @@ export function VisaForm({
         </label>
         <label>
           <span className="field-label">Purpose</span>
-          <input name="purpose" value={f.purpose} onChange={set("purpose")} className="field" placeholder="Tourism, Study…" />
+          <select name="purpose" value={f.purpose} onChange={set("purpose")} className="field">
+            <option value="">—</option>
+            {/* keep a value read from a document even if it isn't in the list */}
+            {f.purpose && !PURPOSES.includes(f.purpose) && <option value={f.purpose}>{f.purpose}</option>}
+            {PURPOSES.map((p) => (
+              <option key={p}>{p}</option>
+            ))}
+          </select>
         </label>
         <label>
           <span className="field-label">Travel from</span>
