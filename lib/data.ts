@@ -214,6 +214,16 @@ export async function getPassportPages(profileId: string): Promise<PassportPage[
     where profile_id = ${profileId} order by passport_number, page_no`;
 }
 
+export type PassportDocument = { id: string; passportNumber: string; fileName: string; size: number };
+
+/** Original whole-passport PDFs (one per passport number). */
+export async function getPassportDocuments(profileId: string): Promise<PassportDocument[]> {
+  if (!isUuid(profileId)) return [];
+  const sql = await getDb();
+  return sql<PassportDocument[]>`
+    select id, passport_number, file_name, size from passport_documents where profile_id = ${profileId}`;
+}
+
 // ---------- places stayed (hotels, Airbnb homes, …) ----------
 
 export { STAY_KINDS, STAY_ICON, stayNights } from "./stay-kinds";

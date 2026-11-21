@@ -1,12 +1,28 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { deletePassportPage, savePassportPage } from "@/lib/passport-actions";
+import { deletePassportPage, savePassportDocument, savePassportPage } from "@/lib/passport-actions";
 import { prepareUpload } from "@/lib/upload-prep";
-import type { PassportPage } from "@/lib/data";
+import type { PassportDocument, PassportPage } from "@/lib/data";
 import { toast } from "./Toaster";
 
 const TOTAL = 64;
+/** Largest original PDF that fits in one upload on the hosting (request limit ~4.5 MB). */
+const MAX_ORIGINAL = 4_200_000;
+
+/** Turns every page of a PDF into a JPEG image (in the browser). */
+async function pdfToPageImages(file: File, onPage: (done: number, total: number) => void): Promise<File[]> {
+  const { getDocumentProxy, renderPageAsImage } = await import("unpdf");
+  const pdf = await getDocumentProxy(new Uint8Array(await file.arrayBuffer()));
+  const out: File[] = [];
+  const total = Math.min(pdf.numPages, TOTAL);
+  for (let n = 1; n <= total; n++) {
+    onPage(n - 1, total);
+    const bytes = (await renderPageAsImage(pdf, n, { width: 1400, format: "jpeg", quality: 0.85 })) as Uint8Array;
+    out.push(new File([new Uint8Array(bytes)], `page-${n}.jpg`, { type: "image/jpeg" }));
+  }
+  return out;
+}
 
 /**
  * "Passport pages": scan and save every page (up to 64) of the current and previous passports,
@@ -17,12 +33,15 @@ export function PassportPagesSection({
   current,
   previous,
   pages,
+  documents = [],
   canDelete,
 }: {
   profileId: string;
   current: string | null;
   previous: string[];
   pages: PassportPage[];
+  /** Original whole-passport PDFs. */
+  documents?: PassportDocument[];
   canDelete: boolean;
 }) {
   // Passports: current first, then previous, then any number that only has saved pages.
@@ -67,6 +86,45 @@ export function PassportPagesSection({
   }
 
   const firstEmpty = Array.from({ length: TOTAL }, (_, i) => i + 1).find((n) => !byPage.has(n)) ?? null;
+  const original = documents.find((d) => d.passportNumber === active);
+  const wholeRef = useRef<HTMLInputElement>(null);
+
+  /** Whole passport as one PDF: page 1 → page 1, page 2 → page 2 …, plus the original PDF kept. */
+  async function uploadWholePdf(file: File | undefined) {
+    if (!file || !active) return;
+    if (file.type !== "application/pdf") return toast("Choose a PDF file of the whole passport.", "error");
+    if (byPage.size && !confirm(`Passport ${active} already has ${byPage.size} saved page(s). Pages in this PDF replace the same page numbers. Continue?`)) return;
+    try {
+      setBusy("Reading the PDF…");
+      const images = await pdfToPageImages(file, (done, total) => setBusy(`Preparing page ${done + 1} of ${total}…`));
+      let saved = 0;
+      for (let i = 0; i < images.length; i++) {
+        setBusy(`Saving page ${i + 1} of ${images.length}…`);
+        const fd = new FormData();
+        fd.append("page", await prepareUpload(images[i]));
+        const r = await savePassportPage(profileId, active, i + 1, fd).catch(() => ({ error: "no answer" }));
+        if (!("error" in r) || !r.error) saved++;
+      }
+      // Keep the original PDF too (when it fits in one upload).
+      let keptOriginal = false;
+      if (file.size <= MAX_ORIGINAL) {
+        setBusy("Saving the original PDF…");
+        const fd = new FormData();
+        fd.append("document", file);
+        const r = await savePassportDocument(profileId, active, fd).catch(() => ({ error: "no answer" }));
+        keptOriginal = !("error" in r) || !r.error;
+      }
+      toast(
+        `${saved} page${saved === 1 ? "" : "s"} of passport ${active} saved${keptOriginal ? " + original PDF kept" : ""}`,
+        saved ? "ok" : "error",
+      );
+      if (!keptOriginal && file.size > MAX_ORIGINAL) toast("The original PDF is too large to keep online, but every page is saved.", "info");
+    } catch {
+      toast("This PDF could not be read. Try another copy, or scan the pages.", "error");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   return (
     <section id="passport-pages" className="panel scroll-mt-24 p-6 sm:p-8">
@@ -109,6 +167,29 @@ export function PassportPagesSection({
                 </button>
               );
             })}
+          </div>
+
+          {/* Whole passport in one PDF: split into pages automatically */}
+          <div className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-dashed border-gold/50 bg-gold/5 p-4">
+            <span className="text-2xl" aria-hidden>
+              📄
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-navy">Whole passport as one PDF</p>
+              <p className="text-sm text-ink-soft">
+                Upload the PDF of passport <b className="font-mono">{active}</b>. Every page is saved automatically (page 1, 2, 3 … up to 64) under this
+                passport number{original ? "" : ", and the original PDF is kept"}.
+              </p>
+              {original && (
+                <a href={`/api/passport-documents/${original.id}`} target="_blank" rel="noopener" className="mt-1 inline-block text-sm font-semibold text-navy-2 hover:underline">
+                  📎 Original PDF: {original.fileName} ({Math.max(1, Math.round(original.size / 1024))} KB)
+                </a>
+              )}
+            </div>
+            <button type="button" disabled={!!busy} onClick={() => wholeRef.current?.click()} className="btn btn-gold">
+              📄 Upload whole passport PDF
+            </button>
+            <input ref={wholeRef} type="file" accept="application/pdf" className="sr-only" onChange={(e) => { uploadWholePdf(e.target.files?.[0]); e.target.value = ""; }} />
           </div>
 
           {/* Actions + progress */}

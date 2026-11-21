@@ -16,6 +16,7 @@ const LABELS: Record<string, string> = {
   visa_pages: "Extra visa pages (photos)",
   boarding_passes: "Boarding passes",
   passport_pages: "Passport pages (scans)",
+  passport_documents: "Whole-passport PDFs",
   admins: "Accounts (admins & users)",
 };
 

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { requireAuth } from "@/lib/session";
-import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, getPassportPages, boardingTrips, travelStats } from "@/lib/data";
+import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, getPassportPages, getPassportDocuments, boardingTrips, travelStats } from "@/lib/data";
 import { PassportPagesSection } from "@/components/PassportPagesSection";
 import { StaySection } from "@/components/StaySection";
 import { AppUpdatePanel } from "@/components/AppUpdatePanel";
@@ -41,6 +41,7 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
         getPassportPages(session.profileId),
       ])
     : [null, [], [], [], [], []];
+  const passportDocs = session.profileId ? await getPassportDocuments(session.profileId) : [];
 
   return (
     <div className="space-y-8">
@@ -81,7 +82,7 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
             <StatsBar stats={travelStats(trips)} />
           </section>
           <ProfileEditor profile={profile} trips={trips} visas={visas} canDelete={false} />
-          <PassportPagesSection profileId={profile.id} current={profile.passportNumber} previous={profile.previousPassports} pages={passportPages} canDelete={false} />
+          <PassportPagesSection profileId={profile.id} current={profile.passportNumber} previous={profile.previousPassports} pages={passportPages} documents={passportDocs} canDelete={false} />
           <section className="space-y-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">My immigration record</p>

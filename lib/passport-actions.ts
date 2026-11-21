@@ -60,6 +60,25 @@ export async function savePassportPage(
   return { ok: true, pageNo: page };
 }
 
+/** Keeps the original whole-passport PDF under the passport number (replaces an earlier one). */
+export async function savePassportDocument(profileId: string, passportNumber: string, form: FormData): Promise<{ ok?: true; error?: string }> {
+  if (!isUuid(profileId)) return { error: "Unknown record." };
+  await requireProfileAccess(profileId);
+  const number = cleanNumber(passportNumber);
+  const file = form.get("document");
+  if (!number || !(file instanceof File) || file.size === 0) return { error: "Choose the passport PDF." };
+  if (file.type !== "application/pdf") return { error: "The whole passport must be a PDF file." };
+  if (file.size > MAX_BYTES) return { error: "The PDF is too large to keep (max 8 MB); the pages are saved." };
+  const sql = await getDb();
+  const row = { profileId, passportNumber: number, fileName: file.name.slice(0, 120) || `passport-${number}.pdf`, mime: file.type, size: file.size, data: Buffer.from(await file.arrayBuffer()) };
+  await sql`
+    insert into passport_documents ${sql(row)}
+    on conflict (profile_id, passport_number) do update
+      set file_name = excluded.file_name, mime = excluded.mime, size = excluded.size, data = excluded.data, created_at = now()`;
+  refresh();
+  return { ok: true };
+}
+
 /** Removes one page (admins only, like other deletes; a restore point is saved first). */
 export async function deletePassportPage(pageId: string) {
   const session = await requireAdmin();

@@ -5,7 +5,7 @@ import { gzipSync, gunzipSync } from "node:zlib";
 type Sql = postgres.Sql | postgres.TransactionSql;
 
 /** Tables in a backup, in restore order (parents before children). */
-export const BACKUP_TABLES = ["profiles", "trips", "stays", "visas", "visa_documents", "visa_pages", "boarding_passes", "passport_pages", "admins"] as const;
+export const BACKUP_TABLES = ["profiles", "trips", "stays", "visas", "visa_documents", "visa_pages", "boarding_passes", "passport_pages", "passport_documents", "admins"] as const;
 export type BackupTable = (typeof BACKUP_TABLES)[number];
 
 /** Primary key used to find rows that already exist when restoring. */
@@ -18,6 +18,7 @@ export const PRIMARY_KEY: Record<BackupTable, string> = {
   visa_pages: "id",
   boarding_passes: "id",
   passport_pages: "id",
+  passport_documents: "id",
   admins: "id",
 };
 
@@ -107,6 +108,7 @@ function scopeQueries(sql: Sql, s: Scope): [BackupTable, Promise<Record<string, 
       ["visa_pages", sql`select * from visa_pages where visa_id in (select id from visas where profile_id = ${id})`],
       ["boarding_passes", sql`select * from boarding_passes where profile_id = ${id}`],
       ["passport_pages", sql`select * from passport_pages where profile_id = ${id}`],
+      ["passport_documents", sql`select * from passport_documents where profile_id = ${id}`],
       ["admins", sql`select * from admins where profile_id = ${id}`], // to re-link the account
     ];
   }

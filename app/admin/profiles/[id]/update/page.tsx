@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { requireProfileAccess } from "@/lib/session";
-import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, getPassportPages, boardingTrips, groupByCountry } from "@/lib/data";
+import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, getPassportPages, getPassportDocuments, boardingTrips, groupByCountry } from "@/lib/data";
 import { PassportPagesSection } from "@/components/PassportPagesSection";
 import { StaySection } from "@/components/StaySection";
 import { VisaCountryManager } from "@/components/VisaCountryManager";
@@ -47,7 +47,7 @@ async function UpdateRecord({
     getStays(id),
     searchParams,
   ]);
-  const passportPages = await getPassportPages(id);
+  const [passportPages, passportDocs] = await Promise.all([getPassportPages(id), getPassportDocuments(id)]);
   if (!profile) notFound();
   const back = session.role === "admin" ? `/admin/profiles/${id}` : "/account";
   const saved = typeof query.saved === "string" ? SAVED_TEXT[query.saved] : undefined;
@@ -120,7 +120,7 @@ async function UpdateRecord({
           stayedAddress: t.stayedAddress,
         }))}
       />
-      <PassportPagesSection profileId={id} current={profile.passportNumber} previous={profile.previousPassports} pages={passportPages} canDelete={session.role === "admin"} />
+      <PassportPagesSection profileId={id} current={profile.passportNumber} previous={profile.previousPassports} pages={passportPages} documents={passportDocs} canDelete={session.role === "admin"} />
       <StaySection profileId={id} stays={stays} trips={boardingTrips(trips)} canDelete={session.role === "admin"} />
       {/* Visas: added and edited here, under the immigration record */}
       <section id="visas" className="panel scroll-mt-24 p-6 sm:p-8">
