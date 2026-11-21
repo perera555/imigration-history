@@ -229,7 +229,7 @@ export function ImmigrationPdf({
         name: t.stayedAt!,
         kind: "From the immigration record",
         city: t.city,
-        address: null,
+        address: t.stayedAddress,
         checkIn: t.departureDate,
         checkOut: t.returnDate,
         booking: null,
@@ -423,7 +423,12 @@ export function ImmigrationPdf({
                       {trip.city ? ` (${trip.city})` : ""}
                     </Text>
                     {trip.countries ? <Text style={s.note}>Countries: {trip.countries.map(countryName).join(", ")}</Text> : null}
-                    {trip.stayedAt ? <Text style={s.note}>Stayed at: {trip.stayedAt}</Text> : null}
+                    {trip.stayedAt ? (
+                      <Text style={s.note}>
+                        Stayed at: {trip.stayedAt}
+                        {trip.stayedAddress ? `, ${trip.stayedAddress}` : ""}
+                      </Text>
+                    ) : null}
                     {trip.notes ? <Text style={s.note}>{trip.notes}</Text> : null}
                   </View>
                   <Text style={[s.cell, { width: pct(W.passport), fontFamily: "Courier" }]}>

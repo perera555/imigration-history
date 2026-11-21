@@ -35,8 +35,9 @@ export type Trip = {
   purpose: string;
   passportNumber: string | null;
   notes: string | null;
-  /** Hotel / Airbnb home stayed on this visit. */
+  /** Hotel / Airbnb home stayed on this visit, and its address. */
   stayedAt: string | null;
+  stayedAddress: string | null;
 };
 
 export type ProfileSummary = Pick<
@@ -91,7 +92,7 @@ export async function getTrips(profileId: string): Promise<Trip[]> {
   const sql = await getDb();
   return sql<Trip[]>`
     select id, profile_id, trim(country_code) as country_code, city, departure_date,
-           return_date, purpose, passport_number, notes, stayed_at
+           return_date, purpose, passport_number, notes, stayed_at, stayed_address
     from trips where profile_id = ${profileId}
     order by departure_date, created_at`;
 }
@@ -101,7 +102,7 @@ export async function getTrip(id: string): Promise<Trip | null> {
   const sql = await getDb();
   const rows = await sql<Trip[]>`
     select id, profile_id, trim(country_code) as country_code, city, departure_date,
-           return_date, purpose, passport_number, notes, stayed_at
+           return_date, purpose, passport_number, notes, stayed_at, stayed_address
     from trips where id = ${id}`;
   return rows[0] ?? null;
 }
@@ -394,7 +395,16 @@ export function formatShortDate(value: string | null): string {
 /** Trip choices for linking a boarding pass or stay, e.g. "Thailand · 10 Dec 2013 → 12 Dec 2013". */
 export function boardingTrips(
   trips: Trip[],
-): { id: string; label: string; date: string; countryCode: string; purpose: string | null; city: string | null; stayedAt: string | null }[] {
+): {
+  id: string;
+  label: string;
+  date: string;
+  countryCode: string;
+  purpose: string | null;
+  city: string | null;
+  stayedAt: string | null;
+  stayedAddress: string | null;
+}[] {
   return [...trips]
     .sort((a, b) => b.departureDate.localeCompare(a.departureDate))
     .map((t) => ({
@@ -405,5 +415,6 @@ export function boardingTrips(
       purpose: t.purpose,
       city: t.city,
       stayedAt: t.stayedAt,
+      stayedAddress: t.stayedAddress,
     }));
 }

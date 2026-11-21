@@ -365,6 +365,7 @@ export type ImportTrip = {
   notes: string | null;
   /** Hotel / Airbnb home stayed on this visit, e.g. "PJ Watergate". */
   stayedAt?: string | null;
+  stayedAddress?: string | null;
 };
 export type ImportProfile = {
   fullName: string | null;
@@ -446,6 +447,7 @@ function cleanTrip(t: ImportTrip): { error: string } | { values: ImportTrip } {
       passportNumber: s(t.passportNumber, 30)?.toUpperCase() ?? null,
       notes: s(t.notes, 1000),
       stayedAt: s(t.stayedAt, 200),
+      stayedAddress: s(t.stayedAddress, 300),
     },
   };
 }

@@ -11,7 +11,7 @@ import { DateInput } from "./DateInput";
 import { DocumentPicker, isImageName } from "./DocumentPicker";
 import { ConfirmButton, SubmitButton } from "./SubmitButton";
 
-export type StayTrip = { id: string; label: string; date: string; countryCode: string; purpose: string | null; city: string | null; stayedAt?: string | null };
+export type StayTrip = { id: string; label: string; date: string; countryCode: string; purpose: string | null; city: string | null; stayedAt?: string | null; stayedAddress?: string | null };
 
 const fmt = (d: string | null) =>
   d ? new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : "—";
@@ -69,7 +69,7 @@ function StayForm({
     // New stay for a trip: start with the trip's country, city and dates.
     if (!stay && t) {
       const [dep, ret] = t.date.split("|");
-      return { ...base, name: t.stayedAt ?? "", countryCode: t.countryCode, city: t.city ?? "", checkIn: dep, checkOut: ret || "" };
+      return { ...base, name: t.stayedAt ?? "", address: t.stayedAddress ?? "", countryCode: t.countryCode, city: t.city ?? "", checkIn: dep, checkOut: ret || "" };
     }
     return base;
   });
@@ -442,10 +442,11 @@ export function StaySection({
                         </span>
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-navy">{t.stayedAt}</p>
+                          {t.stayedAddress && <p className="text-sm text-ink-soft">{t.stayedAddress}</p>}
                           <p className="text-xs text-ink-soft">From the immigration record · {t.label}</p>
                           <div className="mt-2 flex flex-wrap gap-2">
                             <a
-                              href={`https://www.google.com/maps/search/${encodeURIComponent(`${t.stayedAt}, ${t.city ? `${t.city}, ` : ""}${countryName(t.countryCode)}`)}`}
+                              href={`https://www.google.com/maps/search/${encodeURIComponent(`${t.stayedAt}, ${t.stayedAddress ? `${t.stayedAddress}, ` : t.city ? `${t.city}, ` : ""}${countryName(t.countryCode)}`)}`}
                               target="_blank"
                               rel="noopener"
                               className="btn btn-ghost !px-3 !py-1.5 text-xs"

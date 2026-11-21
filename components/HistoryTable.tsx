@@ -19,6 +19,7 @@ function StaysLine({ visit, trips, stays }: { visit: Trip & { countries?: string
       {typed && (
         <li className="text-xs text-navy-2">
           🏨 <b>{typed}</b>
+          {visit.stayedAddress && <span className="text-ink-soft"> · {visit.stayedAddress}</span>}
         </li>
       )}
       {list.map((s) => {

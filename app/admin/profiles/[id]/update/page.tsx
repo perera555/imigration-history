@@ -108,6 +108,7 @@ async function UpdateRecord({
           passportNumber: t.passportNumber,
           notes: t.notes,
           stayedAt: t.stayedAt,
+          stayedAddress: t.stayedAddress,
         }))}
       />
       <StaySection profileId={id} stays={stays} trips={boardingTrips(trips)} canDelete={session.role === "admin"} />

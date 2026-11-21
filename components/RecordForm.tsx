@@ -23,6 +23,7 @@ type Visit = {
   notes: string;
   /** Hotel / Airbnb home stayed on this visit. */
   stayedAt?: string;
+  stayedAddress?: string;
 };
 type CountryBlock = {
   key: number;
@@ -82,6 +83,7 @@ function toBlocks(trips: ImportTrip[]): CountryBlock[] {
       passportNumber: t.passportNumber ?? "",
       notes: t.notes ?? "",
       stayedAt: t.stayedAt ?? "",
+      stayedAddress: t.stayedAddress ?? "",
       ...extra,
     });
     if (isSchengen(t.countryCode)) {
@@ -117,7 +119,7 @@ function collectTrips(blocks: CountryBlock[]): { trips: ImportTrip[] } | { error
   for (const b of blocks) {
     const codes = b.schengen ? [...new Set((b.codes ?? []).map((c) => c.code).filter(Boolean))] : [b.countryCode];
     for (const v of b.visits) {
-      const empty = !v.departureDate && !v.returnDate && !v.purpose && !v.passportNumber && !v.notes && !v.stayedAt;
+      const empty = !v.departureDate && !v.returnDate && !v.purpose && !v.passportNumber && !v.notes && !v.stayedAt && !v.stayedAddress;
       if (empty) continue;
       if (b.schengen && !codes.length) return { error: "Add the Schengen countries you travelled to." };
       if (!b.schengen && !b.countryCode) return { error: "Choose a country for every section that has visits." };
@@ -133,6 +135,7 @@ function collectTrips(blocks: CountryBlock[]): { trips: ImportTrip[] } | { error
           passportNumber: v.passportNumber || null,
           notes: v.notes || null,
           stayedAt: v.stayedAt || null,
+          stayedAddress: v.stayedAddress || null,
         });
       }
     }
@@ -499,7 +502,7 @@ export function RecordForm({
                 )}
 
                 <div className="mt-4 overflow-x-auto">
-                  <table className="w-full min-w-[960px] text-sm">
+                  <table className="w-full min-w-[760px] text-sm">
                     <thead>
                       <tr className="text-left text-[11px] uppercase tracking-[0.12em] text-ink-soft">
                         <th className="pb-2 pr-2">#</th>
@@ -507,15 +510,14 @@ export function RecordForm({
                         <th className="pb-2 pr-2">Return date</th>
                         <th className="pb-2 pr-2">Purpose</th>
                         <th className="pb-2 pr-2">Passport used</th>
-                        <th className="pb-2 pr-2">🏨 Where you stayed</th>
-                        <th className="pb-2 pr-2">Notes</th>
                         <th className="pb-2" />
                       </tr>
                     </thead>
-                    <tbody>
-                      {b.visits.map((v, vi) => (
-                        <tr key={v.key}>
-                          <td className="py-1 pr-2 text-ink-soft">{vi + 1}</td>
+                    {b.visits.map((v, vi) => (
+                      // One visit = two lines: dates / purpose / passport, then hotel, address and notes.
+                      <tbody key={v.key} className={vi ? "border-t border-line" : ""}>
+                        <tr>
+                          <td className="pt-2 pr-2 align-top text-ink-soft">{vi + 1}</td>
                           <td className="py-1 pr-2">
                             <DateInput value={v.departureDate} onChange={(e) => setVisit(b.key, v.key, { departureDate: e.target.value })} className="field !py-2" />
                           </td>
@@ -533,18 +535,6 @@ export function RecordForm({
                               className="field !py-2 font-mono uppercase"
                             />
                           </td>
-                          <td className="py-1 pr-2">
-                            <input
-                              value={v.stayedAt ?? ""}
-                              list="stayed-options"
-                              onChange={(e) => setVisit(b.key, v.key, { stayedAt: e.target.value })}
-                              className="field !py-2"
-                              placeholder="Hotel / Airbnb"
-                            />
-                          </td>
-                          <td className="py-1 pr-2">
-                            <input value={v.notes} onChange={(e) => setVisit(b.key, v.key, { notes: e.target.value })} className="field !py-2" />
-                          </td>
                           <td className="py-1">
                             <button
                               type="button"
@@ -558,8 +548,39 @@ export function RecordForm({
                             </button>
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
+                        <tr>
+                          <td />
+                          <td colSpan={4} className="pb-3 pr-2 pt-1">
+                            <div className="grid gap-2 sm:grid-cols-3">
+                              <label>
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-soft">🏨 Hotel / Airbnb (optional)</span>
+                                <input
+                                  value={v.stayedAt ?? ""}
+                                  list="stayed-options"
+                                  onChange={(e) => setVisit(b.key, v.key, { stayedAt: e.target.value })}
+                                  className="field !py-2"
+                                  placeholder="e.g. PJ Watergate"
+                                />
+                              </label>
+                              <label>
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-soft">Hotel address (optional)</span>
+                                <input
+                                  value={v.stayedAddress ?? ""}
+                                  onChange={(e) => setVisit(b.key, v.key, { stayedAddress: e.target.value })}
+                                  className="field !py-2"
+                                  placeholder="Street, city"
+                                />
+                              </label>
+                              <label>
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-soft">Notes</span>
+                                <input value={v.notes} onChange={(e) => setVisit(b.key, v.key, { notes: e.target.value })} className="field !py-2" />
+                              </label>
+                            </div>
+                          </td>
+                          <td />
+                        </tr>
+                      </tbody>
+                    ))}
                   </table>
                 </div>
                 <button type="button" onClick={() => setBlock(b.key, { visits: [...b.visits, emptyVisit()] })} className="mt-3 text-sm font-semibold text-navy-2 hover:underline">
