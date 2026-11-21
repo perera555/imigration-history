@@ -6,6 +6,7 @@ import { requireAuth } from "@/lib/session";
 import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, getPassportPages, getPassportDocuments, boardingTrips, travelStats } from "@/lib/data";
 import { PassportPagesSection } from "@/components/PassportPagesSection";
 import { DocumentsPanel } from "@/components/DocumentsPanel";
+import { LiveRefresh } from "@/components/LiveRefresh";
 import { StaySection } from "@/components/StaySection";
 import { AppUpdatePanel } from "@/components/AppUpdatePanel";
 import { VisaList } from "@/components/VisaList";
@@ -77,6 +78,7 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
 
       {profile ? (
         <>
+          <LiveRefresh profileId={profile.id} />
           <section className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">My record</p>
             <TravelCard profile={profile} />

@@ -5,6 +5,7 @@ import { travelStats, type Profile, type Stay, type Trip, type Visa } from "@/li
 import { VisaList } from "./VisaList";
 import { TravelCard } from "./TravelCard";
 import { DocumentsPanel } from "./DocumentsPanel";
+import { LiveRefresh } from "./LiveRefresh";
 import { HistoryTable, StatsBar } from "./HistoryTable";
 
 export function ProfileDetail({
@@ -41,6 +42,7 @@ export function ProfileDetail({
       <div className="space-y-3">
         <TravelCard profile={profile} />
         {showDocuments && <DocumentsPanel profileId={profile.id} />}
+        {showDocuments && <LiveRefresh profileId={profile.id} />}
         <StatsBar stats={travelStats(trips)} />
       </div>
 
