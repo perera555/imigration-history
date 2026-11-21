@@ -105,6 +105,13 @@ export async function logout() {
   redirect("/login");
 }
 
+/** "Sign out and create a new account" on the Create account page. */
+export async function logoutToRegister() {
+  await deleteSession();
+  await flash("Signed out. Now create the new account.", "info");
+  redirect("/register");
+}
+
 export async function forgotPassword(_: FormState, form: FormData): Promise<FormState> {
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   if (!EMAIL_RE.test(email)) return { error: "Enter a valid email address." };
@@ -176,15 +183,24 @@ export async function addAdmin(_: FormState, form: FormData): Promise<FormState>
   const problem = validatePassword(password);
   if (problem) return { error: problem };
 
+  const role = form.get("role") === "admin" ? "admin" : "user";
+  if (role === "user" && !name) return { error: "Enter the user's full name (it starts their travel record)." };
+
   const sql = await getDb();
-  const rows = await sql`
-    insert into admins (email, name, password_hash, role)
-    values (${email}, ${name}, ${await hashPassword(password)}, 'admin')
-    on conflict (email) do nothing returning id`;
-  if (!rows.length) return { error: "An account with that email already exists." };
-  await flash(`Admin ${email} added successfully`);
+  const passwordHash = await hashPassword(password);
+  const created = await sql.begin(async (tx) => {
+    if ((await tx`select 1 from admins where email = ${email}`).length) return false;
+    // A user gets their own empty travel record, like signing up themselves.
+    const profileId =
+      role === "user" ? (await tx<{ id: string }[]>`insert into profiles (full_name, email) values (${name}, ${email}) returning id`)[0].id : null;
+    await tx`insert into admins (email, name, password_hash, role, profile_id) values (${email}, ${name}, ${passwordHash}, ${role}, ${profileId})`;
+    return true;
+  });
+  if (!created) return { error: "An account with that email already exists." };
+  const what = role === "admin" ? "Admin" : "User";
+  await flash(`${what} account for ${email} created successfully`);
   refresh();
-  return { ok: `Admin ${email} added.` };
+  return { ok: `${what} account ${email} created. They can sign in with this email and password.` };
 }
 
 export async function setAdminPassword(adminId: string, _: FormState, form: FormData): Promise<FormState> {

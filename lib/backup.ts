@@ -5,7 +5,7 @@ import { gzipSync, gunzipSync } from "node:zlib";
 type Sql = postgres.Sql | postgres.TransactionSql;
 
 /** Tables in a backup, in restore order (parents before children). */
-export const BACKUP_TABLES = ["profiles", "trips", "stays", "visas", "visa_documents", "visa_pages", "boarding_passes", "admins"] as const;
+export const BACKUP_TABLES = ["profiles", "trips", "stays", "visas", "visa_documents", "visa_pages", "boarding_passes", "passport_pages", "admins"] as const;
 export type BackupTable = (typeof BACKUP_TABLES)[number];
 
 /** Primary key used to find rows that already exist when restoring. */
@@ -17,6 +17,7 @@ export const PRIMARY_KEY: Record<BackupTable, string> = {
   visa_documents: "visa_id",
   visa_pages: "id",
   boarding_passes: "id",
+  passport_pages: "id",
   admins: "id",
 };
 
@@ -88,6 +89,7 @@ export type Scope =
   | { visaId: string }
   | { visaPageId: string }
   | { stayId: string }
+  | { passportPageId: string }
   | { passId: string }
   | { adminId: string };
 
@@ -104,6 +106,7 @@ function scopeQueries(sql: Sql, s: Scope): [BackupTable, Promise<Record<string, 
       ["visa_documents", sql`select * from visa_documents where visa_id in (select id from visas where profile_id = ${id})`],
       ["visa_pages", sql`select * from visa_pages where visa_id in (select id from visas where profile_id = ${id})`],
       ["boarding_passes", sql`select * from boarding_passes where profile_id = ${id}`],
+      ["passport_pages", sql`select * from passport_pages where profile_id = ${id}`],
       ["admins", sql`select * from admins where profile_id = ${id}`], // to re-link the account
     ];
   }
@@ -128,6 +131,7 @@ function scopeQueries(sql: Sql, s: Scope): [BackupTable, Promise<Record<string, 
       ["visa_pages", sql`select * from visa_pages where visa_id = ${s.visaId}`],
     ];
   if ("visaPageId" in s) return [["visa_pages", sql`select * from visa_pages where id = ${s.visaPageId}`]];
+  if ("passportPageId" in s) return [["passport_pages", sql`select * from passport_pages where id = ${s.passportPageId}`]];
   if ("stayId" in s) return [["stays", sql`select * from stays where id = ${s.stayId}`]];
   if ("passId" in s) return [["boarding_passes", sql`select * from boarding_passes where id = ${s.passId}`]];
   return [["admins", sql`select * from admins where id = ${s.adminId}`]];

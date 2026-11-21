@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { requireProfileAccess } from "@/lib/session";
-import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, boardingTrips, groupByCountry } from "@/lib/data";
+import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, getPassportPages, boardingTrips, groupByCountry } from "@/lib/data";
+import { PassportPagesSection } from "@/components/PassportPagesSection";
 import { StaySection } from "@/components/StaySection";
 import { VisaCountryManager } from "@/components/VisaCountryManager";
 import { VisaList } from "@/components/VisaList";
@@ -46,6 +47,7 @@ async function UpdateRecord({
     getStays(id),
     searchParams,
   ]);
+  const passportPages = await getPassportPages(id);
   if (!profile) notFound();
   const back = session.role === "admin" ? `/admin/profiles/${id}` : "/account";
   const saved = typeof query.saved === "string" ? SAVED_TEXT[query.saved] : undefined;
@@ -73,6 +75,7 @@ async function UpdateRecord({
           items={[
             { id: "card", label: "🪪 Travel card" },
             { id: "record", label: "🌍 Immigration record" },
+            { id: "passport-pages", label: "📘 Passport pages" },
             { id: "stays", label: "🏨 Hotels & Airbnb" },
             { id: "visas", label: "🛂 Visas" },
             { id: "boarding", label: "✈ Boarding passes", primary: true },
@@ -117,6 +120,7 @@ async function UpdateRecord({
           stayedAddress: t.stayedAddress,
         }))}
       />
+      <PassportPagesSection profileId={id} current={profile.passportNumber} previous={profile.previousPassports} pages={passportPages} canDelete={session.role === "admin"} />
       <StaySection profileId={id} stays={stays} trips={boardingTrips(trips)} canDelete={session.role === "admin"} />
       {/* Visas: added and edited here, under the immigration record */}
       <section id="visas" className="panel scroll-mt-24 p-6 sm:p-8">

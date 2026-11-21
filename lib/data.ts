@@ -201,6 +201,19 @@ export async function getBoardingPasses(profileId: string): Promise<BoardingPass
     order by flight_date desc nulls first, created_at desc`;
 }
 
+// ---------- scanned passport pages ----------
+
+export const PASSPORT_PAGES = 64;
+export type PassportPage = { id: string; passportNumber: string; pageNo: number; fileName: string; mime: string };
+
+export async function getPassportPages(profileId: string): Promise<PassportPage[]> {
+  if (!isUuid(profileId)) return [];
+  const sql = await getDb();
+  return sql<PassportPage[]>`
+    select id, passport_number, page_no, file_name, mime from passport_pages
+    where profile_id = ${profileId} order by passport_number, page_no`;
+}
+
 // ---------- places stayed (hotels, Airbnb homes, …) ----------
 
 export { STAY_KINDS, STAY_ICON, stayNights } from "./stay-kinds";

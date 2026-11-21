@@ -2,7 +2,8 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireProfileAccess } from "@/lib/session";
-import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, boardingTrips } from "@/lib/data";
+import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, getPassportPages, boardingTrips } from "@/lib/data";
+import { PassportPagesSection } from "@/components/PassportPagesSection";
 import { StaySection } from "@/components/StaySection";
 import { VisaList } from "@/components/VisaList";
 import { BoardingPassSection } from "@/components/BoardingPassSection";
@@ -21,7 +22,14 @@ export default function EditProfilePage({ params }: PageProps<"/admin/profiles/[
 async function EditProfile({ params }: { params: PageProps<"/admin/profiles/[id]">["params"] }) {
   const { id } = await params;
   const session = await requireProfileAccess(id);
-  const [profile, trips, visas, passes, stays] = await Promise.all([getProfile(id), getTrips(id), getVisas(id), getBoardingPasses(id), getStays(id)]);
+  const [profile, trips, visas, passes, stays, passportPages] = await Promise.all([
+    getProfile(id),
+    getTrips(id),
+    getVisas(id),
+    getBoardingPasses(id),
+    getStays(id),
+    getPassportPages(id),
+  ]);
   if (!profile) notFound();
 
   return (
@@ -38,6 +46,7 @@ async function EditProfile({ params }: { params: PageProps<"/admin/profiles/[id]
       </div>
       <h1 className="font-serif text-3xl font-bold text-navy">{profile.fullName}</h1>
       <ProfileEditor profile={profile} trips={trips} visas={visas} canDelete={session.role === "admin"} />
+      <PassportPagesSection profileId={profile.id} current={profile.passportNumber} previous={profile.previousPassports} pages={passportPages} canDelete={session.role === "admin"} />
       <StaySection profileId={profile.id} stays={stays} trips={boardingTrips(trips)} canDelete={session.role === "admin"} />
       <VisaList profileId={profile.id} holder={profile} visas={visas} trips={trips} canViewDocument />
       <BoardingPassSection profileId={profile.id} holder={profile.fullName} passes={passes} trips={boardingTrips(trips)} canDelete={session.role === "admin"} />

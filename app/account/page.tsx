@@ -3,7 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { requireAuth } from "@/lib/session";
-import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, boardingTrips, travelStats } from "@/lib/data";
+import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, getPassportPages, boardingTrips, travelStats } from "@/lib/data";
+import { PassportPagesSection } from "@/components/PassportPagesSection";
 import { StaySection } from "@/components/StaySection";
 import { AppUpdatePanel } from "@/components/AppUpdatePanel";
 import { VisaList } from "@/components/VisaList";
@@ -30,15 +31,16 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
   const session = await requireAuth();
   if (session.role === "admin") redirect("/admin");
   const { welcome } = await searchParams;
-  const [profile, trips, visas, passes, stays] = session.profileId
+  const [profile, trips, visas, passes, stays, passportPages] = session.profileId
     ? await Promise.all([
         getProfile(session.profileId),
         getTrips(session.profileId),
         getVisas(session.profileId),
         getBoardingPasses(session.profileId),
         getStays(session.profileId),
+        getPassportPages(session.profileId),
       ])
-    : [null, [], [], [], []];
+    : [null, [], [], [], [], []];
 
   return (
     <div className="space-y-8">
@@ -79,6 +81,7 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
             <StatsBar stats={travelStats(trips)} />
           </section>
           <ProfileEditor profile={profile} trips={trips} visas={visas} canDelete={false} />
+          <PassportPagesSection profileId={profile.id} current={profile.passportNumber} previous={profile.previousPassports} pages={passportPages} canDelete={false} />
           <section className="space-y-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">My immigration record</p>

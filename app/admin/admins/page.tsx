@@ -24,7 +24,10 @@ export default function AdminsPage() {
         <AdminList />
       </Suspense>
       <section className="panel p-6 sm:p-8">
-        <h2 className="mb-5 font-serif text-xl font-bold text-navy">Add an admin</h2>
+        <h2 className="font-serif text-xl font-bold text-navy">Create an account</h2>
+        <p className="mb-5 mt-1 text-sm text-ink-soft">
+          A <b>user</b> gets their own empty travel record and manages only that. An <b>admin</b> manages every record.
+        </p>
         <AddAdminForm />
       </section>
     </div>

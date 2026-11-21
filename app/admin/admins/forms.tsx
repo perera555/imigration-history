@@ -14,10 +14,17 @@ export function AddAdminForm() {
 
   return (
     <form ref={ref} action={action} className="space-y-5">
-      <div className="grid gap-5 sm:grid-cols-3">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <label>
-          <span className="field-label">Name</span>
-          <input name="name" className="field" placeholder="Optional" />
+          <span className="field-label">Account type</span>
+          <select name="role" defaultValue="user" className="field">
+            <option value="user">User (own travel record)</option>
+            <option value="admin">Admin (manages all records)</option>
+          </select>
+        </label>
+        <label>
+          <span className="field-label">Full name</span>
+          <input name="name" className="field" placeholder="Needed for a user" />
         </label>
         <label>
           <span className="field-label">Email *</span>
@@ -29,7 +36,7 @@ export function AddAdminForm() {
         </label>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <SubmitButton pendingText="Adding…">Add admin</SubmitButton>
+        <SubmitButton pendingText="Creating…">Create account</SubmitButton>
         {state?.error && <p className="text-sm font-medium text-danger">{state.error}</p>}
         {state?.ok && <p className="text-sm font-medium text-ok">✓ {state.ok}</p>}
       </div>
