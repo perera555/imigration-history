@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PdfButtons } from "./PdfButtons";
 import { UpdateButton } from "./UpdateButton";
-import { travelStats, type Profile, type Trip, type Visa } from "@/lib/data";
+import { travelStats, type Profile, type Stay, type Trip, type Visa } from "@/lib/data";
 import { VisaList } from "./VisaList";
 import { TravelCard } from "./TravelCard";
 import { HistoryTable, StatsBar } from "./HistoryTable";
@@ -10,11 +10,13 @@ export function ProfileDetail({
   profile,
   trips,
   visas = [],
+  stays = [],
   showBack,
 }: {
   profile: Profile;
   trips: Trip[];
   visas?: Visa[];
+  stays?: Stay[];
   showBack?: boolean;
 }) {
   return (
@@ -39,7 +41,7 @@ export function ProfileDetail({
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Travel record</p>
           <h2 className="mt-1 font-serif text-2xl font-bold text-navy">Previous immigration history</h2>
         </div>
-        <HistoryTable trips={trips} />
+        <HistoryTable trips={trips} stays={stays} />
       </section>
 
       {/* Visas: shown below the immigration record */}

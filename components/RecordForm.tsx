@@ -21,6 +21,8 @@ type Visit = {
   purpose: string;
   passportNumber: string;
   notes: string;
+  /** Hotel / Airbnb home stayed on this visit. */
+  stayedAt?: string;
 };
 type CountryBlock = {
   key: number;
@@ -79,6 +81,7 @@ function toBlocks(trips: ImportTrip[]): CountryBlock[] {
       purpose: t.purpose ?? "",
       passportNumber: t.passportNumber ?? "",
       notes: t.notes ?? "",
+      stayedAt: t.stayedAt ?? "",
       ...extra,
     });
     if (isSchengen(t.countryCode)) {
@@ -114,7 +117,7 @@ function collectTrips(blocks: CountryBlock[]): { trips: ImportTrip[] } | { error
   for (const b of blocks) {
     const codes = b.schengen ? [...new Set((b.codes ?? []).map((c) => c.code).filter(Boolean))] : [b.countryCode];
     for (const v of b.visits) {
-      const empty = !v.departureDate && !v.returnDate && !v.purpose && !v.passportNumber && !v.notes;
+      const empty = !v.departureDate && !v.returnDate && !v.purpose && !v.passportNumber && !v.notes && !v.stayedAt;
       if (empty) continue;
       if (b.schengen && !codes.length) return { error: "Add the Schengen countries you travelled to." };
       if (!b.schengen && !b.countryCode) return { error: "Choose a country for every section that has visits." };
@@ -129,6 +132,7 @@ function collectTrips(blocks: CountryBlock[]): { trips: ImportTrip[] } | { error
           purpose: v.purpose,
           passportNumber: v.passportNumber || null,
           notes: v.notes || null,
+          stayedAt: v.stayedAt || null,
         });
       }
     }
@@ -495,7 +499,7 @@ export function RecordForm({
                 )}
 
                 <div className="mt-4 overflow-x-auto">
-                  <table className="w-full min-w-[760px] text-sm">
+                  <table className="w-full min-w-[960px] text-sm">
                     <thead>
                       <tr className="text-left text-[11px] uppercase tracking-[0.12em] text-ink-soft">
                         <th className="pb-2 pr-2">#</th>
@@ -503,6 +507,7 @@ export function RecordForm({
                         <th className="pb-2 pr-2">Return date</th>
                         <th className="pb-2 pr-2">Purpose</th>
                         <th className="pb-2 pr-2">Passport used</th>
+                        <th className="pb-2 pr-2">🏨 Where you stayed</th>
                         <th className="pb-2 pr-2">Notes</th>
                         <th className="pb-2" />
                       </tr>
@@ -526,6 +531,15 @@ export function RecordForm({
                               list="passport-options"
                               onChange={(e) => setVisit(b.key, v.key, { passportNumber: e.target.value.toUpperCase() })}
                               className="field !py-2 font-mono uppercase"
+                            />
+                          </td>
+                          <td className="py-1 pr-2">
+                            <input
+                              value={v.stayedAt ?? ""}
+                              list="stayed-options"
+                              onChange={(e) => setVisit(b.key, v.key, { stayedAt: e.target.value })}
+                              className="field !py-2"
+                              placeholder="Hotel / Airbnb"
                             />
                           </td>
                           <td className="py-1 pr-2">
@@ -588,6 +602,12 @@ export function RecordForm({
       </datalist>
       <datalist id="passport-options">
         {passports.map((p) => (
+          <option key={p} value={p} />
+        ))}
+      </datalist>
+      {/* Places already typed on other visits: pick again with one click */}
+      <datalist id="stayed-options">
+        {[...new Set(blocks.flatMap((b) => b.visits.map((v) => v.stayedAt?.trim())).filter(Boolean))].map((p) => (
           <option key={p} value={p} />
         ))}
       </datalist>

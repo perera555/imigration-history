@@ -121,8 +121,7 @@ export function VisaCard({
         {visa.countriesTravelled.length > 0 && (
           <Item label="Countries travelled" value={visa.countriesTravelled.map(countryName).join(", ")} wide />
         )}
-        {visa.issuedAt && <Item label="Issued at" value={visa.issuedAt} wide />}
-        {visa.notes && <Item label="Notes" value={visa.notes} wide />}
+        {visa.issuedAt && <Item label="Issued at" value={visa.issuedAt} wide />}        {visa.notes && <Item label="Notes" value={visa.notes} wide />}
       </dl>
 
       <div className="mt-auto space-y-3 border-t border-[#e3d6b4] px-5 py-4">

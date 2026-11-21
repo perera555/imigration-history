@@ -10,6 +10,7 @@ export const metadata: Metadata = { title: "Backup & recovery" };
 const LABELS: Record<string, string> = {
   profiles: "Travellers (travel cards)",
   trips: "Immigration record visits",
+  stays: "Hotels & Airbnb stays",
   visas: "Visas",
   visa_documents: "Visa documents",
   visa_pages: "Extra visa pages (photos)",

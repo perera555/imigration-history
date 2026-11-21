@@ -5,13 +5,14 @@ import { gzipSync, gunzipSync } from "node:zlib";
 type Sql = postgres.Sql | postgres.TransactionSql;
 
 /** Tables in a backup, in restore order (parents before children). */
-export const BACKUP_TABLES = ["profiles", "trips", "visas", "visa_documents", "visa_pages", "boarding_passes", "admins"] as const;
+export const BACKUP_TABLES = ["profiles", "trips", "stays", "visas", "visa_documents", "visa_pages", "boarding_passes", "admins"] as const;
 export type BackupTable = (typeof BACKUP_TABLES)[number];
 
 /** Primary key used to find rows that already exist when restoring. */
 export const PRIMARY_KEY: Record<BackupTable, string> = {
   profiles: "id",
   trips: "id",
+  stays: "id",
   visas: "id",
   visa_documents: "visa_id",
   visa_pages: "id",
@@ -20,7 +21,7 @@ export const PRIMARY_KEY: Record<BackupTable, string> = {
 };
 
 /** Links that a delete sets to null (e.g. a boarding pass loses its trip); restoring puts them back. */
-const RELINK: Partial<Record<BackupTable, string>> = { boarding_passes: "trip_id", admins: "profile_id" };
+const RELINK: Partial<Record<BackupTable, string>> = { boarding_passes: "trip_id", stays: "trip_id", admins: "profile_id" };
 
 /** Never rolled back by "put back exactly", so nobody gets locked out by an old password. */
 const KEEP_CURRENT = new Set(["password_hash"]);
@@ -86,6 +87,7 @@ export type Scope =
   | { tripIds: string[] }
   | { visaId: string }
   | { visaPageId: string }
+  | { stayId: string }
   | { passId: string }
   | { adminId: string };
 
@@ -97,6 +99,7 @@ function scopeQueries(sql: Sql, s: Scope): [BackupTable, Promise<Record<string, 
     return [
       ["profiles", sql`select * from profiles where id = ${id}`],
       ["trips", sql`select * from trips where profile_id = ${id}`],
+      ["stays", sql`select * from stays where profile_id = ${id}`],
       ["visas", sql`select * from visas where profile_id = ${id}`],
       ["visa_documents", sql`select * from visa_documents where visa_id in (select id from visas where profile_id = ${id})`],
       ["visa_pages", sql`select * from visa_pages where visa_id in (select id from visas where profile_id = ${id})`],
@@ -114,6 +117,7 @@ function scopeQueries(sql: Sql, s: Scope): [BackupTable, Promise<Record<string, 
     if (!s.tripIds.length) return [];
     return [
       ["trips", sql`select * from trips where id in ${sql(s.tripIds)}`],
+      ["stays", sql`select * from stays where trip_id in ${sql(s.tripIds)}`],
       ["boarding_passes", sql`select * from boarding_passes where trip_id in ${sql(s.tripIds)}`],
     ];
   }
@@ -124,6 +128,7 @@ function scopeQueries(sql: Sql, s: Scope): [BackupTable, Promise<Record<string, 
       ["visa_pages", sql`select * from visa_pages where visa_id = ${s.visaId}`],
     ];
   if ("visaPageId" in s) return [["visa_pages", sql`select * from visa_pages where id = ${s.visaPageId}`]];
+  if ("stayId" in s) return [["stays", sql`select * from stays where id = ${s.stayId}`]];
   if ("passId" in s) return [["boarding_passes", sql`select * from boarding_passes where id = ${s.passId}`]];
   return [["admins", sql`select * from admins where id = ${s.adminId}`]];
 }

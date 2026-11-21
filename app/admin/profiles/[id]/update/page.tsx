@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { requireProfileAccess } from "@/lib/session";
-import { getProfile, getTrips, getVisas, getBoardingPasses, boardingTrips, groupByCountry } from "@/lib/data";
+import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, boardingTrips, groupByCountry } from "@/lib/data";
+import { StaySection } from "@/components/StaySection";
 import { VisaCountryManager } from "@/components/VisaCountryManager";
 import { VisaList } from "@/components/VisaList";
 import { UpdateRecordForm } from "@/components/UpdateRecordForm";
@@ -37,7 +38,14 @@ async function UpdateRecord({
 }) {
   const { id } = await params;
   const session = await requireProfileAccess(id);
-  const [profile, trips, visas, passes, query] = await Promise.all([getProfile(id), getTrips(id), getVisas(id), getBoardingPasses(id), searchParams]);
+  const [profile, trips, visas, passes, stays, query] = await Promise.all([
+    getProfile(id),
+    getTrips(id),
+    getVisas(id),
+    getBoardingPasses(id),
+    getStays(id),
+    searchParams,
+  ]);
   if (!profile) notFound();
   const back = session.role === "admin" ? `/admin/profiles/${id}` : "/account";
   const saved = typeof query.saved === "string" ? SAVED_TEXT[query.saved] : undefined;
@@ -65,6 +73,7 @@ async function UpdateRecord({
           items={[
             { id: "card", label: "🪪 Travel card" },
             { id: "record", label: "🌍 Immigration record" },
+            { id: "stays", label: "🏨 Hotels & Airbnb" },
             { id: "visas", label: "🛂 Visas" },
             { id: "boarding", label: "✈ Boarding passes", primary: true },
           ]}
@@ -98,8 +107,10 @@ async function UpdateRecord({
           purpose: t.purpose,
           passportNumber: t.passportNumber,
           notes: t.notes,
+          stayedAt: t.stayedAt,
         }))}
       />
+      <StaySection profileId={id} stays={stays} trips={boardingTrips(trips)} canDelete={session.role === "admin"} />
       {/* Visas: added and edited here, under the immigration record */}
       <section id="visas" className="panel scroll-mt-24 p-6 sm:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Visas</p>

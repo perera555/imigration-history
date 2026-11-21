@@ -1,9 +1,45 @@
 import { Flag } from "./Flag";
-import { formatDate, formatShortDate, groupForDisplay, tripDuration, daysToYmd, type Trip } from "@/lib/data";
+import { formatDate, formatShortDate, groupForDisplay, tripDuration, daysToYmd, type Stay, type Trip } from "@/lib/data";
+import { STAY_ICON, stayNights } from "@/lib/stay-kinds";
 import { countryName } from "@/lib/countries";
 import { CountrySearch } from "./CountrySearch";
 
-export function HistoryTable({ trips }: { trips: Trip[] }) {
+/** Hotels / Airbnb homes under a visit (Schengen visits: every trip on those dates). */
+function StaysLine({ visit, trips, stays }: { visit: Trip & { countries?: string[] }; trips: Trip[]; stays: Stay[] }) {
+  const ids = new Set(
+    visit.countries
+      ? trips.filter((t) => t.departureDate === visit.departureDate && t.returnDate === visit.returnDate && visit.countries!.includes(t.countryCode)).map((t) => t.id)
+      : [visit.id],
+  );
+  const list = stays.filter((s) => s.tripId && ids.has(s.tripId));
+  const typed = visit.stayedAt && !list.some((s) => s.name.toLowerCase() === visit.stayedAt!.toLowerCase()) ? visit.stayedAt : null;
+  if (!list.length && !typed) return null;
+  return (
+    <ul className="mt-1 space-y-0.5">
+      {typed && (
+        <li className="text-xs text-navy-2">
+          🏨 <b>{typed}</b>
+        </li>
+      )}
+      {list.map((s) => {
+        const n = stayNights(s);
+        return (
+          <li key={s.id} className="text-xs text-navy-2">
+            {STAY_ICON[s.kind] ?? "📍"} <b>{s.name}</b>
+            <span className="text-ink-soft">
+              {" "}
+              · {s.kind}
+              {s.city && ` · ${s.city}`}
+              {n !== null && ` · ${n} night${n === 1 ? "" : "s"}`}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+export function HistoryTable({ trips, stays = [] }: { trips: Trip[]; stays?: Stay[] }) {
   const groups = groupForDisplay(trips);
 
   if (!groups.length) {
@@ -21,6 +57,7 @@ export function HistoryTable({ trips }: { trips: Trip[] }) {
       g.countryCode,
       g.schengen ? "schengen europe" : "",
       ...g.visits.flatMap((v) => [...(v.countries ?? []).flatMap((c) => [countryName(c), c]), v.city ?? ""]),
+      ...stays.filter((s) => g.visits.some((v) => v.id === s.tripId)).map((s) => `${s.name} ${s.city ?? ""}`),
     ].join(" ");
 
   return (
@@ -75,6 +112,7 @@ export function HistoryTable({ trips }: { trips: Trip[] }) {
                       <p className="mt-0.5 text-xs font-medium text-sky-900">Countries: {trip.countries.map(countryName).join(", ")}</p>
                     )}
                     {trip.notes && <p className="mt-0.5 text-xs text-ink-soft">{trip.notes}</p>}
+                    <StaysLine visit={trip} trips={trips} stays={stays} />
                   </td>
                   <td className="px-5 py-2.5 font-mono text-xs tracking-wide text-ink-soft">
                     {trip.passportNumber ?? "—"}
@@ -116,6 +154,7 @@ export function HistoryTable({ trips }: { trips: Trip[] }) {
                   </p>
                   {trip.countries && <p className="mt-1 text-xs font-medium text-sky-900">Countries: {trip.countries.map(countryName).join(", ")}</p>}
                   {trip.notes && <p className="mt-1 text-xs text-ink-soft">{trip.notes}</p>}
+                  <StaysLine visit={trip} trips={trips} stays={stays} />
                 </li>
               ))}
             </ul>

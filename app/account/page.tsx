@@ -3,7 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { requireAuth } from "@/lib/session";
-import { getProfile, getTrips, getVisas, getBoardingPasses, boardingTrips, travelStats } from "@/lib/data";
+import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, boardingTrips, travelStats } from "@/lib/data";
+import { StaySection } from "@/components/StaySection";
 import { VisaList } from "@/components/VisaList";
 import { BoardingPassSection } from "@/components/BoardingPassSection";
 import { TravelCard } from "@/components/TravelCard";
@@ -28,9 +29,15 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
   const session = await requireAuth();
   if (session.role === "admin") redirect("/admin");
   const { welcome } = await searchParams;
-  const [profile, trips, visas, passes] = session.profileId
-    ? await Promise.all([getProfile(session.profileId), getTrips(session.profileId), getVisas(session.profileId), getBoardingPasses(session.profileId)])
-    : [null, [], [], []];
+  const [profile, trips, visas, passes, stays] = session.profileId
+    ? await Promise.all([
+        getProfile(session.profileId),
+        getTrips(session.profileId),
+        getVisas(session.profileId),
+        getBoardingPasses(session.profileId),
+        getStays(session.profileId),
+      ])
+    : [null, [], [], [], []];
 
   return (
     <div className="space-y-8">
@@ -75,8 +82,9 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">My immigration record</p>
               <h2 className="mt-1 font-serif text-2xl font-bold text-navy">Previous immigration history</h2>
             </div>
-            <HistoryTable trips={trips} />
+            <HistoryTable trips={trips} stays={stays} />
           </section>
+          <StaySection profileId={profile.id} stays={stays} trips={boardingTrips(trips)} canDelete={false} />
           <VisaList profileId={profile.id} holder={profile} visas={visas} trips={trips} canViewDocument emptyHint="No visas yet. Add one in Step 3 above." />
           <BoardingPassSection profileId={profile.id} holder={profile.fullName} passes={passes} trips={boardingTrips(trips)} canDelete={false} />
         </>

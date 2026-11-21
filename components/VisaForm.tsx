@@ -323,7 +323,6 @@ export function VisaForm({
           <input name="notes" value={f.notes} onChange={set("notes")} className="field" />
         </label>
       </div>
-
       <div className="flex flex-wrap items-center gap-3">
         <SubmitButton pendingText="Saving…">{visa ? "Save visa" : "Add visa"}</SubmitButton>
         {onDone && (

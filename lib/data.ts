@@ -35,6 +35,8 @@ export type Trip = {
   purpose: string;
   passportNumber: string | null;
   notes: string | null;
+  /** Hotel / Airbnb home stayed on this visit. */
+  stayedAt: string | null;
 };
 
 export type ProfileSummary = Pick<
@@ -89,7 +91,7 @@ export async function getTrips(profileId: string): Promise<Trip[]> {
   const sql = await getDb();
   return sql<Trip[]>`
     select id, profile_id, trim(country_code) as country_code, city, departure_date,
-           return_date, purpose, passport_number, notes
+           return_date, purpose, passport_number, notes, stayed_at
     from trips where profile_id = ${profileId}
     order by departure_date, created_at`;
 }
@@ -99,7 +101,7 @@ export async function getTrip(id: string): Promise<Trip | null> {
   const sql = await getDb();
   const rows = await sql<Trip[]>`
     select id, profile_id, trim(country_code) as country_code, city, departure_date,
-           return_date, purpose, passport_number, notes
+           return_date, purpose, passport_number, notes, stayed_at
     from trips where id = ${id}`;
   return rows[0] ?? null;
 }
@@ -135,8 +137,7 @@ export type Visa = {
 
 const VISA_COLUMNS = (sql: Awaited<ReturnType<typeof getDb>>) => sql`
   v.id, v.profile_id, trim(v.country_code) as country_code, v.visa_type, v.visa_format, v.visa_number, v.issue_date,
-  v.expiry_date, v.travel_from, v.travel_to, v.purpose, v.entries, v.stay_days, v.issued_at, v.passport_number, v.status, v.notes, v.countries_travelled,
-  (d.visa_id is not null) as has_document, d.file_name as document_name,
+  v.expiry_date, v.travel_from, v.travel_to, v.purpose, v.entries, v.stay_days, v.issued_at, v.passport_number, v.status, v.notes, v.countries_travelled,  (d.visa_id is not null) as has_document, d.file_name as document_name,
   coalesce((select json_agg(json_build_object('id', p.id, 'fileName', p.file_name, 'mime', p.mime) order by p.created_at)
             from visa_pages p where p.visa_id = v.id), '[]'::json) as pages`;
 
@@ -190,6 +191,40 @@ export async function getBoardingPasses(profileId: string): Promise<BoardingPass
            flight_date, seat, booking_ref, notes, checkin_url, checked_in, file_name, mime, (data is not null) as has_file
     from boarding_passes where profile_id = ${profileId}
     order by flight_date desc nulls first, created_at desc`;
+}
+
+// ---------- places stayed (hotels, Airbnb homes, …) ----------
+
+export { STAY_KINDS, STAY_ICON, stayNights } from "./stay-kinds";
+
+export type Stay = {
+  id: string;
+  profileId: string;
+  tripId: string | null;
+  kind: string;
+  name: string;
+  countryCode: string | null;
+  city: string | null;
+  address: string | null;
+  checkIn: string | null;
+  checkOut: string | null;
+  bookingRef: string | null;
+  link: string | null;
+  rating: number | null;
+  notes: string | null;
+  fileName: string | null;
+  mime: string | null;
+  hasFile: boolean;
+};
+
+export async function getStays(profileId: string): Promise<Stay[]> {
+  if (!isUuid(profileId)) return [];
+  const sql = await getDb();
+  return sql<Stay[]>`
+    select id, profile_id, trip_id, kind, name, trim(country_code) as country_code, city, address, check_in, check_out,
+           booking_ref, link, rating, notes, file_name, mime, (data is not null) as has_file
+    from stays where profile_id = ${profileId}
+    order by check_in desc nulls first, created_at desc`;
 }
 
 export type VisaState ={ label: string; tone: "valid" | "expired" | "upcoming" | "closed"; detail: string | null };
@@ -356,13 +391,19 @@ export function formatShortDate(value: string | null): string {
   });
 }
 
-/** Trip choices for linking a boarding pass, e.g. "Thailand · 10 Dec 2013 → 12 Dec 2013". */
-export function boardingTrips(trips: Trip[]): { id: string; label: string; date: string }[] {
+/** Trip choices for linking a boarding pass or stay, e.g. "Thailand · 10 Dec 2013 → 12 Dec 2013". */
+export function boardingTrips(
+  trips: Trip[],
+): { id: string; label: string; date: string; countryCode: string; purpose: string | null; city: string | null; stayedAt: string | null }[] {
   return [...trips]
     .sort((a, b) => b.departureDate.localeCompare(a.departureDate))
     .map((t) => ({
       id: t.id,
-      label: `${countryName(t.countryCode)} · ${formatShortDate(t.departureDate)} → ${formatShortDate(t.returnDate)}`,
+      label: `${countryName(t.countryCode)} · ${formatShortDate(t.departureDate)} → ${formatShortDate(t.returnDate)}${t.purpose ? ` · ${t.purpose}` : ""}`,
       date: `${t.departureDate}|${t.returnDate ?? ""}`,
+      countryCode: t.countryCode,
+      purpose: t.purpose,
+      city: t.city,
+      stayedAt: t.stayedAt,
     }));
 }

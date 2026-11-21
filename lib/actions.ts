@@ -363,6 +363,8 @@ export type ImportTrip = {
   purpose: string;
   passportNumber: string | null;
   notes: string | null;
+  /** Hotel / Airbnb home stayed on this visit, e.g. "PJ Watergate". */
+  stayedAt?: string | null;
 };
 export type ImportProfile = {
   fullName: string | null;
@@ -443,6 +445,7 @@ function cleanTrip(t: ImportTrip): { error: string } | { values: ImportTrip } {
       purpose: s(t.purpose, 200) ?? "",
       passportNumber: s(t.passportNumber, 30)?.toUpperCase() ?? null,
       notes: s(t.notes, 1000),
+      stayedAt: s(t.stayedAt, 200),
     },
   };
 }
