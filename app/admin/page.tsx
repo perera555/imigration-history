@@ -6,6 +6,7 @@ import { listProfiles } from "@/lib/data";
 import { deleteProfile, logout } from "@/lib/actions";
 import { ConfirmButton } from "@/components/SubmitButton";
 import { UpdateButton } from "@/components/UpdateButton";
+import { AppUpdatePanel } from "@/components/UpdateChecker";
 
 export const metadata: Metadata = { title: "Admin" };
 
@@ -39,6 +40,7 @@ export default function AdminPage() {
       <Suspense fallback={<div className="panel h-48 animate-pulse" />}>
         <ProfileTable />
       </Suspense>
+      <AppUpdatePanel />
     </div>
   );
 }

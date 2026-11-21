@@ -89,9 +89,13 @@ export function AccountMenu({ name, email, role, photo, profileId }: Props) {
                 <Link href="/admin/import" className={item}>➕ New travel record</Link>
                 <Link href="/admin/admins" className={item}>👥 Admins &amp; users</Link>
                 <Link href="/admin/recovery" className={item}>🛟 Backup &amp; recovery</Link>
+                <Link href="/admin#app-update" className={item}>📲 App update</Link>
               </>
             ) : (
-              <Link href="/account" className={item}>👤 My account &amp; profile</Link>
+              <>
+                <Link href="/account" className={item}>👤 My account &amp; profile</Link>
+                <Link href="/account#app-update" className={item}>📲 App update</Link>
+              </>
             )}
             {profileId && (
               <>
