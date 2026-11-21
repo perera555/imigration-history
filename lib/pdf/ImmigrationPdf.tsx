@@ -311,67 +311,10 @@ export function ImmigrationPdf({
   );
 
 
-  return (
-    <Document title={`${heading} - ${profile.fullName}`} author={profile.fullName}>
-      {parts.card && (
-      <Page size="A4" style={s.page}>
-        {titleRow}
-
-        {/* Travel identity card */}
-        <View style={s.card} wrap={false}>
-          <View style={s.cardHeader}>
-            <View>
-              <Text style={s.cardEyebrow}>TRAVEL IDENTITY CARD</Text>
-              <Text style={s.cardTitle}>{profile.fullName}</Text>
-            </View>
-            <Text style={[s.cardEyebrow, { alignSelf: "flex-end" }]}>
-              {[profile.passportNumber, ...profile.previousPassports].filter(Boolean).join(" · ")}
-            </Text>
-          </View>
-          <View style={s.cardBody}>
-            <View style={s.photoFrame}>
-              {profile.photo ? (
-                // eslint-disable-next-line jsx-a11y/alt-text
-                <Image src={profile.photo} style={s.photo} />
-              ) : (
-                <View style={s.photoEmpty}>
-                  <Text style={{ color: "#8090a8", fontSize: 7 }}>NO PHOTO</Text>
-                </View>
-              )}
-            </View>
-            <View style={s.fields}>
-              <F label="Full name" value={profile.fullName} wide />
-              <F label="Sex" value={profile.sex} />
-              <F label="Age" value={age !== null ? `${age} years (born ${formatDate(profile.dateOfBirth)})` : null} />
-              <F label="Nationality" value={profile.nationality} />
-              <F label="Citizenship" value={[profile.citizenship, profile.otherCitizenship].filter(Boolean).join(" / ")} />
-              <F label="ID number (NIC)" value={profile.nationalId} mono />
-              {profile.tin ? <F label="TIN" value={profile.tin} mono /> : null}
-              <F label="Passport no." value={profile.passportNumber} mono />
-              <F label="Passport issue date" value={profile.passportIssueDate ? formatDate(profile.passportIssueDate) : null} />
-              <F label="Passport expiry date" value={profile.passportExpiryDate ? formatDate(profile.passportExpiryDate) : null} />
-              <F label="Previous passports" value={profile.previousPassports.join(", ")} mono wide />
-              <F label="Phone" value={[profile.phone, profile.phone2].filter(Boolean).join(" / ")} />
-              {profile.whatsapp ? <F label="WhatsApp" value={profile.whatsapp} /> : null}
-              <F label="Email" value={profile.email} />
-              {profile.email2 ? <F label="Other email" value={profile.email2} /> : null}
-              <F label="Address" value={profile.address} wide />
-            </View>
-          </View>
-          <View style={s.mrz}>
-            <Text style={s.mrzText}>{mrz1}</Text>
-            <Text style={s.mrzText}>{mrz2}</Text>
-          </View>
-        </View>
-
-
-        {footer}
-      </Page>
-      )}
-      {/* Page 2+: immigration record (its table header repeats only on these pages) */}
-      {parts.record && (
-        <Page size="A4" style={s.page}>
-        {!parts.card && titleRow}
+  // Immigration record (stats + table). In the full PDF it starts right below the travel card on page 1;
+  // on its own it starts a page and its table header repeats on every page.
+  const recordBody = (repeatHead: boolean) => (
+    <>
         <View style={s.stats}>
           {[
             ["COUNTRIES", stats.countries],
@@ -388,7 +331,7 @@ export function ImmigrationPdf({
 
         {/* Immigration history */}
         <Text style={s.sectionTitle}>Immigration Record</Text>
-        <View style={s.thead} fixed>
+        <View style={s.thead} fixed={repeatHead}>
           <Text style={[s.th, { width: W.country }]}>COUNTRY</Text>
           <Text style={[s.th, { width: W.visits, textAlign: "center" }]}>VISITS</Text>
           <Text style={[s.th, { width: W.dep }]}>DEPARTURE</Text>
@@ -443,7 +386,71 @@ export function ImmigrationPdf({
             </View>
           </View>
         ))}
+    </>
+  );
 
+  return (
+    <Document title={`${heading} - ${profile.fullName}`} author={profile.fullName}>
+      {parts.card && (
+      <Page size="A4" style={s.page}>
+        {titleRow}
+
+        {/* Travel identity card */}
+        <View style={s.card} wrap={false}>
+          <View style={s.cardHeader}>
+            <View>
+              <Text style={s.cardEyebrow}>TRAVEL IDENTITY CARD</Text>
+              <Text style={s.cardTitle}>{profile.fullName}</Text>
+            </View>
+            <Text style={[s.cardEyebrow, { alignSelf: "flex-end" }]}>
+              {[profile.passportNumber, ...profile.previousPassports].filter(Boolean).join(" · ")}
+            </Text>
+          </View>
+          <View style={s.cardBody}>
+            <View style={s.photoFrame}>
+              {profile.photo ? (
+                // eslint-disable-next-line jsx-a11y/alt-text
+                <Image src={profile.photo} style={s.photo} />
+              ) : (
+                <View style={s.photoEmpty}>
+                  <Text style={{ color: "#8090a8", fontSize: 7 }}>NO PHOTO</Text>
+                </View>
+              )}
+            </View>
+            <View style={s.fields}>
+              <F label="Full name" value={profile.fullName} wide />
+              <F label="Sex" value={profile.sex} />
+              <F label="Age" value={age !== null ? `${age} years (born ${formatDate(profile.dateOfBirth)})` : null} />
+              <F label="Nationality" value={profile.nationality} />
+              <F label="Citizenship" value={[profile.citizenship, profile.otherCitizenship].filter(Boolean).join(" / ")} />
+              <F label="ID number (NIC)" value={profile.nationalId} mono />
+              {profile.tin ? <F label="TIN" value={profile.tin} mono /> : null}
+              <F label="Passport no." value={profile.passportNumber} mono />
+              <F label="Passport issue date" value={profile.passportIssueDate ? formatDate(profile.passportIssueDate) : null} />
+              <F label="Passport expiry date" value={profile.passportExpiryDate ? formatDate(profile.passportExpiryDate) : null} />
+              <F label="Previous passports" value={profile.previousPassports.join(", ")} mono wide />
+              <F label="Phone" value={[profile.phone, profile.phone2].filter(Boolean).join(" / ")} />
+              {profile.whatsapp ? <F label="WhatsApp" value={profile.whatsapp} /> : null}
+              <F label="Email" value={profile.email} />
+              {profile.email2 ? <F label="Other email" value={profile.email2} /> : null}
+              <F label="Address" value={profile.address} wide />
+            </View>
+          </View>
+          <View style={s.mrz}>
+            <Text style={s.mrzText}>{mrz1}</Text>
+            <Text style={s.mrzText}>{mrz2}</Text>
+          </View>
+        </View>
+
+        {/* Immigration record continues right below the card (no empty space) */}
+        {parts.record && <View style={{ marginTop: 14 }}>{recordBody(false)}</View>}
+        {footer}
+      </Page>
+      )}
+      {parts.record && !parts.card && (
+        <Page size="A4" style={s.page}>
+          {titleRow}
+          {recordBody(true)}
           {footer}
         </Page>
       )}
