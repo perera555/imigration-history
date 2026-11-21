@@ -17,6 +17,7 @@ import {
   type BoardingPass,
 } from "@/lib/data";
 import { countryName, isSchengen } from "@/lib/countries";
+import { BoardingPassView } from "./BoardingPassPdf";
 
 const NAVY = "#0b1f3a";
 const NAVY_2 = "#13315c";
@@ -344,45 +345,33 @@ export function ImmigrationPdf({
         </Page>
       )}
       {parts.boarding && (
-        <Page size="A4" style={s.page}>
+        // Boarding passes at real size: 203 x 83 mm (575 x 235 pt), landscape A4, two per page.
+        <Page size="A4" orientation="landscape" style={[s.page, { paddingHorizontal: 40 }]}>
           {!parts.card && !parts.record && !parts.visas && titleRow}
           <Text style={s.sectionTitle}>Boarding Passes</Text>
-          <View style={s.thead}>
-            <Text style={[s.th, { width: "14%" }]}>DATE</Text>
-            <Text style={[s.th, { width: "14%" }]}>FLIGHT</Text>
-            <Text style={[s.th, { width: "20%" }]}>AIRLINE</Text>
-            <Text style={[s.th, { width: "16%" }]}>FROM - TO</Text>
-            <Text style={[s.th, { width: "8%" }]}>SEAT</Text>
-            <Text style={[s.th, { width: "28%" }]}>TRIP</Text>
-          </View>
-          {boarding.length === 0 && (
-            <View style={[s.group, { padding: 12 }]}>
-              <Text style={{ color: MUTED }}>No boarding passes uploaded yet.</Text>
-            </View>
-          )}
-          {boarding.map((b, i) => (
-            <View key={b.id} style={[s.group, i % 2 ? { backgroundColor: PAPER } : {}]} wrap={false}>
-              <Text style={[s.cell, { width: "14%" }]}>{b.flightDate ? formatDate(b.flightDate) : "-"}</Text>
-              <Text style={[s.cell, { width: "14%", fontFamily: "Courier-Bold" }]}>{b.flightNumber ?? "-"}</Text>
-              <Text style={[s.cell, { width: "20%" }]}>{b.airline ?? "-"}</Text>
-              <Text style={[s.cell, { width: "16%" }]}>{`${b.fromAirport ?? "-"} - ${b.toAirport ?? "-"}`}</Text>
-              <Text style={[s.cell, { width: "8%" }]}>{b.seat ?? "-"}</Text>
-              <View style={[s.cell, { width: "28%" }]}>
-                <Text>{b.tripLabel ?? "Current / upcoming trip"}</Text>
-                {b.direction ? <Text style={s.note}>{b.direction}{b.bookingRef ? ` · PNR ${b.bookingRef}` : ""}</Text> : null}
-              </View>
-            </View>
-          ))}
-          {boarding.filter((b) => b.image).map((b) => (
-            <View key={`img-${b.id}`} style={{ marginTop: 14 }} wrap={false}>
-              <Text style={s.note}>{`${b.flightNumber ?? "Boarding pass"} · ${b.flightDate ? formatDate(b.flightDate) : ""}`}</Text>
-              {/* eslint-disable-next-line jsx-a11y/alt-text */}
-              <Image src={b.image!} style={{ marginTop: 4, maxHeight: 260, objectFit: "contain" }} />
+          <Text style={[s.note, { marginBottom: 10 }]}>Actual size 203 x 83 mm. Print at 100% (no "fit to page").</Text>
+          {boarding.length === 0 && <Text style={{ color: MUTED }}>No boarding passes uploaded yet.</Text>}
+          {boarding.map((b) => (
+            <View key={b.id} wrap={false} style={{ marginBottom: 14 }}>
+              <BoardingPassView pass={b} passenger={profile.fullName} tripLabel={b.tripLabel} />
             </View>
           ))}
           {footer}
         </Page>
       )}
-    </Document>
+      {parts.boarding && boarding.some((b) => b.image) && (
+        // Uploaded boarding pass photos, shown at boarding pass width (203 mm).
+        <Page size="A4" orientation="landscape" style={[s.page, { paddingHorizontal: 40 }]}>
+          <Text style={s.sectionTitle}>Uploaded boarding passes</Text>
+          {boarding.filter((b) => b.image).map((b) => (
+            <View key={`img-${b.id}`} wrap={false} style={{ marginBottom: 14 }}>
+              <Text style={s.note}>{`${b.flightNumber ?? "Boarding pass"}${b.flightDate ? ` · ${formatDate(b.flightDate)}` : ""}`}</Text>
+              {/* eslint-disable-next-line jsx-a11y/alt-text */}
+              <Image src={b.image!} style={{ width: 575.4, maxHeight: 420, objectFit: "contain", marginTop: 4 }} />
+            </View>
+          ))}
+          {footer}
+        </Page>
+      )}    </Document>
   );
 }

@@ -25,6 +25,9 @@ export default function AdminPage() {
           <Link href="/admin/admins" className="btn btn-ghost">
             Admins & users
           </Link>
+          <Link href="/admin/recovery" className="btn btn-ghost">
+            🛟 Backup & recovery
+          </Link>
           <Link href="/admin/import" className="btn btn-primary">
             + New travel record
           </Link>

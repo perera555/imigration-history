@@ -113,6 +113,66 @@ body {
   position: relative;
 }
 
+/* ---------- Boarding pass (real proportions 203 x 83 mm, 3D look) ---------- */
+.bp-scene {
+  perspective: 1400px;
+}
+.bp {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 30%;
+  aspect-ratio: 203 / 83;
+  border-radius: 18px;
+  overflow: hidden;
+  color: #f6f1e3;
+  background: linear-gradient(135deg, #0a1a33 0%, #13315c 60%, #0b1f3a 100%);
+  transform: rotateX(8deg) rotateY(-6deg);
+  transform-style: preserve-3d;
+  box-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.08) inset,
+    0 30px 45px -22px rgba(11, 31, 58, 0.75),
+    0 12px 18px -10px rgba(11, 31, 58, 0.45);
+  transition: transform 0.45s ease, box-shadow 0.45s ease;
+}
+.bp-scene:hover .bp {
+  transform: rotateX(0) rotateY(0) translateY(-4px);
+  box-shadow: 0 34px 55px -24px rgba(11, 31, 58, 0.8);
+}
+.bp::after {
+  /* glossy sheen */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.14) 0%, transparent 35%, transparent 65%, rgba(255, 255, 255, 0.06) 100%);
+}
+.bp-stub {
+  position: relative;
+  background: linear-gradient(160deg, #fffdf6, #efe6cf);
+  color: #0f1b2d;
+  border-left: 2px dashed rgba(201, 165, 76, 0.7);
+}
+.bp-stub::before,
+.bp-stub::after {
+  /* tear-off notches */
+  content: "";
+  position: absolute;
+  left: -11px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--card);
+}
+.bp-stub::before {
+  top: -10px;
+}
+.bp-stub::after {
+  bottom: -10px;
+}
+.bp-barcode {
+  background: repeating-linear-gradient(90deg, #0f1b2d 0 2px, transparent 2px 4px, #0f1b2d 4px 5px, transparent 5px 8px, #0f1b2d 8px 11px, transparent 11px 12px);
+}
+
 /* ---------- Forms ---------- */
 .field-label {
   display: block;

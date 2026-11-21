@@ -78,7 +78,7 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
             <HistoryTable trips={trips} />
           </section>
           <VisaList profileId={profile.id} holder={profile} visas={visas} trips={trips} canViewDocument emptyHint="No visas yet. Add one in Step 3 above." />
-          <BoardingPassSection profileId={profile.id} passes={passes} trips={boardingTrips(trips)} canDelete={false} />
+          <BoardingPassSection profileId={profile.id} holder={profile.fullName} passes={passes} trips={boardingTrips(trips)} canDelete={false} />
         </>
       ) : (
         <div className="panel p-10 text-center text-ink-soft">

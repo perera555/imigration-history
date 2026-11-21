@@ -5,6 +5,7 @@ import { useActionState, useEffect, useRef, useState, useTransition } from "reac
 import { readBoardingPass, saveBoardingPass, type BoardingSaveState } from "@/lib/boarding-actions";
 import type { BoardingPass } from "@/lib/data";
 import { SubmitButton } from "./SubmitButton";
+import { parseBcbp } from "@/lib/bcbp";
 
 export type TripOption = { id: string; label: string; date: string };
 
@@ -19,6 +20,7 @@ type Fields = {
   seat: string;
   bookingRef: string;
   notes: string;
+  checkinUrl: string;
 };
 
 const fromPass = (p?: BoardingPass): Fields => ({
@@ -32,6 +34,7 @@ const fromPass = (p?: BoardingPass): Fields => ({
   seat: p?.seat ?? "",
   bookingRef: p?.bookingRef ?? "",
   notes: p?.notes ?? "",
+  checkinUrl: p?.checkinUrl ?? "",
 });
 
 /** Add or update a boarding pass: upload (PDF/photo), read details, link to a trip or mark as current. */
@@ -56,6 +59,49 @@ export function BoardingPassForm({
   useEffect(() => {
     if (state?.ok) onDone?.();
   }, [state, onDone]);
+
+  const scanRef = useRef<HTMLInputElement>(null);
+
+  /** 📷 Scan: camera photo (or picked image) -> attached as the document; barcode read when possible. */
+  async function onScan(file: File | undefined) {
+    if (!file) return;
+    // Attach the photo as the boarding pass document.
+    if (fileRef.current) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileRef.current.files = dt.files;
+    }
+    setReadMsg({});
+    type Detector = { detect: (src: ImageBitmap) => Promise<{ rawValue: string }[]> };
+    const BD = (window as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => Detector }).BarcodeDetector;
+    if (!BD) {
+      setReadMsg({ ok: "📷 Photo attached. This browser can't read barcodes, so please fill in the flight details." });
+      return;
+    }
+    try {
+      const codes = await new BD({ formats: ["pdf417", "aztec", "qr_code", "data_matrix"] }).detect(await createImageBitmap(file));
+      const d = codes.map((c) => parseBcbp(c.rawValue)).find(Boolean);
+      if (!d) {
+        setReadMsg({ ok: "📷 Photo attached. No boarding pass barcode found, so please fill in the flight details." });
+        return;
+      }
+      const match = d.flightDate ? trips.find((t) => t.date.split("|").includes(d.flightDate!)) : undefined;
+      setF((x) => ({
+        ...x,
+        flightNumber: d.flightNumber ?? x.flightNumber,
+        fromAirport: d.fromAirport ?? x.fromAirport,
+        toAirport: d.toAirport ?? x.toAirport,
+        flightDate: d.flightDate ?? x.flightDate,
+        seat: d.seat ?? x.seat,
+        bookingRef: d.bookingRef ?? x.bookingRef,
+        airline: x.airline || (d.airlineCode ?? ""),
+        tripId: x.tripId || match?.id || "",
+      }));
+      setReadMsg({ ok: `✓ Barcode scanned: ${d.flightNumber ?? ""} ${d.fromAirport ?? ""}→${d.toAirport ?? ""} for ${d.passenger}. Check the details, then save.` });
+    } catch {
+      setReadMsg({ ok: "📷 Photo attached. The barcode couldn't be read, so please fill in the flight details." });
+    }
+  }
 
   function readDetails() {
     const file = fileRef.current?.files?.[0];
@@ -101,6 +147,17 @@ export function BoardingPassForm({
           <button type="button" onClick={readDetails} disabled={reading} className="btn btn-gold">
             {reading ? "Reading…" : "Read details from boarding pass"}
           </button>
+          <button type="button" onClick={() => scanRef.current?.click()} className="btn btn-primary">
+            📷 Scan boarding pass
+          </button>
+          <input
+            ref={scanRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="sr-only"
+            onChange={(e) => onScan(e.target.files?.[0])}
+          />
         </div>
         {pass?.hasFile && (
           <a href={`/api/boarding/${pass.id}/file`} target="_blank" rel="noopener" className="mt-2 inline-block text-sm font-semibold text-navy-2 hover:underline">
@@ -159,6 +216,14 @@ export function BoardingPassForm({
         <label>
           <span className="field-label">Booking reference (PNR)</span>
           <input name="bookingRef" value={f.bookingRef} onChange={set("bookingRef")} className="field font-mono uppercase" />
+        </label>
+        <label className="sm:col-span-2">
+          <span className="field-label">Online check-in link (airline website)</span>
+          <input name="checkinUrl" value={f.checkinUrl} onChange={set("checkinUrl")} className="field" placeholder="https://…" />
+        </label>
+        <label className="flex items-center gap-2 self-end pb-3 text-sm font-medium">
+          <input type="checkbox" name="checkedIn" defaultChecked={pass?.checkedIn} className="size-4 accent-navy" />
+          Checked in online ✓
         </label>
         <label className="sm:col-span-2">
           <span className="field-label">Notes</span>

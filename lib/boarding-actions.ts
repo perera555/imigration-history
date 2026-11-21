@@ -63,6 +63,11 @@ export async function saveBoardingPass(
     seat: text(form, "seat", 6)?.toUpperCase() ?? null,
     bookingRef: text(form, "bookingRef", 12)?.toUpperCase() ?? null,
     notes: text(form, "notes", 500),
+    checkinUrl: (() => {
+      const u = text(form, "checkinUrl", 500);
+      return u && /^https?:\/\//i.test(u) ? u : null;
+    })(),
+    checkedIn: form.get("checkedIn") === "on",
   };
 
   const file = form.get("file");
@@ -77,6 +82,16 @@ export async function saveBoardingPass(
   if (values.tripId) {
     const ok = await sql`select 1 from trips where id = ${values.tripId} and profile_id = ${profileId}`;
     if (!ok.length) values.tripId = null;
+  }
+  // Not linked yet: put it under the trip whose departure or return date is the flight date.
+  if (!values.tripId && values.flightDate) {
+    const [match] = await sql<{ id: string; departureDate: string }[]>`select id, departure_date from trips
+      where profile_id = ${profileId} and (departure_date = ${values.flightDate} or return_date = ${values.flightDate})
+      order by departure_date limit 1`;
+    if (match) {
+      values.tripId = match.id;
+      if (!values.direction) values.direction = match.departureDate === values.flightDate ? "Departure" : "Return";
+    }
   }
   // Same flight on the same date = the same boarding pass; don't add it twice.
   if (!passId && values.flightNumber && values.flightDate) {

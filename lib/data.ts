@@ -171,6 +171,8 @@ export type BoardingPass = {
   seat: string | null;
   bookingRef: string | null;
   notes: string | null;
+  checkinUrl: string | null;
+  checkedIn: boolean;
   fileName: string | null;
   mime: string | null;
   hasFile: boolean;
@@ -181,7 +183,7 @@ export async function getBoardingPasses(profileId: string): Promise<BoardingPass
   const sql = await getDb();
   return sql<BoardingPass[]>`
     select id, profile_id, trip_id, direction, airline, flight_number, from_airport, to_airport,
-           flight_date, seat, booking_ref, notes, file_name, mime, (data is not null) as has_file
+           flight_date, seat, booking_ref, notes, checkin_url, checked_in, file_name, mime, (data is not null) as has_file
     from boarding_passes where profile_id = ${profileId}
     order by flight_date desc nulls first, created_at desc`;
 }

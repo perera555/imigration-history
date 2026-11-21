@@ -32,7 +32,8 @@ export function ProfileEditor({
           { id: "details", label: "🪪 Travel card details" },
           { id: "trips", label: "🌍 Immigration record" },
           { id: "recorded", label: "🧾 Recorded trips" },
-          { id: "visas", label: "🛂 Visas", primary: true },
+          { id: "visas", label: "🛂 Visas" },
+          { id: "boarding", label: "✈ Boarding passes", primary: true },
         ]}
       />
       <section id="details" className="panel p-6 sm:p-8">

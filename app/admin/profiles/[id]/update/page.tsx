@@ -3,12 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { requireProfileAccess } from "@/lib/session";
-import { getProfile, getTrips, getVisas, groupByCountry } from "@/lib/data";
+import { getProfile, getTrips, getVisas, getBoardingPasses, boardingTrips, groupByCountry } from "@/lib/data";
 import { VisaCountryManager } from "@/components/VisaCountryManager";
 import { VisaList } from "@/components/VisaList";
 import { UpdateRecordForm } from "@/components/UpdateRecordForm";
 import { JumpNav } from "@/components/JumpNav";
 import { HashScroll } from "@/components/HashScroll";
+import { BoardingPassSection } from "@/components/BoardingPassSection";
 
 export const metadata: Metadata = { title: "Update record" };
 
@@ -36,7 +37,7 @@ async function UpdateRecord({
 }) {
   const { id } = await params;
   const session = await requireProfileAccess(id);
-  const [profile, trips, visas, query] = await Promise.all([getProfile(id), getTrips(id), getVisas(id), searchParams]);
+  const [profile, trips, visas, passes, query] = await Promise.all([getProfile(id), getTrips(id), getVisas(id), getBoardingPasses(id), searchParams]);
   if (!profile) notFound();
   const back = session.role === "admin" ? `/admin/profiles/${id}` : "/account";
   const saved = typeof query.saved === "string" ? SAVED_TEXT[query.saved] : undefined;
@@ -64,7 +65,8 @@ async function UpdateRecord({
           items={[
             { id: "card", label: "🪪 Travel card" },
             { id: "record", label: "🌍 Immigration record" },
-            { id: "visas", label: "🛂 Visas", primary: true },
+            { id: "visas", label: "🛂 Visas" },
+            { id: "boarding", label: "✈ Boarding passes", primary: true },
           ]}
         />
       </div>
@@ -117,6 +119,7 @@ async function UpdateRecord({
       </section>
 
       <VisaList profileId={id} holder={profile} visas={visas} trips={trips} canViewDocument />
+      <BoardingPassSection profileId={id} holder={profile.fullName} passes={passes} trips={boardingTrips(trips)} canDelete={session.role === "admin"} />
       <HashScroll />
     </div>
   );
