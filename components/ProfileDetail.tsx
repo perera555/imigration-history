@@ -4,6 +4,7 @@ import { UpdateButton } from "./UpdateButton";
 import { travelStats, type Profile, type Stay, type Trip, type Visa } from "@/lib/data";
 import { VisaList } from "./VisaList";
 import { TravelCard } from "./TravelCard";
+import { DocumentsPanel } from "./DocumentsPanel";
 import { HistoryTable, StatsBar } from "./HistoryTable";
 
 export function ProfileDetail({
@@ -12,12 +13,15 @@ export function ProfileDetail({
   visas = [],
   stays = [],
   showBack,
+  showDocuments = false,
 }: {
   profile: Profile;
   trips: Trip[];
   visas?: Visa[];
   stays?: Stay[];
   showBack?: boolean;
+  /** Owner or admin: list every saved PDF / document below the travel card. */
+  showDocuments?: boolean;
 }) {
   return (
     <div className="space-y-8">
@@ -33,8 +37,12 @@ export function ProfileDetail({
         </div>
       </div>
 
-      <TravelCard profile={profile} />
-      <StatsBar stats={travelStats(trips)} />
+      {/* Card, documents and stats close together: no big gaps below the travel card */}
+      <div className="space-y-3">
+        <TravelCard profile={profile} />
+        {showDocuments && <DocumentsPanel profileId={profile.id} />}
+        <StatsBar stats={travelStats(trips)} />
+      </div>
 
       <section className="space-y-4">
         <div>

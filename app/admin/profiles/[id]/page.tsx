@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { requireProfileAccess } from "@/lib/session";
 import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, getPassportPages, getPassportDocuments, boardingTrips } from "@/lib/data";
 import { PassportPagesSection } from "@/components/PassportPagesSection";
+import { DocumentsPanel } from "@/components/DocumentsPanel";
 import { StaySection } from "@/components/StaySection";
 import { VisaList } from "@/components/VisaList";
 import { BoardingPassSection } from "@/components/BoardingPassSection";
@@ -46,6 +47,7 @@ async function EditProfile({ params }: { params: PageProps<"/admin/profiles/[id]
         <PdfButtons profileId={profile.id} />
       </div>
       <h1 className="font-serif text-3xl font-bold text-navy">{profile.fullName}</h1>
+      <DocumentsPanel profileId={profile.id} />
       <ProfileEditor profile={profile} trips={trips} visas={visas} canDelete={session.role === "admin"} />
       <PassportPagesSection profileId={profile.id} current={profile.passportNumber} previous={profile.previousPassports} pages={passportPages} documents={passportDocs} canDelete={session.role === "admin"} />
       <StaySection profileId={profile.id} stays={stays} trips={boardingTrips(trips)} canDelete={session.role === "admin"} />

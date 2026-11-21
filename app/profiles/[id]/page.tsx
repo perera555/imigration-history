@@ -19,5 +19,7 @@ async function ProfileView({ params }: { params: PageProps<"/profiles/[id]">["pa
   const [profile, trips, visas, session] = await Promise.all([getProfile(id), getTrips(id), getVisas(id), getSession()]);
   if (!profile) notFound();
   // Hotels / homes stayed are private: only the owner and admins see them.
-  const stays = session && canAccessProfile(session, id) ? await getStays(id) : [];  return <ProfileDetail profile={profile} trips={trips} visas={visas} stays={stays} showBack />;
+  const own = !!session && canAccessProfile(session, id);
+  const stays = own ? await getStays(id) : [];
+  return <ProfileDetail profile={profile} trips={trips} visas={visas} stays={stays} showBack showDocuments={own} />;
 }
