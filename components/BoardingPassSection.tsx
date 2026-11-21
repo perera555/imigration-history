@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { deleteBoardingPass } from "@/lib/boarding-actions";
+import { useRef, useState } from "react";
+import { deleteBoardingPass, readBoardingPass, saveBoardingPass } from "@/lib/boarding-actions";
+import { parseBcbp } from "@/lib/bcbp";
+import { prepareUpload } from "@/lib/upload-prep";
+import { CountrySearch } from "./CountrySearch";
 import type { BoardingPass } from "@/lib/data";
 import { BoardingPassForm, type TripOption } from "./BoardingPassForm";
 import { ConfirmButton } from "./SubmitButton";
@@ -9,6 +12,75 @@ import { downloadBoardingPassImage } from "@/lib/bp-image";
 
 const fmt = (d: string | null) =>
   d ? new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }) : "—";
+
+/** Reads flight details from a file: PDF text (server) or barcode in a photo (browser). */
+async function detailsFrom(profileId: string, file: File): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  try {
+    if (file.type === "application/pdf") {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await readBoardingPass(profileId, fd);
+      if (r && "ok" in r) for (const [k, v] of Object.entries(r.details)) if (v) out[k] = String(v);
+    } else {
+      type Detector = { detect: (src: ImageBitmap) => Promise<{ rawValue: string }[]> };
+      const BD = (window as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => Detector }).BarcodeDetector;
+      if (BD) {
+        const codes = await new BD({ formats: ["pdf417", "aztec", "qr_code", "data_matrix"] }).detect(await createImageBitmap(file));
+        const d = codes.map((c) => parseBcbp(c.rawValue)).find(Boolean);
+        if (d) {
+          for (const k of ["flightNumber", "fromAirport", "toAirport", "flightDate", "seat", "bookingRef"] as const) if (d[k]) out[k] = String(d[k]);
+          if (d.airlineCode) out.airline = d.airlineCode;
+        }
+      }
+    }
+  } catch {
+    /* details stay empty; the file is still saved */
+  }
+  return out;
+}
+
+/** "📷 Add several boarding passes": one boarding pass per chosen file, details read when possible, linked to trips by date. */
+function BulkBoardingPasses({ profileId }: { profileId: string }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [msg, setMsg] = useState<{ busy?: string; ok?: string; error?: string }>({});
+  async function go(list: FileList | null) {
+    const files = [...(list ?? [])];
+    if (!files.length) return;
+    let added = 0;
+    const problems: string[] = [];
+    for (let i = 0; i < files.length; i++) {
+      setMsg({ busy: `Adding boarding pass ${i + 1} of ${files.length}…` });
+      const file = await prepareUpload(files[i]);
+      const fd = new FormData();
+      fd.append("file", file);
+      for (const [k, v] of Object.entries(await detailsFrom(profileId, file))) fd.append(k, v);
+      try {
+        const r = await saveBoardingPass(profileId, null, undefined, fd);
+        if (r?.error) problems.push(`${files[i].name}: ${r.error}`);
+        else added++;
+      } catch {
+        problems.push(`${files[i].name}: no answer from the server`);
+      }
+    }
+    setMsg(
+      problems.length
+        ? { error: `${added} added. Not added: ${problems.join("; ")}` }
+        : { ok: `✓ ${added} boarding pass${added === 1 ? "" : "es"} added. Check each one and press ✏️ Update to fill in anything missing.` },
+    );
+  }
+  return (
+    <>
+      <button type="button" onClick={() => ref.current?.click()} disabled={!!msg.busy} className="btn btn-ghost" title="Choose several photos or PDFs: one boarding pass is made for each">
+        📷 Add several boarding passes
+      </button>
+      <input ref={ref} type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { go(e.target.files); e.target.value = ""; }} />
+      {(msg.busy || msg.ok || msg.error) && (
+        <p className={`basis-full text-sm font-medium ${msg.error ? "text-danger" : msg.ok ? "text-ok" : "text-navy-2"}`}>{msg.busy ?? msg.ok ?? msg.error}</p>
+      )}
+    </>
+  );
+}
 
 /** Separate "Boarding passes" section: cards (previous trips and current travel) + add / update form. */
 export function BoardingPassSection({
@@ -30,6 +102,15 @@ export function BoardingPassSection({
   const tripLabel = (id: string | null) => trips.find((t) => t.id === id)?.label;
   const current = passes.filter((p) => !p.tripId);
   const previous = passes.filter((p) => p.tripId);
+  // Trip labels start with the country ("Thailand · 10 Dec 2013 → …").
+  const byCountry = (list: BoardingPass[]) => {
+    const m = new Map<string, BoardingPass[]>();
+    for (const p of list) {
+      const c = tripLabel(p.tripId)?.split(" · ")[0] ?? "Other";
+      m.set(c, [...(m.get(c) ?? []), p]);
+    }
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  };
 
   const card = (p: BoardingPass) => (
     <article key={p.id} className="space-y-3">
@@ -91,6 +172,12 @@ export function BoardingPassSection({
           </div>
         </div>
       </div>
+      {p.hasFile && (p.mime?.startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(p.fileName ?? "")) && (
+        <a href={`/api/boarding/${p.id}/file`} target="_blank" rel="noopener" title="Open the uploaded photo full size" className="block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`/api/boarding/${p.id}/file`} alt="Boarding pass photo" loading="lazy" className="max-h-48 w-full rounded-xl bg-paper object-contain shadow-[0_0_0_1px_rgba(0,0,0,0.08)]" />
+        </a>
+      )}
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="mr-auto text-ink-soft">
           {p.tripId ? `Trip: ${tripLabel(p.tripId) ?? "recorded trip"}` : "🕒 Current / upcoming trip"}
@@ -153,9 +240,12 @@ export function BoardingPassSection({
           <p className="mt-1 text-sm text-ink-soft">Upload boarding passes for previous trips and for your current travel.</p>
         </div>
         {editing !== "new" && (
-          <button type="button" onClick={() => setEditing("new")} className="btn btn-gold ml-auto">
-            + Upload boarding pass
-          </button>
+          <div className="ml-auto flex flex-wrap justify-end gap-2">
+            <BulkBoardingPasses profileId={profileId} />
+            <button type="button" onClick={() => setEditing("new")} className="btn btn-gold">
+              + Upload boarding pass
+            </button>
+          </div>
         )}
       </div>
 
@@ -181,7 +271,21 @@ export function BoardingPassSection({
         </div>
         <div>
           <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-ink-soft">🧾 Previous trips ({previous.length})</h3>
-          {previous.length ? <div className="grid gap-4 lg:grid-cols-2">{previous.map(card)}</div> : <p className="text-sm text-ink-soft">None yet.</p>}
+          {previous.length ? (
+            <CountrySearch>
+              {/* Grouped by country (from the linked trip), e.g. all Thailand boarding passes together */}
+              {byCountry(previous).map(([country, list]) => (
+                <div key={country} data-search={country} className="space-y-3">
+                  <h4 className="font-serif text-lg font-bold text-navy">
+                    {country} <span className="text-sm font-normal text-ink-soft">· {list.length} boarding pass{list.length === 1 ? "" : "es"}</span>
+                  </h4>
+                  <div className="grid gap-4 lg:grid-cols-2">{list.map(card)}</div>
+                </div>
+              ))}
+            </CountrySearch>
+          ) : (
+            <p className="text-sm text-ink-soft">None yet.</p>
+          )}
         </div>
       </div>
     </section>

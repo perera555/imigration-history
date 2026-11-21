@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { deleteVisa } from "@/lib/visa-actions";
+import { useRef, useState } from "react";
+import { addVisaFromPhoto, deleteVisa } from "@/lib/visa-actions";
+import { prepareUpload } from "@/lib/upload-prep";
 import { countryName, flagSvg, isSchengen } from "@/lib/countries";
 import type { Visa } from "@/lib/data";
 import { VisaForm } from "./VisaForm";
 import { ConfirmButton } from "./SubmitButton";
+import { CountrySearch } from "./CountrySearch";
 
 type Group = {
   key: string;
@@ -21,6 +23,45 @@ type Group = {
   addType?: string;
   addLabel: string;
 };
+
+/** "📷 Add several visa photos": one new visa per chosen photo, for this country. */
+function BulkVisaPhotos({ profileId, countryCode, visaType, title }: { profileId: string; countryCode: string; visaType: string; title: string }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [msg, setMsg] = useState<{ busy?: string; ok?: string; error?: string }>({});
+  async function go(list: FileList | null) {
+    const files = [...(list ?? [])];
+    if (!files.length) return;
+    let failed = 0;
+    for (let i = 0; i < files.length; i++) {
+      setMsg({ busy: `Adding ${title} visa ${i + 1} of ${files.length}…` });
+      const fd = new FormData();
+      fd.append("document", await prepareUpload(files[i]));
+      try {
+        const r = await addVisaFromPhoto(profileId, countryCode, visaType, fd);
+        if (r.error) failed++;
+      } catch {
+        failed++;
+      }
+    }
+    const ok = files.length - failed;
+    setMsg(
+      failed
+        ? { error: `${ok} visa${ok === 1 ? "" : "s"} added, ${failed} photo(s) could not be added (JPEG, PNG or PDF, max 8 MB).` }
+        : { ok: `✓ ${ok} ${title} visa${ok === 1 ? "" : "s"} added. Open each one below to fill in its dates and number.` },
+    );
+  }
+  return (
+    <>
+      <button type="button" onClick={() => ref.current?.click()} disabled={!!msg.busy} className="btn btn-ghost !py-1.5" title="Choose several photos: one visa is made for each">
+        📷 Add several visa photos
+      </button>
+      <input ref={ref} type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { go(e.target.files); e.target.value = ""; }} />
+      {(msg.busy || msg.ok || msg.error) && (
+        <p className={`basis-full text-sm font-medium ${msg.error ? "text-danger" : msg.ok ? "text-ok" : "text-navy-2"}`}>{msg.busy ?? msg.ok ?? msg.error}</p>
+      )}
+    </>
+  );
+}
 
 /**
  * Visas arranged like the immigration record: one section per visited country
@@ -124,11 +165,17 @@ export function VisaCountryManager({
   );
 
   return (
+    <CountrySearch>
     <div className="divide-y divide-line rounded-2xl border border-line bg-white">
       {groups.map((g, i) => {
         const own = visas.filter((v) => g.codes.includes(v.countryCode));
         return (
-          <section key={g.key} id={`visa-country-${g.key}`} className={`p-5 sm:p-6 ${i % 2 ? "bg-paper/40" : ""}`}>
+          <section
+            key={g.key}
+            id={`visa-country-${g.key}`}
+            data-search={[g.title, g.subtitle ?? "", g.key, ...g.codes, ...g.codes.map(countryName), ...own.map((v) => `${v.countryCode} ${countryName(v.countryCode)}`)].join(" ")}
+            className={`p-5 sm:p-6 ${i % 2 ? "bg-paper/40" : ""}`}
+          >
             <header className="flex flex-wrap items-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={flagSvg(g.flag)} alt="" className="h-9 w-14 rounded-md object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.08)]" />
@@ -150,9 +197,14 @@ export function VisaCountryManager({
                 </p>
               </div>
               {adding !== g.key && (
-                <button type="button" onClick={() => setAdding(g.key)} className="btn btn-gold ml-auto !py-1.5">
-                  {g.addLabel}
-                </button>
+                <div className="ml-auto flex flex-wrap gap-2">
+                  {g.addCountry && (
+                    <BulkVisaPhotos profileId={profileId} countryCode={g.addCountry} visaType={g.addType ?? ""} title={g.title} />
+                  )}
+                  <button type="button" onClick={() => setAdding(g.key)} className="btn btn-gold !py-1.5">
+                    {g.addLabel}
+                  </button>
+                </div>
               )}
             </header>
 
@@ -176,6 +228,7 @@ export function VisaCountryManager({
                   )}
                 </div>
                 <VisaForm
+                  canDeletePages={canDelete}
                   profileId={profileId}
                   visa={v}
                   passports={passports}
@@ -199,5 +252,6 @@ export function VisaCountryManager({
         )}
       </section>
     </div>
+    </CountrySearch>
   );
 }

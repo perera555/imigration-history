@@ -12,6 +12,7 @@ const LABELS: Record<string, string> = {
   trips: "Immigration record visits",
   visas: "Visas",
   visa_documents: "Visa documents",
+  visa_pages: "Extra visa pages (photos)",
   boarding_passes: "Boarding passes",
   admins: "Accounts (admins & users)",
 };

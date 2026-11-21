@@ -60,7 +60,75 @@ export async function readVisaDocument(profileId: string, form: FormData): Promi
   };
 }
 
-export type VisaSaveState = { error?: string; ok?: string } | undefined;
+export type VisaSaveState = { error?: string; ok?: string; id?: string } | undefined;
+
+/** Checks an uploaded photo / PDF; returns an error message or null. */
+function checkFile(file: FormDataEntryValue | null): file is File {
+  return file instanceof File && file.size > 0 && DOC_TYPES.includes(file.type) && file.size <= MAX_DOC_BYTES;
+}
+const fileError = (file: FormDataEntryValue | null) =>
+  !(file instanceof File) || file.size === 0
+    ? "Choose a photo or PDF."
+    : !DOC_TYPES.includes(file.type)
+      ? "Use a JPEG, PNG, WEBP or PDF file."
+      : "File is too large (max 8 MB).";
+
+/** Adds one extra page / photo to a visa (visa page, entry stamp, …). Users: own record only. */
+export async function addVisaPage(visaId: string, form: FormData): Promise<{ ok?: true; error?: string }> {
+  if (!isUuid(visaId)) return { error: "Unknown visa." };
+  const sql = await getDb();
+  const [v] = await sql<{ profileId: string }[]>`select profile_id from visas where id = ${visaId}`;
+  if (!v) return { error: "Unknown visa." };
+  await requireProfileAccess(v.profileId);
+  const file = form.get("page");
+  if (!checkFile(file)) return { error: fileError(file) };
+  await sql`insert into visa_pages ${sql({
+    visaId,
+    fileName: file.name.slice(0, 120) || "visa-page",
+    mime: file.type,
+    size: file.size,
+    data: Buffer.from(await file.arrayBuffer()),
+  })}`;
+  await sql`update profiles set updated_at = now() where id = ${v.profileId}`;
+  refresh();
+  return { ok: true };
+}
+
+/** Removes one extra page (admins only, like other deletes; a restore point is saved first). */
+export async function deleteVisaPage(pageId: string) {
+  const session = await requireAdmin();
+  if (!isUuid(pageId)) return;
+  const sql = await getDb();
+  await saveRestorePoint(sql, { visaPageId: pageId }, "Deleted a visa page photo", session.email);
+  await sql`delete from visa_pages where id = ${pageId}`;
+  refresh();
+}
+
+/** "Add several visa photos": makes one new visa for this country with the photo as its document. */
+export async function addVisaFromPhoto(profileId: string, countryCode: string, visaType: string, form: FormData): Promise<{ ok?: true; error?: string }> {
+  if (!isUuid(profileId)) return { error: "Unknown record." };
+  await requireProfileAccess(profileId);
+  const code = countryCode.toUpperCase();
+  if (!isCountryCode(code)) return { error: "Unknown country." };
+  const file = form.get("document");
+  if (!checkFile(file)) return { error: fileError(file) };
+  const sql = await getDb();
+  await sql.begin(async (tx) => {
+    const [row] = await tx<{ id: string }[]>`
+      insert into visas ${tx({ profileId, countryCode: code, visaType: visaType.slice(0, 80), notes: "Added from a photo, please fill in the details." })}
+      returning id`;
+    await tx`insert into visa_documents ${tx({
+      visaId: row.id,
+      fileName: file.name.slice(0, 120) || "visa",
+      mime: file.type,
+      size: file.size,
+      data: Buffer.from(await file.arrayBuffer()),
+    })}`;
+    await tx`update profiles set updated_at = now() where id = ${profileId}`;
+  });
+  refresh();
+  return { ok: true };
+}
 
 /** Adds a visa (visaId = null) or updates one, with an optional document upload. Users: own record only. */
 export async function saveVisa(profileId: string, visaId: string | null, _: VisaSaveState, form: FormData): Promise<VisaSaveState> {
@@ -123,6 +191,7 @@ export async function saveVisa(profileId: string, visaId: string | null, _: Visa
     if (dup.length) return { error: `Visa ${values.visaNumber} is already in this record.` };
   }
 
+  let savedId = visaId;
   await sql.begin(async (tx) => {
     let id = visaId;
     if (id) {
@@ -132,6 +201,7 @@ export async function saveVisa(profileId: string, visaId: string | null, _: Visa
       const [row] = await tx<{ id: string }[]>`insert into visas ${tx({ ...values, profileId })} returning id`;
       id = row.id;
     }
+    savedId = id;
     if (hasFile) {
       const doc = {
         visaId: id,
@@ -149,7 +219,7 @@ export async function saveVisa(profileId: string, visaId: string | null, _: Visa
     await tx`update profiles set updated_at = now() where id = ${profileId}`;
   });
   refresh();
-  return { ok: visaId ? "Visa updated." : "Visa added." };
+  return { ok: visaId ? "Visa updated." : "Visa added.", id: savedId ?? undefined };
 }
 
 /** Deleting is admin-only, like trips. */

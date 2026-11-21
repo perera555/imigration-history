@@ -1,6 +1,7 @@
 import { Flag } from "./Flag";
 import { formatDate, formatShortDate, groupForDisplay, tripDuration, daysToYmd, type Trip } from "@/lib/data";
 import { countryName } from "@/lib/countries";
+import { CountrySearch } from "./CountrySearch";
 
 export function HistoryTable({ trips }: { trips: Trip[] }) {
   const groups = groupForDisplay(trips);
@@ -13,8 +14,17 @@ export function HistoryTable({ trips }: { trips: Trip[] }) {
     );
   }
 
+  // Words the search bar matches: country name and code, plus Schengen countries and cities.
+  const searchText = (g: (typeof groups)[number]) =>
+    [
+      g.countryName,
+      g.countryCode,
+      g.schengen ? "schengen europe" : "",
+      ...g.visits.flatMap((v) => [...(v.countries ?? []).flatMap((c) => [countryName(c), c]), v.city ?? ""]),
+    ].join(" ");
+
   return (
-    <>
+    <CountrySearch>
       {/* Desktop: table grouped by country, like the original document */}
       <div className="panel hidden overflow-hidden md:block">
         <table className="w-full text-sm">
@@ -30,7 +40,7 @@ export function HistoryTable({ trips }: { trips: Trip[] }) {
             </tr>
           </thead>
           {groups.map((group, gi) => (
-            <tbody key={group.countryCode} className={gi % 2 ? "bg-paper/50" : ""}>
+            <tbody key={group.countryCode} data-search={searchText(group)} className={gi % 2 ? "bg-paper/50" : ""}>
               {group.visits.map((trip, i) => (
                 <tr key={trip.id} className={i === 0 ? "border-t border-line" : ""}>
                   {i === 0 && (
@@ -79,7 +89,7 @@ export function HistoryTable({ trips }: { trips: Trip[] }) {
       {/* Mobile: one card per country */}
       <div className="grid gap-4 md:hidden">
         {groups.map((group) => (
-          <section key={group.countryCode} className="panel overflow-hidden">
+          <section key={group.countryCode} data-search={searchText(group)} className="panel overflow-hidden">
             <header className="flex items-center gap-3 border-b border-line bg-paper/60 px-4 py-3">
               <Flag code={group.countryCode} className="h-7 w-10" />
               <h3 className="font-semibold">
@@ -112,7 +122,7 @@ export function HistoryTable({ trips }: { trips: Trip[] }) {
           </section>
         ))}
       </div>
-    </>
+    </CountrySearch>
   );
 }
 

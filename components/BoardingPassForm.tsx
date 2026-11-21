@@ -6,6 +6,7 @@ import { readBoardingPass, saveBoardingPass, type BoardingSaveState } from "@/li
 import type { BoardingPass } from "@/lib/data";
 import { SubmitButton } from "./SubmitButton";
 import { parseBcbp } from "@/lib/bcbp";
+import { DocumentPicker, isImageName } from "./DocumentPicker";
 
 export type TripOption = { id: string; label: string; date: string };
 
@@ -70,6 +71,7 @@ export function BoardingPassForm({
       const dt = new DataTransfer();
       dt.items.add(file);
       fileRef.current.files = dt.files;
+      fileRef.current.dispatchEvent(new Event("change", { bubbles: true })); // show the preview
     }
     setReadMsg({});
     type Detector = { detect: (src: ImageBitmap) => Promise<{ rawValue: string }[]> };
@@ -135,20 +137,18 @@ export function BoardingPassForm({
   return (
     <form action={action} className="space-y-5">
       <div className="rounded-2xl border border-dashed border-line bg-paper/50 p-4">
-        <p className="field-label">Boarding pass (PDF or photo, max 8 MB)</p>
-        <div className="flex flex-wrap items-center gap-3">
-          <input
-            ref={fileRef}
-            type="file"
-            name="file"
-            accept="application/pdf,image/png,image/jpeg,image/webp"
-            className="field max-w-md file:mr-3 file:rounded-full file:border-0 file:bg-navy file:px-4 file:py-1.5 file:text-sm file:font-semibold file:text-white"
-          />
+        <DocumentPicker
+          name="file"
+          inputRef={fileRef}
+          label="Boarding pass photo or PDF"
+          saved={pass?.hasFile ? { url: `/api/boarding/${pass.id}/file`, name: pass.fileName, image: isImageName(pass.fileName, pass.mime) } : null}
+        />
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" onClick={readDetails} disabled={reading} className="btn btn-gold">
             {reading ? "Reading…" : "Read details from boarding pass"}
           </button>
-          <button type="button" onClick={() => scanRef.current?.click()} className="btn btn-primary">
-            📷 Scan boarding pass
+          <button type="button" onClick={() => scanRef.current?.click()} className="btn btn-ghost">
+            🔎 Scan barcode
           </button>
           <input
             ref={scanRef}
@@ -159,11 +159,6 @@ export function BoardingPassForm({
             onChange={(e) => onScan(e.target.files?.[0])}
           />
         </div>
-        {pass?.hasFile && (
-          <a href={`/api/boarding/${pass.id}/file`} target="_blank" rel="noopener" className="mt-2 inline-block text-sm font-semibold text-navy-2 hover:underline">
-            View saved boarding pass ({pass.fileName})
-          </a>
-        )}
         {readMsg.ok && <p className="mt-2 text-sm font-medium text-ok">{readMsg.ok}</p>}
         {readMsg.error && <p className="mt-2 text-sm font-medium text-danger">{readMsg.error}</p>}
       </div>

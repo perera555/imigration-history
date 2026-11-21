@@ -129,12 +129,16 @@ export type Visa = {
   countriesTravelled: string[];
   hasDocument: boolean;
   documentName: string | null;
+  /** Extra pages / photos (visa page, entry stamps, …). */
+  pages: { id: string; fileName: string; mime: string }[];
 };
 
 const VISA_COLUMNS = (sql: Awaited<ReturnType<typeof getDb>>) => sql`
   v.id, v.profile_id, trim(v.country_code) as country_code, v.visa_type, v.visa_format, v.visa_number, v.issue_date,
   v.expiry_date, v.travel_from, v.travel_to, v.purpose, v.entries, v.stay_days, v.issued_at, v.passport_number, v.status, v.notes, v.countries_travelled,
-  (d.visa_id is not null) as has_document, d.file_name as document_name`;
+  (d.visa_id is not null) as has_document, d.file_name as document_name,
+  coalesce((select json_agg(json_build_object('id', p.id, 'fileName', p.file_name, 'mime', p.mime) order by p.created_at)
+            from visa_pages p where p.visa_id = v.id), '[]'::json) as pages`;
 
 export async function getVisas(profileId: string): Promise<Visa[]> {
   if (!isUuid(profileId)) return [];

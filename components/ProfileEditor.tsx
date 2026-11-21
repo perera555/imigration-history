@@ -9,6 +9,7 @@ import { RecordForm } from "./RecordForm";
 import { EMPTY_PROFILE } from "@/lib/record";
 import { Flag } from "./Flag";
 import { ConfirmButton } from "./SubmitButton";
+import { CountrySearch } from "./CountrySearch";
 
 /** One page with everything for an existing record: card details, add trip, recorded trips. */
 export function ProfileEditor({
@@ -69,9 +70,15 @@ export function ProfileEditor({
           Recorded trips <span className="text-base font-normal text-ink-soft">({trips.length})</span>
         </h2>
         {!trips.length && <p className="px-6 py-8 text-center text-ink-soft">No trips yet. Add your first trip above.</p>}
-        <ul className="divide-y divide-line">
+        <div className="px-6 pt-4">
+        <CountrySearch>
+        <ul className="-mx-6 divide-y divide-line">
           {newestFirst.map((trip) => (
-            <li key={trip.id} className="flex flex-wrap items-center gap-3 px-6 py-3">
+            <li
+              key={trip.id}
+              data-search={`${countryName(trip.countryCode)} ${trip.countryCode} ${trip.city ?? ""}`}
+              className="flex flex-wrap items-center gap-3 px-6 py-3"
+            >
               <Flag code={trip.countryCode} className="h-6 w-9" />
               <div className="min-w-0 flex-1">
                 <p className="font-semibold">
@@ -97,6 +104,8 @@ export function ProfileEditor({
             </li>
           ))}
         </ul>
+        </CountrySearch>
+        </div>
       </section>
 
       <section id="visas" className="panel p-6 sm:p-8">

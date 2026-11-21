@@ -7,6 +7,8 @@ import type { Visa } from "@/lib/data";
 import { CountrySelect } from "./CountrySelect";
 import { isSchengen } from "@/lib/countries";
 import { SubmitButton } from "./SubmitButton";
+import { DocumentPicker, isImageName } from "./DocumentPicker";
+import { VisaPages, uploadVisaPages } from "./VisaPages";
 
 const PURPOSES = [
   "Tourism",
@@ -71,7 +73,10 @@ export function VisaForm({
   defaultType,
   schengenCountries,
   onDone,
+  canDeletePages = false,
 }: {
+  /** Admins can remove single visa pages. */
+  canDeletePages?: boolean;
   /** Schengen section: the Schengen countries travelled, shown as fields with their flags. */
   schengenCountries?: { code: string; visits: number }[];
   /** Pre-filled visa type for a new visa (e.g. Schengen). */
@@ -102,9 +107,24 @@ export function VisaForm({
   const set = (k: keyof Fields) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setF((x) => ({ ...x, [k]: e.target.value }));
 
+  // Extra pages picked for a new visa: uploaded right after the visa is first saved.
+  const [queued, setQueued] = useState<File[]>([]);
+  const [pageMsg, setPageMsg] = useState("");
   useEffect(() => {
-    if (state?.ok) onDone?.();
-  }, [state, onDone]);
+    if (!state?.ok) return;
+    if (!visa && state.id && queued.length) {
+      const files = queued;
+      setQueued([]);
+      setPageMsg(`Uploading ${files.length} page${files.length === 1 ? "" : "s"}…`);
+      uploadVisaPages(state.id, files, (n) => setPageMsg(`Uploading pages… ${n} of ${files.length}`)).then((failed) => {
+        setPageMsg(failed ? `${failed} page(s) could not be added.` : "");
+        onDone?.();
+      });
+      return;
+    }
+    onDone?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   function readDetails() {
     const file = fileRef.current?.files?.[0];
@@ -142,24 +162,17 @@ export function VisaForm({
     <form action={action} className="space-y-6">
       {/* 1. Document */}
       <div className="rounded-2xl border border-dashed border-line bg-paper/50 p-4">
-        <p className="field-label">Visa document (PDF or photo, max 8 MB)</p>
-        <div className="flex flex-wrap items-center gap-3">
-          <input
-            ref={fileRef}
-            type="file"
-            name="document"
-            accept="application/pdf,image/png,image/jpeg,image/webp"
-            className="field max-w-md file:mr-3 file:rounded-full file:border-0 file:bg-navy file:px-4 file:py-1.5 file:text-sm file:font-semibold file:text-white"
-          />
-          <button type="button" onClick={readDetails} disabled={reading} className="btn btn-gold">
-            {reading ? "Reading…" : "Read details from document"}
-          </button>
-        </div>
+        <DocumentPicker
+          name="document"
+          inputRef={fileRef}
+          label="Visa photo or document"
+          saved={visa?.hasDocument ? { url: `/api/visas/${visa.id}/document`, name: visa.documentName, image: isImageName(visa.documentName) } : null}
+        />
+        <button type="button" onClick={readDetails} disabled={reading} className="btn btn-gold mt-3">
+          {reading ? "Reading…" : "Read details from document"}
+        </button>
         {visa?.hasDocument && (
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-            <a href={`/api/visas/${visa.id}/document`} target="_blank" rel="noopener" className="font-semibold text-navy-2 hover:underline">
-              View saved document ({visa.documentName})
-            </a>
             <label className="flex items-center gap-1.5 text-ink-soft">
               <input type="checkbox" name="removeDocument" className="accent-navy" /> Remove it
             </label>
@@ -168,6 +181,9 @@ export function VisaForm({
         {readMsg.ok && <p className="mt-2 text-sm font-medium text-ok">{readMsg.ok}</p>}
         {readMsg.error && <p className="mt-2 text-sm font-medium text-danger">{readMsg.error}</p>}
       </div>
+
+      <VisaPages visaId={visa?.id} pages={visa?.pages} canDelete={canDeletePages} queued={visa ? undefined : queued} onQueue={setQueued} />
+      {pageMsg && <p className="text-sm font-medium text-navy-2">{pageMsg}</p>}
 
       {/* Countries travelled on this visa (Schengen: any number of countries) */}
       {showTravelled && (

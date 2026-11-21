@@ -147,6 +147,29 @@ export function VisaCard({
             ✏️ Update visa
           </Link>
         </div>
+        {canViewDocument && visa.hasDocument && /\.(png|jpe?g|webp)$/i.test(visa.documentName ?? "") && (
+          <a href={`/api/visas/${visa.id}/document`} target="_blank" rel="noopener" title="Open full size">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`/api/visas/${visa.id}/document`} alt="Visa photo" loading="lazy" className="max-h-56 w-full rounded-xl object-contain bg-paper shadow-[0_0_0_1px_rgba(0,0,0,0.08)]" />
+          </a>
+        )}
+        {canViewDocument && visa.pages?.length > 0 && (
+          <div>
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft">More pages ({visa.pages.length})</p>
+            <div className="flex flex-wrap gap-1.5">
+              {visa.pages.map((p, i) => (
+                <a key={p.id} href={`/api/visa-pages/${p.id}`} target="_blank" rel="noopener" title={`Page ${i + 1}`} className="block h-16 w-12 overflow-hidden rounded-md bg-paper shadow-[0_0_0_1px_rgba(0,0,0,0.08)]">
+                  {p.mime.startsWith("image/") ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={`/api/visa-pages/${p.id}`} alt={`Visa page ${i + 1}`} loading="lazy" className="size-full object-cover" />
+                  ) : (
+                    <span className="grid size-full place-items-center">📄</span>
+                  )}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
         {canViewDocument && visa.hasDocument && (
           <div className="flex flex-wrap gap-2">
             <a href={`/api/visas/${visa.id}/document`} target="_blank" rel="noopener" className="btn btn-ghost !py-1.5 text-xs">
