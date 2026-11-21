@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { restoreRows } from "@/lib/backup-actions";
 
 type Line = { table: string; row: Record<string, unknown> };
-type Result = Record<string, { added: number; skipped: number }>;
+type Result = Record<string, { added: number; updated: number; skipped: number }>;
 
 /** Download a backup / restore missing records from one. */
 export function RecoveryPanel() {
@@ -15,6 +15,7 @@ export function RecoveryPanel() {
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
+  const [mode, setMode] = useState<"missing" | "exact">("missing");
 
   async function restore() {
     const file = fileRef.current?.files?.[0];
@@ -30,7 +31,11 @@ export function RecoveryPanel() {
       return setError("This is not a backup file from this app.");
     }
     const rows: Line[] = lines.slice(1).map((l) => JSON.parse(l));
-    if (!confirm(`Restore from this backup (${rows.length} records)? Records that already exist are kept as they are; only missing ones are added back.`)) return;
+    const note =
+      mode === "exact"
+        ? "Missing records are added back AND existing ones are put back to the values in the file (later edits are undone)."
+        : "Records that already exist are kept as they are; only missing ones are added back.";
+    if (!confirm(`Restore from this backup (${rows.length} records)?\n\n${note}`)) return;
 
     setBusy(true);
     const out: Result = {};
@@ -40,14 +45,15 @@ export function RecoveryPanel() {
       let done = 0;
       for (const table of tables) {
         const list = rows.filter((r) => r.table === table).map((r) => r.row);
-        out[table] = { added: 0, skipped: 0 };
+        out[table] = { added: 0, updated: 0, skipped: 0 };
         let batch: Record<string, unknown>[] = [];
         let size = 0;
         const send = async () => {
           if (!batch.length) return;
-          const r = await restoreRows(table, batch);
+          const r = await restoreRows(table, batch, mode);
           if (r.error) throw new Error(r.error);
           out[table].added += r.added;
+          out[table].updated += r.updated;
           out[table].skipped += r.skipped;
           done += batch.length;
           setProgress(`Restoring… ${done} of ${rows.length}`);
@@ -91,6 +97,16 @@ export function RecoveryPanel() {
           Choose a backup file. Anything missing (deleted travellers, visits, visas, boarding passes, documents, accounts) is added back.
           Nothing that exists now is changed or duplicated.
         </p>
+        <div className="flex flex-wrap gap-4 text-sm">
+          <label className="flex items-center gap-2">
+            <input type="radio" name="mode" checked={mode === "missing"} onChange={() => setMode("missing")} className="accent-navy" />
+            Add back missing records only
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="radio" name="mode" checked={mode === "exact"} onChange={() => setMode("exact")} className="accent-navy" />
+            Also undo edits (put records back exactly as in the file)
+          </label>
+        </div>
         <div className="flex flex-wrap items-center gap-3">
           <input
             ref={fileRef}
@@ -108,7 +124,7 @@ export function RecoveryPanel() {
           <ul className="space-y-1 text-sm">
             {Object.entries(result).map(([t, r]) => (
               <li key={t}>
-                <b>{t.replace("_", " ")}</b>: {r.added} restored, {r.skipped} already there
+                <b>{t.replace("_", " ")}</b>: {r.added} restored{r.updated ? `, ${r.updated} put back` : ""}, {r.skipped} already there
               </li>
             ))}
           </ul>

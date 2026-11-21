@@ -2,6 +2,7 @@
 
 import { refresh } from "next/cache";
 import { getDb } from "./db";
+import { saveRestorePoint } from "./backup";
 import { isUuid } from "./data";
 import { requireAdmin, requireProfileAccess } from "./session";
 import type { BoardingDetails } from "./boarding-reader";
@@ -121,9 +122,10 @@ export async function saveBoardingPass(
 
 /** Deleting is admin-only, like trips and visas. */
 export async function deleteBoardingPass(passId: string) {
-  await requireAdmin();
+  const session = await requireAdmin();
   if (!isUuid(passId)) return;
   const sql = await getDb();
+  await saveRestorePoint(sql, { passId }, "Deleted a boarding pass", session.email);
   await sql`delete from boarding_passes where id = ${passId}`;
   refresh();
 }

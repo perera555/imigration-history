@@ -2,6 +2,7 @@
 
 import { refresh } from "next/cache";
 import { getDb } from "./db";
+import { saveRestorePoint } from "./backup";
 import { isUuid } from "./data";
 import { isCountryCode, NATIONALITIES } from "./countries";
 import { requireAdmin, requireProfileAccess } from "./session";
@@ -153,9 +154,10 @@ export async function saveVisa(profileId: string, visaId: string | null, _: Visa
 
 /** Deleting is admin-only, like trips. */
 export async function deleteVisa(visaId: string) {
-  await requireAdmin();
+  const session = await requireAdmin();
   if (!isUuid(visaId)) return;
   const sql = await getDb();
+  await saveRestorePoint(sql, { visaId }, "Deleted a visa (with its document)", session.email);
   await sql`delete from visas where id = ${visaId}`;
   refresh();
 }

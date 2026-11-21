@@ -16,6 +16,7 @@ import {
 } from "./session";
 import { hashPassword, newResetToken, sha256, validatePassword, verifyPassword } from "./password";
 import { sendEmail } from "./email";
+import { saveRestorePoint } from "./backup";
 
 export type FormState = { error?: string; ok?: string } | undefined;
 
@@ -203,7 +204,10 @@ export async function deleteAdmin(adminId: string) {
     if (!target) return;
     const [{ count }] = await tx<{ count: number }[]>`select count(*)::int as count from admins where role = 'admin'`;
     // Users can always be removed; an admin only while another admin remains.
-    if (target.role !== "admin" || count > 1) await tx`delete from admins where id = ${adminId}`;
+    if (target.role !== "admin" || count > 1) {
+      await saveRestorePoint(tx, { adminId }, "Removed an account", session.email);
+      await tx`delete from admins where id = ${adminId}`;
+    }
   });
   refresh();
 }
@@ -279,9 +283,12 @@ export async function updateProfile(id: string, _: FormState, form: FormData): P
 }
 
 export async function deleteProfile(id: string) {
-  await requireAdmin();
+  const session = await requireAdmin();
   if (!isUuid(id)) return;
   const sql = await getDb();
+  const [p] = await sql<{ fullName: string }[]>`select full_name from profiles where id = ${id}`;
+  if (!p) return;
+  await saveRestorePoint(sql, { profileId: id }, `Deleted traveller ${p.fullName || "(no name)"} (with all trips, visas, boarding passes)`, session.email);
   await sql`delete from profiles where id = ${id}`;
   redirect("/admin");
 }
@@ -478,7 +485,7 @@ export async function updateRecord(
   part: "card" | "record" | "all" = "all",
 ): Promise<{ error: string } | { profileId: string; skipped?: number }> {
   if (!isUuid(profileId)) return { error: "Unknown record." };
-  await requireProfileAccess(profileId);
+  const session = await requireProfileAccess(profileId);
   const values = profileValuesFrom(payload.profile);
   if (part !== "record" && !values.fullName) return { error: "Full name is required." };
   if (values.passportIssueDate && values.passportExpiryDate && values.passportExpiryDate <= values.passportIssueDate) {
@@ -500,6 +507,11 @@ export async function updateRecord(
   }
 
   const sql = await getDb();
+  const [before] = await sql<{ fullName: string }[]>`select full_name from profiles where id = ${profileId}`;
+  if (before) {
+    const what = part === "card" ? "travel card" : part === "record" ? "immigration record" : "travel card and immigration record";
+    await saveRestorePoint(sql, { profileRecord: profileId }, `Before saving the ${what} of ${before.fullName || "(no name)"}`, session.email);
+  }
   await sql.begin(async (tx) => {
     if (part !== "record") {
       await tx`update profiles set ${tx({ ...values, fullName: values.fullName! })}, updated_at = now() where id = ${profileId}`;
@@ -599,6 +611,7 @@ export async function deleteTrip(tripId: string) {
   const sql = await getDb();
   const [owner] = await sql<{ profileId: string }[]>`select profile_id from trips where id = ${tripId}`;
   if (!owner || !canAccessProfile(session, owner.profileId)) return;
+  await saveRestorePoint(sql, { tripIds: [tripId] }, "Deleted a visit from the immigration record", session.email);
   const [row] = await sql<{ profileId: string }[]>`delete from trips where id = ${tripId} returning profile_id`;
   if (row) await sql`update profiles set updated_at = now() where id = ${row.profileId}`;
   refresh();

@@ -81,7 +81,7 @@ async function ProfileTable() {
             </Link>
             <UpdateButton profileId={p.id} />
             <form action={deleteProfile.bind(null, p.id)}>
-              <ConfirmButton message={`Delete ${p.fullName} and all trips? This cannot be undone.`}>Delete</ConfirmButton>
+              <ConfirmButton message={`Delete ${p.fullName} and all trips? (You can get it back later from Backup & recovery.)`}>Delete</ConfirmButton>
             </form>
           </div>
         </div>

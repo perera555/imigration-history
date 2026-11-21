@@ -1,0 +1,3 @@
+{
+  "crons": [{ "path": "/api/cron/restore-point", "schedule": "30 20 * * *" }]
+}

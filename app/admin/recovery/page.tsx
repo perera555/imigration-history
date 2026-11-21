@@ -1,8 +1,9 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { recordCounts } from "@/lib/backup-actions";
+import { listRestorePoints, recordCounts } from "@/lib/backup-actions";
 import { RecoveryPanel } from "./RecoveryPanel";
+import { RestorePoints } from "./RestorePoints";
 
 export const metadata: Metadata = { title: "Backup & recovery" };
 
@@ -31,6 +32,10 @@ export default function RecoveryPage() {
       <Suspense fallback={<div className="panel h-48 animate-pulse" />}>
         <Counts />
       </Suspense>
+      <Suspense fallback={<div className="panel h-48 animate-pulse" />}>
+        <Points />
+      </Suspense>
+      <h2 className="pt-2 font-serif text-xl font-bold text-navy">Backup files (keep a copy outside the app)</h2>
       <RecoveryPanel />
       <section className="panel space-y-2 p-6 text-sm text-ink-soft sm:p-8">
         <h2 className="font-serif text-xl font-bold text-navy">If the whole database is lost</h2>
@@ -42,6 +47,10 @@ export default function RecoveryPage() {
       </section>
     </div>
   );
+}
+
+async function Points() {
+  return <RestorePoints points={await listRestorePoints()} />;
 }
 
 async function Counts() {

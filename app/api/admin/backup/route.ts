@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/db";
 import { getSession } from "@/lib/session";
-import { BACKUP_TABLES, encodeRow } from "@/lib/backup";
+import { BACKUP_TABLES, backupHeader, encodeRow } from "@/lib/backup";
 
 /**
  * Full backup of every record, admins only. Streamed as JSON lines:
@@ -18,16 +18,13 @@ export async function GET() {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        controller.enqueue(enc.encode(JSON.stringify({ backup: "immigration-history", version: 1, exportedAt, tables: BACKUP_TABLES }) + "\n"));
+        controller.enqueue(enc.encode(backupHeader(exportedAt) + "\n"));
         for (const table of BACKUP_TABLES) {
           // Page through each table so memory stays small.
           let offset = 0;
           for (;;) {
-            const rows = await sql.unsafe(`select * from ${table} order by 1 limit 20 offset ${offset}`);
-            for (const r of rows) {
-              // postgres.camel turns column names into camelCase; restore converts them back.
-              controller.enqueue(enc.encode(JSON.stringify({ table, row: encodeRow(r as Record<string, unknown>) }) + "\n"));
-            }
+            const rows = await sql`select * from ${sql(table)} order by 1 limit 20 offset ${offset}`;
+            for (const r of rows) controller.enqueue(enc.encode(JSON.stringify({ table, row: encodeRow(r) }) + "\n"));
             if (rows.length < 20) break;
             offset += 20;
           }
@@ -39,11 +36,10 @@ export async function GET() {
     },
   });
 
-  const day = exportedAt.slice(0, 10);
   return new Response(stream, {
     headers: {
       "Content-Type": "application/x-ndjson; charset=utf-8",
-      "Content-Disposition": `attachment; filename="immigration-history-backup-${day}.json"`,
+      "Content-Disposition": `attachment; filename="immigration-history-backup-${exportedAt.slice(0, 10)}.json"`,
       "Cache-Control": "private, no-store",
     },
   });

@@ -5,6 +5,7 @@ import { deleteBoardingPass } from "@/lib/boarding-actions";
 import type { BoardingPass } from "@/lib/data";
 import { BoardingPassForm, type TripOption } from "./BoardingPassForm";
 import { ConfirmButton } from "./SubmitButton";
+import { downloadBoardingPassImage } from "@/lib/bp-image";
 
 const fmt = (d: string | null) =>
   d ? new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }) : "—";
@@ -109,6 +110,12 @@ export function BoardingPassSection({
         <a href={`/api/boarding/${p.id}/pdf`} className="btn btn-ghost !px-3 !py-1.5 text-xs" title="Single boarding pass, 203 x 83 mm">
           ⬇ Real-size PDF
         </a>
+        <button type="button" onClick={() => downloadBoardingPassImage(p, holder, "png", tripLabel(p.tripId))} className="btn btn-ghost !px-3 !py-1.5 text-xs" title="Real size, 300 dpi">
+          ⬇ PNG
+        </button>
+        <button type="button" onClick={() => downloadBoardingPassImage(p, holder, "jpeg", tripLabel(p.tripId))} className="btn btn-ghost !px-3 !py-1.5 text-xs" title="Real size, 300 dpi">
+          ⬇ JPEG
+        </button>
         {p.hasFile && (
           <>
             <a href={`/api/boarding/${p.id}/file`} target="_blank" rel="noopener" className="btn btn-ghost !px-3 !py-1.5 text-xs">
