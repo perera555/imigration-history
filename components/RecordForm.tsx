@@ -8,7 +8,7 @@ import { CountrySelect } from "./CountrySelect";
 import { PhotoInput } from "./PhotoInput";
 import { Flag } from "./Flag";
 import { EMPTY_PROFILE } from "@/lib/record";
-import { NationalitySelect } from "./NationalitySelect";
+import { CountryNameSelect, NationalitySelect } from "./NationalitySelect";
 import { flagSvg, isSchengen } from "@/lib/countries";
 import { useToastOn } from "./Toaster";
 
@@ -149,10 +149,16 @@ const PROFILE_FIELDS: { key: keyof Omit<ImportProfile, "previousPassports" | "ph
   { key: "dateOfBirth", label: "Date of birth", type: "date" },
   { key: "sex", label: "Sex" },
   { key: "nationality", label: "Nationality" },
+  { key: "citizenship", label: "Citizenship" },
+  { key: "otherCitizenship", label: "Other country citizenship (dual, optional)" },
   { key: "phone", label: "Phone number", type: "tel" },
-  { key: "email", label: "Email", type: "email", wide: true },
+  { key: "phone2", label: "Second phone number (optional)", type: "tel" },
+  { key: "whatsapp", label: "WhatsApp number (optional)", type: "tel" },
+  { key: "email", label: "Email", type: "email" },
+  { key: "email2", label: "Other email (optional)", type: "email" },
   { key: "address", label: "Address", wide: true },
   { key: "nationalId", label: "ID number (NIC)" },
+  { key: "tin", label: "TIN – tax number (optional)" },
   { key: "passportNumber", label: "Current passport number" },
   { key: "passportIssueDate", label: "Passport issue date", type: "date" },
   { key: "passportExpiryDate", label: "Passport expiry date", type: "date" },
@@ -332,6 +338,15 @@ export function RecordForm({
                     <span className="field-label">{f.label}</span>
                     <NationalitySelect defaultValue={profile.nationality} onChange={(v) => setProfile((p) => ({ ...p, nationality: v || null }))} />
                   </div>
+                ) : f.key === "citizenship" || f.key === "otherCitizenship" ? (
+                  <div key={f.key}>
+                    <span className="field-label">{f.label}</span>
+                    <CountryNameSelect
+                      defaultValue={profile[f.key]}
+                      placeholder={f.key === "otherCitizenship" ? "None, or choose a country" : undefined}
+                      onChange={(v) => setProfile((p) => ({ ...p, [f.key]: v || null }))}
+                    />
+                  </div>
                 ) : f.key === "sex" ? (
                   <label key={f.key}>
                     <span className="field-label">{f.label}</span>
@@ -355,7 +370,7 @@ export function RecordForm({
                       type={f.type ?? "text"}
                       value={profile[f.key] ?? ""}
                       onChange={(e) =>
-                        setProfile({ ...profile, [f.key]: (f.key === "passportNumber" || f.key === "nationalId" ? e.target.value.toUpperCase() : e.target.value) || null })
+                        setProfile({ ...profile, [f.key]: (f.key === "passportNumber" || f.key === "nationalId" || f.key === "tin" ? e.target.value.toUpperCase() : e.target.value) || null })
                       }
                       className={`field ${f.key === "passportNumber" ? "font-mono uppercase" : ""}`}
                     />

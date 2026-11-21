@@ -7,7 +7,7 @@ import type { Profile } from "@/lib/data";
 import { PhotoInput } from "./PhotoInput";
 import { PassportListInput } from "./PassportListInput";
 import { SubmitButton } from "./SubmitButton";
-import { NationalitySelect } from "./NationalitySelect";
+import { CountryNameSelect, NationalitySelect } from "./NationalitySelect";
 
 export function ProfileForm({
   action,
@@ -80,6 +80,36 @@ export function ProfileForm({
           <span className="field-label">Email</span>
           <input type="email" name="email" readOnly={locked(profile?.email)} defaultValue={profile?.email ?? ""} className={`field ${locked(profile?.email) ? lockClass : ""}`} />
         </label>
+        {(["citizenship", "otherCitizenship"] as const).map((key) => (
+          <label key={key}>
+            <span className="field-label">{key === "citizenship" ? "Citizenship" : "Other country citizenship (dual, optional)"}</span>
+            {locked(profile?.[key]) ? (
+              <input name={key} readOnly defaultValue={profile?.[key] ?? ""} className={`field ${lockClass}`} />
+            ) : (
+              <CountryNameSelect name={key} defaultValue={profile?.[key]} placeholder={key === "otherCitizenship" ? "None, or choose a country" : undefined} />
+            )}
+          </label>
+        ))}
+        {(
+          [
+            ["phone2", "Second phone number (optional)", "tel", "+94 …"],
+            ["whatsapp", "WhatsApp number (optional)", "tel", "+94 …"],
+            ["email2", "Other email (optional)", "email", ""],
+            ["tin", "TIN – tax number (optional)", "text", ""],
+          ] as const
+        ).map(([key, label, type, placeholder]) => (
+          <label key={key}>
+            <span className="field-label">{label}</span>
+            <input
+              type={type}
+              name={key}
+              readOnly={locked(profile?.[key])}
+              defaultValue={profile?.[key] ?? ""}
+              placeholder={placeholder}
+              className={`field ${key === "tin" ? "font-mono uppercase" : ""} ${locked(profile?.[key]) ? lockClass : ""}`}
+            />
+          </label>
+        ))}
         <label className="sm:col-span-2">
           <span className="field-label">Address</span>
           <textarea name="address" rows={2} readOnly={locked(profile?.address)} defaultValue={profile?.address ?? ""} className={`field ${locked(profile?.address) ? lockClass : ""}`} />

@@ -1,7 +1,12 @@
 "use client";
 
 import { useId, useMemo, useRef, useState } from "react";
-import { NATIONALITIES, flagSvg } from "@/lib/countries";
+import { COUNTRIES, NATIONALITIES, flagSvg } from "@/lib/countries";
+
+/** Searchable country list with flags for citizenship; submits the country name (e.g. "Sri Lanka"). */
+export function CountryNameSelect(props: { name?: string; defaultValue?: string | null; onChange?: (value: string) => void; className?: string; placeholder?: string }) {
+  return <NationalitySelect {...props} list={COUNTRIES} placeholder={props.placeholder ?? "Choose country (type to search)"} emptyText="No country found" />;
+}
 
 /** Searchable nationality dropdown with flags; submits the nationality name (e.g. "Sri Lankan"). */
 export function NationalitySelect({
@@ -9,12 +14,20 @@ export function NationalitySelect({
   defaultValue,
   onChange,
   className = "",
+  list = NATIONALITIES,
+  placeholder = "Choose nationality (type to search)",
+  emptyText = "No nationality found",
 }: {
   name?: string;
   defaultValue?: string | null;
   onChange?: (value: string) => void;
   className?: string;
+  /** Options to choose from (default: nationalities). */
+  list?: { code: string; name: string }[];
+  placeholder?: string;
+  emptyText?: string;
 }) {
+  const NATIONALITIES = list;
   const [value, setValueState] = useState(defaultValue ?? "");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -31,7 +44,7 @@ export function NationalitySelect({
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
     return q ? NATIONALITIES.filter((n) => n.name.toLowerCase().includes(q)) : NATIONALITIES;
-  }, [query]);
+  }, [query, NATIONALITIES]);
 
   function choose(v: string) {
     setValue(v);
@@ -59,7 +72,7 @@ export function NationalitySelect({
           aria-controls={listId}
           aria-autocomplete="list"
           className="w-full bg-transparent py-2.5 outline-none"
-          placeholder={value || "Choose nationality (type to search)"}
+          placeholder={value || placeholder}
           value={open ? query : value}
           onFocus={() => {
             setOpen(true);
@@ -92,7 +105,7 @@ export function NationalitySelect({
       </div>
       {open && (
         <ul id={listId} role="listbox" className="absolute z-50 mt-1 max-h-72 w-full min-w-64 overflow-auto rounded-xl border border-line bg-white p-1 shadow-2xl">
-          {matches.length === 0 && <li className="px-3 py-2 text-sm text-ink-soft">No nationality found</li>}
+          {matches.length === 0 && <li className="px-3 py-2 text-sm text-ink-soft">{emptyText}</li>}
           {matches.map((n, i) => (
             <li
               key={n.code}

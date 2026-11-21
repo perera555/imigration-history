@@ -11,9 +11,9 @@ function mrzLine(profile: Profile) {
 
 function Field({ label, value, mono, wide }: { label: string; value: React.ReactNode; mono?: boolean; wide?: boolean }) {
   return (
-    <div className={wide ? "col-span-2" : ""}>
-      <dt className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gold-soft/70">{label}</dt>
-      <dd className={`mt-0.5 break-words text-sm text-white sm:text-[15px] ${mono ? "font-mono tracking-wider" : ""}`}>
+    <div className={wide ? "col-span-2 lg:col-span-3" : ""}>
+      <dt className="text-[9px] font-semibold uppercase tracking-[0.16em] text-gold-soft/70">{label}</dt>
+      <dd className={`mt-0.5 break-words text-[13px] leading-snug text-white ${mono ? "font-mono tracking-wider" : ""}`}>
         {value || <span className="text-white/40">—</span>}
       </dd>
     </div>
@@ -61,7 +61,8 @@ export function TravelCard({ profile, title = "Previous Immigration History" }: 
             </p>
           </div>
 
-          <dl className="grid flex-1 grid-cols-2 gap-x-6 gap-y-4">
+          {/* Same card size: three compact columns on wide screens so the extra details fit. */}
+          <dl className="grid flex-1 grid-cols-2 gap-x-5 gap-y-3 lg:grid-cols-3">
             <Field label="Full name" value={profile.fullName} wide />
             <Field label="Sex" value={profile.sex} />
             <Field
@@ -69,7 +70,10 @@ export function TravelCard({ profile, title = "Previous Immigration History" }: 
               value={age !== null ? `${age} yrs · ${formatDate(profile.dateOfBirth)}` : null}
             />
             <Field label="Nationality" value={profile.nationality} />
+            <Field label="Citizenship" value={profile.citizenship} />
+            {profile.otherCitizenship && <Field label="Other citizenship" value={profile.otherCitizenship} />}
             <Field label="ID number (NIC)" value={profile.nationalId} mono />
+            {profile.tin && <Field label="TIN" value={profile.tin} mono />}
             <Field label="Passport no." value={profile.passportNumber} mono />
             <Field label="Passport issued" value={profile.passportIssueDate ? formatDate(profile.passportIssueDate) : null} />
             <Field
@@ -91,8 +95,10 @@ export function TravelCard({ profile, title = "Previous Immigration History" }: 
               mono
               wide
             />
-            <Field label="Phone" value={profile.phone} />
+            <Field label="Phone" value={[profile.phone, profile.phone2].filter(Boolean).join(" · ")} />
+            {profile.whatsapp && <Field label="WhatsApp" value={profile.whatsapp} />}
             <Field label="Email" value={profile.email} />
+            {profile.email2 && <Field label="Other email" value={profile.email2} />}
             <Field label="Address" value={profile.address} wide />
           </dl>
         </div>

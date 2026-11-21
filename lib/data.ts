@@ -15,6 +15,13 @@ export type Profile = {
   passportIssueDate: string | null;
   passportExpiryDate: string | null;
   nationalId: string | null;
+  /** Other email, WhatsApp, second phone, citizenship, other country citizenship (dual), tax number. */
+  email2: string | null;
+  whatsapp: string | null;
+  phone2: string | null;
+  citizenship: string | null;
+  otherCitizenship: string | null;
+  tin: string | null;
   previousPassports: string[];
   photo: string | null;
   createdAt: Date;

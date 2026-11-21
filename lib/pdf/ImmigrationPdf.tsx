@@ -344,13 +344,17 @@ export function ImmigrationPdf({
               <F label="Sex" value={profile.sex} />
               <F label="Age" value={age !== null ? `${age} years (born ${formatDate(profile.dateOfBirth)})` : null} />
               <F label="Nationality" value={profile.nationality} />
+              <F label="Citizenship" value={[profile.citizenship, profile.otherCitizenship].filter(Boolean).join(" / ")} />
               <F label="ID number (NIC)" value={profile.nationalId} mono />
+              {profile.tin ? <F label="TIN" value={profile.tin} mono /> : null}
               <F label="Passport no." value={profile.passportNumber} mono />
               <F label="Passport issue date" value={profile.passportIssueDate ? formatDate(profile.passportIssueDate) : null} />
               <F label="Passport expiry date" value={profile.passportExpiryDate ? formatDate(profile.passportExpiryDate) : null} />
               <F label="Previous passports" value={profile.previousPassports.join(", ")} mono wide />
-              <F label="Phone" value={profile.phone} />
+              <F label="Phone" value={[profile.phone, profile.phone2].filter(Boolean).join(" / ")} />
+              {profile.whatsapp ? <F label="WhatsApp" value={profile.whatsapp} /> : null}
               <F label="Email" value={profile.email} />
+              {profile.email2 ? <F label="Other email" value={profile.email2} /> : null}
               <F label="Address" value={profile.address} wide />
             </View>
           </View>

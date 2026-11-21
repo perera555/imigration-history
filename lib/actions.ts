@@ -259,6 +259,12 @@ function readProfile(form: FormData) {
       address: text(form, "address", 400),
       phone: text(form, "phone", 40),
       email,
+      email2: text(form, "email2", 200),
+      whatsapp: text(form, "whatsapp", 40),
+      phone2: text(form, "phone2", 40),
+      citizenship: text(form, "citizenship", 80),
+      otherCitizenship: text(form, "otherCitizenship", 160),
+      tin: text(form, "tin", 40)?.toUpperCase() ?? null,
       passportNumber: text(form, "passportNumber", 30)?.toUpperCase() ?? null,
       passportIssueDate,
       passportExpiryDate,
@@ -393,6 +399,12 @@ export type ImportProfile = {
   nationalId?: string | null;
   passportIssueDate?: string | null;
   passportExpiryDate?: string | null;
+  email2?: string | null;
+  whatsapp?: string | null;
+  phone2?: string | null;
+  citizenship?: string | null;
+  otherCitizenship?: string | null;
+  tin?: string | null;
 };
 export type ExtractState =
   | { error: string }
@@ -478,6 +490,12 @@ function profileValuesFrom(p: ImportProfile) {
     email: email && EMAIL_RE.test(email) ? email : null,
     passportNumber: s(p.passportNumber, 30)?.toUpperCase() ?? null,
     nationalId: s(p.nationalId, 40)?.toUpperCase() ?? null,
+    email2: s(p.email2, 200),
+    whatsapp: s(p.whatsapp, 40),
+    phone2: s(p.phone2, 40),
+    citizenship: s(p.citizenship, 80),
+    otherCitizenship: s(p.otherCitizenship, 160),
+    tin: s(p.tin, 40)?.toUpperCase() ?? null,
     passportIssueDate: p.passportIssueDate && isDate(p.passportIssueDate) ? p.passportIssueDate : null,
     passportExpiryDate: p.passportExpiryDate && isDate(p.passportExpiryDate) ? p.passportExpiryDate : null,
     previousPassports: (p.previousPassports ?? [])
