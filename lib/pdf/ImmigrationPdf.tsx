@@ -5,7 +5,7 @@ Font.registerHyphenationCallback((word) => [word]);
 import {
   ageFrom,
   formatDate,
-  groupByCountry,
+  groupForDisplay,
   travelStats,
   tripDuration,
   daysToYmd,
@@ -14,6 +14,7 @@ import {
   type Profile,
   type Trip,
   type Visa,
+  type BoardingPass,
 } from "@/lib/data";
 import { countryName, isSchengen } from "@/lib/countries";
 
@@ -98,16 +99,22 @@ function mrz(profile: Profile) {
   return [top.padEnd(44, "<").slice(0, 44), bottom.padEnd(44, "<").slice(0, 44)];
 }
 
+export type PdfParts = { card: boolean; record: boolean; visas: boolean; boarding?: boolean };
+export type PdfBoardingPass = BoardingPass & { image: string | null; tripLabel: string | null };
+
 export function ImmigrationPdf({
   profile,
   trips,
   flags,
   generatedOn,
   visas = [],
-  only,
+  parts = { card: true, record: true, visas: true },
+  boarding = [],
 }: {
-  /** "visas" = travel card + visas only. */
-  only?: "visas";
+  /** Boarding passes (with an embedded image when the upload was a photo). */
+  boarding?: PdfBoardingPass[];
+  /** Which parts to include (each starts on its own page). */
+  parts?: PdfParts;
   profile: Profile;
   trips: Trip[];
   visas?: Visa[];
@@ -116,9 +123,18 @@ export function ImmigrationPdf({
 }) {
   const age = ageFrom(profile.dateOfBirth);
   const stats = travelStats(trips);
-  const groups = groupByCountry(trips);
+  const groups = groupForDisplay(trips);
   const [mrz1, mrz2] = mrz(profile);
-  const visasOnly = only === "visas";
+  const heading = !parts.record && parts.visas ? "Visas Held" : "Previous Immigration History";
+  const titleRow = (
+    <View style={s.titleRow}>
+      <View>
+        <Text style={s.eyebrow}>PERSONAL TRAVEL RECORD</Text>
+        <Text style={s.title}>{heading}</Text>
+      </View>
+      <Text style={s.generated}>Generated {generatedOn}</Text>
+    </View>
+  );
   // Visa Record: always the last part of the full PDF (travel card -> immigration record -> visa record),
   // or the whole content of the visas-only PDF.
   const visasSection = visas.length > 0 ? (
@@ -194,15 +210,10 @@ export function ImmigrationPdf({
 
 
   return (
-    <Document title={` - ${profile.fullName}`} author={profile.fullName}>
+    <Document title={`${heading} - ${profile.fullName}`} author={profile.fullName}>
+      {parts.card && (
       <Page size="A4" style={s.page}>
-        <View style={s.titleRow}>
-          <View>
-            <Text style={s.eyebrow}>PERSONAL TRAVEL RECORD</Text>
-            <Text style={s.title}>{visasOnly ? "Visas Held" : "Previous Immigration History"}</Text>
-          </View>
-          <Text style={s.generated}>Generated {generatedOn}</Text>
-        </View>
+        {titleRow}
 
         {/* Travel identity card */}
         <View style={s.card} wrap={false}>
@@ -248,16 +259,13 @@ export function ImmigrationPdf({
         </View>
 
 
-        {visasOnly && visasSection}
-
-        <View style={s.footer} fixed>
-          <Text>{profile.fullName} · Private &amp; confidential</Text>
-          <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
-        </View>
+        {footer}
       </Page>
+      )}
       {/* Page 2+: immigration record (its table header repeats only on these pages) */}
-      {!visasOnly && (
+      {parts.record && (
         <Page size="A4" style={s.page}>
+        {!parts.card && titleRow}
         <View style={s.stats}>
           {[
             ["COUNTRIES", stats.countries],
@@ -296,6 +304,7 @@ export function ImmigrationPdf({
                 <Image src={flags[group.countryCode]!} style={s.flag} />
               )}
               <Text style={s.countryName}>{group.countryName}</Text>
+              {group.schengen ? <Text style={s.note}>Schengen visa</Text> : null}
             </View>
             <Text style={[s.cell, { width: W.visits, textAlign: "center", fontFamily: "Helvetica-Bold", paddingTop: 6 }]}>
               {group.visits.length}
@@ -311,6 +320,7 @@ export function ImmigrationPdf({
                       {trip.purpose || "—"}
                       {trip.city ? ` (${trip.city})` : ""}
                     </Text>
+                    {trip.countries ? <Text style={s.note}>Countries: {trip.countries.map(countryName).join(", ")}</Text> : null}
                     {trip.notes ? <Text style={s.note}>{trip.notes}</Text> : null}
                   </View>
                   <Text style={[s.cell, { width: pct(W.passport), fontFamily: "Courier" }]}>
@@ -326,9 +336,50 @@ export function ImmigrationPdf({
         </Page>
       )}
       {/* Last part: visa record */}
-      {!visasOnly && (
+      {parts.visas && (
         <Page size="A4" style={s.page}>
+          {!parts.card && !parts.record && titleRow}
           {visasSection}
+          {footer}
+        </Page>
+      )}
+      {parts.boarding && (
+        <Page size="A4" style={s.page}>
+          {!parts.card && !parts.record && !parts.visas && titleRow}
+          <Text style={s.sectionTitle}>Boarding Passes</Text>
+          <View style={s.thead}>
+            <Text style={[s.th, { width: "14%" }]}>DATE</Text>
+            <Text style={[s.th, { width: "14%" }]}>FLIGHT</Text>
+            <Text style={[s.th, { width: "20%" }]}>AIRLINE</Text>
+            <Text style={[s.th, { width: "16%" }]}>FROM - TO</Text>
+            <Text style={[s.th, { width: "8%" }]}>SEAT</Text>
+            <Text style={[s.th, { width: "28%" }]}>TRIP</Text>
+          </View>
+          {boarding.length === 0 && (
+            <View style={[s.group, { padding: 12 }]}>
+              <Text style={{ color: MUTED }}>No boarding passes uploaded yet.</Text>
+            </View>
+          )}
+          {boarding.map((b, i) => (
+            <View key={b.id} style={[s.group, i % 2 ? { backgroundColor: PAPER } : {}]} wrap={false}>
+              <Text style={[s.cell, { width: "14%" }]}>{b.flightDate ? formatDate(b.flightDate) : "-"}</Text>
+              <Text style={[s.cell, { width: "14%", fontFamily: "Courier-Bold" }]}>{b.flightNumber ?? "-"}</Text>
+              <Text style={[s.cell, { width: "20%" }]}>{b.airline ?? "-"}</Text>
+              <Text style={[s.cell, { width: "16%" }]}>{`${b.fromAirport ?? "-"} - ${b.toAirport ?? "-"}`}</Text>
+              <Text style={[s.cell, { width: "8%" }]}>{b.seat ?? "-"}</Text>
+              <View style={[s.cell, { width: "28%" }]}>
+                <Text>{b.tripLabel ?? "Current / upcoming trip"}</Text>
+                {b.direction ? <Text style={s.note}>{b.direction}{b.bookingRef ? ` · PNR ${b.bookingRef}` : ""}</Text> : null}
+              </View>
+            </View>
+          ))}
+          {boarding.filter((b) => b.image).map((b) => (
+            <View key={`img-${b.id}`} style={{ marginTop: 14 }} wrap={false}>
+              <Text style={s.note}>{`${b.flightNumber ?? "Boarding pass"} · ${b.flightDate ? formatDate(b.flightDate) : ""}`}</Text>
+              {/* eslint-disable-next-line jsx-a11y/alt-text */}
+              <Image src={b.image!} style={{ marginTop: 4, maxHeight: 260, objectFit: "contain" }} />
+            </View>
+          ))}
           {footer}
         </Page>
       )}

@@ -1,8 +1,9 @@
 import { Flag } from "./Flag";
-import { formatDate, formatShortDate, groupByCountry, tripDuration, daysToYmd, type Trip } from "@/lib/data";
+import { formatDate, formatShortDate, groupForDisplay, tripDuration, daysToYmd, type Trip } from "@/lib/data";
+import { countryName } from "@/lib/countries";
 
 export function HistoryTable({ trips }: { trips: Trip[] }) {
-  const groups = groupByCountry(trips);
+  const groups = groupForDisplay(trips);
 
   if (!groups.length) {
     return (
@@ -37,7 +38,14 @@ export function HistoryTable({ trips }: { trips: Trip[] }) {
                       <td rowSpan={group.visits.length} className="px-5 py-3 align-top">
                         <div className="flex items-center gap-3">
                           <Flag code={group.countryCode} className="h-7 w-10" />
-                          <span className="font-semibold text-ink">{group.countryName}</span>
+                          <div>
+                            <span className="font-semibold text-ink">{group.countryName}</span>
+                            {group.schengen && (
+                              <span className="mt-0.5 block w-fit rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-900">
+                                Schengen visa
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td rowSpan={group.visits.length} className="px-3 py-3 text-center align-top">
@@ -53,6 +61,9 @@ export function HistoryTable({ trips }: { trips: Trip[] }) {
                   <td className="px-3 py-2.5">
                     {trip.purpose || "—"}
                     {trip.city && <span className="ml-1.5 text-xs text-ink-soft">· {trip.city}</span>}
+                    {trip.countries && (
+                      <p className="mt-0.5 text-xs font-medium text-sky-900">Countries: {trip.countries.map(countryName).join(", ")}</p>
+                    )}
                     {trip.notes && <p className="mt-0.5 text-xs text-ink-soft">{trip.notes}</p>}
                   </td>
                   <td className="px-5 py-2.5 font-mono text-xs tracking-wide text-ink-soft">
@@ -71,7 +82,10 @@ export function HistoryTable({ trips }: { trips: Trip[] }) {
           <section key={group.countryCode} className="panel overflow-hidden">
             <header className="flex items-center gap-3 border-b border-line bg-paper/60 px-4 py-3">
               <Flag code={group.countryCode} className="h-7 w-10" />
-              <h3 className="font-semibold">{group.countryName}</h3>
+              <h3 className="font-semibold">
+                {group.countryName}
+                {group.schengen && <span className="ml-2 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold uppercase text-sky-900">Schengen visa</span>}
+              </h3>
               <span className="ml-auto rounded-full bg-navy px-2.5 py-0.5 text-xs font-semibold text-gold-soft">
                 {group.visits.length} {group.visits.length === 1 ? "visit" : "visits"}
               </span>
@@ -90,6 +104,7 @@ export function HistoryTable({ trips }: { trips: Trip[] }) {
                     {trip.city && ` · ${trip.city}`}
                     {trip.passportNumber && <span className="font-mono text-xs"> · {trip.passportNumber}</span>}
                   </p>
+                  {trip.countries && <p className="mt-1 text-xs font-medium text-sky-900">Countries: {trip.countries.map(countryName).join(", ")}</p>}
                   {trip.notes && <p className="mt-1 text-xs text-ink-soft">{trip.notes}</p>}
                 </li>
               ))}

@@ -1,5 +1,6 @@
 "use client";
 
+import { DateInput } from "./DateInput";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveImport, updateRecord, type ImportProfile, type ImportTrip } from "@/lib/actions";
@@ -8,9 +9,28 @@ import { PhotoInput } from "./PhotoInput";
 import { Flag } from "./Flag";
 import { EMPTY_PROFILE } from "@/lib/record";
 import { NationalitySelect } from "./NationalitySelect";
+import { flagSvg, isSchengen } from "@/lib/countries";
 
-type Visit = { key: number; id?: string | null; departureDate: string; returnDate: string; purpose: string; passportNumber: string; notes: string };
-type CountryBlock = { key: number; countryCode: string; city: string; visits: Visit[] };
+type Visit = {
+  key: number;
+  id?: string | null;
+  /** Schengen trip: the saved trip id for each country (one trip per country, same dates). */
+  ids?: Record<string, string>;
+  departureDate: string;
+  returnDate: string;
+  purpose: string;
+  passportNumber: string;
+  notes: string;
+};
+type CountryBlock = {
+  key: number;
+  countryCode: string;
+  city: string;
+  visits: Visit[];
+  /** Schengen trip: several Schengen countries visited on the same dates, under one Schengen visa. */
+  schengen?: boolean;
+  codes?: { key: number; code: string }[];
+};
 
 // Rows added by the user get keys from this counter (client-only, after hydration).
 // Initial rows use fixed keys (see toBlocks) so server and browser HTML match.
@@ -18,22 +38,40 @@ let seq = 1_000_000;
 const nextKey = () => seq++;
 const emptyVisit = (): Visit => ({ key: nextKey(), departureDate: "", returnDate: "", purpose: "", passportNumber: "", notes: "" });
 const emptyCountry = (): CountryBlock => ({ key: nextKey(), countryCode: "", city: "", visits: [emptyVisit()] });
+const emptySchengen = (): CountryBlock => ({
+  key: nextKey(),
+  countryCode: "",
+  city: "",
+  schengen: true,
+  codes: [{ key: nextKey(), code: "" }],
+  visits: [emptyVisit()],
+});
 
-
-
-/** Groups flat trips into country blocks (same country → one block), in order of first visit. */
+/**
+ * Groups flat trips into blocks in order of first visit: one block per country, except
+ * Schengen countries visited on the same dates, which become one Schengen block
+ * (e.g. Netherlands + Belgium + France, 14–21 Feb 2018).
+ */
 function toBlocks(trips: ImportTrip[]): CountryBlock[] {
   let k = 0;
   const key = () => ++k; // deterministic keys for the first render
+  const sorted = [...trips].sort((a, b) => (a.departureDate || "").localeCompare(b.departureDate || ""));
+
+  // Schengen trips grouped by their dates: which countries, and each country's trip id.
+  const byDate = new Map<string, { codes: string[]; ids: Record<string, string> }>();
+  for (const t of sorted) {
+    if (!isSchengen(t.countryCode)) continue;
+    const d = `${t.departureDate}|${t.returnDate ?? ""}`;
+    const g = byDate.get(d) ?? { codes: [], ids: {} };
+    if (!g.codes.includes(t.countryCode)) g.codes.push(t.countryCode);
+    if (t.id) g.ids[t.countryCode] = t.id;
+    byDate.set(d, g);
+  }
+
   const blocks = new Map<string, CountryBlock>();
-  for (const t of [...trips].sort((a, b) => (a.departureDate || "").localeCompare(b.departureDate || ""))) {
-    const id = `${t.countryCode}|${t.city ?? ""}`;
-    let block = blocks.get(id);
-    if (!block) {
-      block = { key: key(), countryCode: t.countryCode, city: t.city ?? "", visits: [] };
-      blocks.set(id, block);
-    }
-    block.visits.push({
+  const doneDates = new Set<string>();
+  for (const t of sorted) {
+    const visit = (extra: Partial<Visit>): Visit => ({
       key: key(),
       id: t.id ?? null,
       departureDate: t.departureDate ?? "",
@@ -41,11 +79,61 @@ function toBlocks(trips: ImportTrip[]): CountryBlock[] {
       purpose: t.purpose ?? "",
       passportNumber: t.passportNumber ?? "",
       notes: t.notes ?? "",
+      ...extra,
     });
+    if (isSchengen(t.countryCode)) {
+      const d = `${t.departureDate}|${t.returnDate ?? ""}`;
+      if (doneDates.has(d)) continue;
+      doneDates.add(d);
+      const g = byDate.get(d)!;
+      const id = `schengen|${g.codes.join(",")}`;
+      let block = blocks.get(id);
+      if (!block) {
+        block = { key: key(), countryCode: "", city: "", schengen: true, codes: g.codes.map((code) => ({ key: key(), code })), visits: [] };
+        blocks.set(id, block);
+      }
+      block.visits.push(visit({ id: null, ids: g.ids }));
+      continue;
+    }
+    const id = `${t.countryCode}|${t.city ?? ""}`;
+    let block = blocks.get(id);
+    if (!block) {
+      block = { key: key(), countryCode: t.countryCode, city: t.city ?? "", visits: [] };
+      blocks.set(id, block);
+    }
+    block.visits.push(visit({}));
   }
   return blocks.size
     ? [...blocks.values()]
     : [{ key: key(), countryCode: "", city: "", visits: [{ key: key(), departureDate: "", returnDate: "", purpose: "", passportNumber: "", notes: "" }] }];
+}
+
+/** Turns the form blocks into trips; a Schengen visit becomes one trip per Schengen country. */
+function collectTrips(blocks: CountryBlock[]): { trips: ImportTrip[] } | { error: string } {
+  const trips: ImportTrip[] = [];
+  for (const b of blocks) {
+    const codes = b.schengen ? [...new Set((b.codes ?? []).map((c) => c.code).filter(Boolean))] : [b.countryCode];
+    for (const v of b.visits) {
+      const empty = !v.departureDate && !v.returnDate && !v.purpose && !v.passportNumber && !v.notes;
+      if (empty) continue;
+      if (b.schengen && !codes.length) return { error: "Add the Schengen countries you travelled to." };
+      if (!b.schengen && !b.countryCode) return { error: "Choose a country for every section that has visits." };
+      if (!v.departureDate) return { error: "Every visit needs a departure date." };
+      for (const code of codes) {
+        trips.push({
+          id: b.schengen ? (v.ids?.[code] ?? null) : (v.id ?? null),
+          countryCode: code,
+          city: b.schengen ? null : b.city || null,
+          departureDate: v.departureDate,
+          returnDate: v.returnDate || null,
+          purpose: v.purpose,
+          passportNumber: v.passportNumber || null,
+          notes: v.notes || null,
+        });
+      }
+    }
+  }
+  return { trips };
 }
 
 const PROFILE_FIELDS: { key: keyof Omit<ImportProfile, "previousPassports" | "photo">; label: string; type?: string; wide?: boolean }[] = [
@@ -110,30 +198,20 @@ export function RecordForm({
     setError("");
     setSaved("");
     // Skip completely empty rows; every other row needs a country and departure date.
-    const trips: ImportTrip[] = [];
-    for (const b of blocks) {
-      for (const v of b.visits) {
-        const empty = !v.departureDate && !v.returnDate && !v.purpose && !v.passportNumber && !v.notes;
-        if (empty) continue;
-        if (!b.countryCode) return setError("Choose a country for every section that has visits.");
-        if (!v.departureDate) return setError("Every visit needs a departure date.");
-        trips.push({
-          id: v.id ?? null,
-          countryCode: b.countryCode,
-          city: b.city || null,
-          departureDate: v.departureDate,
-          returnDate: v.returnDate || null,
-          purpose: v.purpose,
-          passportNumber: v.passportNumber || null,
-          notes: v.notes || null,
-        });
-      }
-    }
+    const collected = collectTrips(blocks);
+    if ("error" in collected) return setError(collected.error);
+    const trips = collected.trips;
     if (saveTo === "new" && !profile.fullName?.trim()) return setError("Full name is required.");
     startSaving(async () => {
-      const result = updateId
-        ? await updateRecord(updateId, { profile, trips })
-        : await saveImport(saveTo, { profile, trips });
+      let result: Awaited<ReturnType<typeof saveImport>>;
+      try {
+        result = updateId
+          ? await updateRecord(updateId, { profile, trips })
+          : await saveImport(saveTo, { profile, trips });
+      } catch {
+        setError("Couldn't save (no answer from the server). Please check your connection and press Save again.");
+        return;
+      }
       if ("error" in result) {
         setError(result.error);
         return;
@@ -167,32 +245,23 @@ export function RecordForm({
   async function savePart(part: "card" | "record") {
     if (!updateId) return;
     setPartMsg((m) => ({ ...m, [part]: undefined }));
-    const trips: ImportTrip[] = [];
+    let trips: ImportTrip[] = [];
     if (part === "record") {
-      for (const b of blocks) {
-        for (const v of b.visits) {
-          const empty = !v.departureDate && !v.returnDate && !v.purpose && !v.passportNumber && !v.notes;
-          if (empty) continue;
-          if (!b.countryCode) return setPartMsg((m) => ({ ...m, record: { error: "Choose a country for every section that has visits." } }));
-          if (!v.departureDate) return setPartMsg((m) => ({ ...m, record: { error: "Every visit needs a departure date." } }));
-          trips.push({
-            id: v.id ?? null,
-            countryCode: b.countryCode,
-            city: b.city || null,
-            departureDate: v.departureDate,
-            returnDate: v.returnDate || null,
-            purpose: v.purpose,
-            passportNumber: v.passportNumber || null,
-            notes: v.notes || null,
-          });
-        }
-      }
+      const collected = collectTrips(blocks);
+      if ("error" in collected) return setPartMsg((m) => ({ ...m, record: { error: collected.error } }));
+      trips = collected.trips;
     } else if (!profile.fullName?.trim()) {
       return setPartMsg((m) => ({ ...m, card: { error: "Full name is required." } }));
     }
     setPartSaving(part);
     try {
-      const result = await updateRecord(updateId, { profile, trips }, part);
+      let result: Awaited<ReturnType<typeof updateRecord>>;
+      try {
+        result = await updateRecord(updateId, { profile, trips }, part);
+      } catch {
+        setPartMsg((m) => ({ ...m, [part]: { error: "Couldn't save (no answer from the server). Please check your connection and press Save again." } }));
+        return;
+      }
       if ("error" in result) {
         setPartMsg((m) => ({ ...m, [part]: { error: result.error } }));
       } else {
@@ -263,6 +332,12 @@ export function RecordForm({
                     </select>
                   </label>
                 ) : (
+                  f.type === "date" ? (
+                  <label key={f.key}>
+                    <span className="field-label">{f.label}</span>
+                    <DateInput value={profile[f.key] ?? ""} onChange={(e) => setProfile({ ...profile, [f.key]: e.target.value || null })} />
+                  </label>
+                  ) : (
                   <label key={f.key} className={f.wide ? "sm:col-span-2" : ""}>
                     <span className="field-label">{f.label}</span>
                     <input
@@ -274,6 +349,7 @@ export function RecordForm({
                       className={`field ${f.key === "passportNumber" ? "font-mono uppercase" : ""}`}
                     />
                   </label>
+                  )
                 ),
               )}
               <label>
@@ -315,15 +391,33 @@ export function RecordForm({
             return (
               <div key={b.key} className={`p-5 sm:p-6 ${bi % 2 ? "bg-paper/50" : ""}`}>
                 <div className="flex flex-wrap items-end gap-4">
-                  {b.countryCode && <Flag code={b.countryCode} className="mb-1 h-9 w-14" />}
-                  <div className="min-w-56 flex-1">
-                    <span className="field-label">Country</span>
-                    <CountrySelect key={b.key} name={`country-${b.key}`} defaultValue={b.countryCode} onChange={(code) => setBlock(b.key, { countryCode: code })} />
-                  </div>
-                  <label className="w-48">
-                    <span className="field-label">City (optional)</span>
-                    <input value={b.city} onChange={(e) => setBlock(b.key, { city: e.target.value })} className="field" placeholder="e.g. Dubai" />
-                  </label>
+                  {b.schengen ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={flagSvg("eu")} alt="" className="mb-1 h-9 w-14 rounded-md object-cover" />
+                      <div className="min-w-56 flex-1">
+                        <p className="font-serif text-xl font-bold text-navy">
+                          Schengen Area
+                          <span className="ml-2 rounded-full bg-sky-100 px-2 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wide text-sky-900">
+                            Schengen visa
+                          </span>
+                        </p>
+                        <p className="text-xs text-ink-soft">Countries travelled on the same dates under one Schengen visa.</p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {b.countryCode && <Flag code={b.countryCode} className="mb-1 h-9 w-14" />}
+                      <div className="min-w-56 flex-1">
+                        <span className="field-label">Country</span>
+                        <CountrySelect key={b.key} name={`country-${b.key}`} defaultValue={b.countryCode} onChange={(code) => setBlock(b.key, { countryCode: code })} />
+                      </div>
+                      <label className="w-48">
+                        <span className="field-label">City (optional)</span>
+                        <input value={b.city} onChange={(e) => setBlock(b.key, { city: e.target.value })} className="field" placeholder="e.g. Dubai" />
+                      </label>
+                    </>
+                  )}
                   <div className="text-center">
                     <span className="field-label">No. of visits</span>
                     <div className="flex items-center gap-1.5">
@@ -357,9 +451,48 @@ export function RecordForm({
                     onClick={() => setBlocks((list) => (list.length === 1 ? [emptyCountry()] : list.filter((x) => x.key !== b.key)))}
                     className="btn btn-danger !py-1.5"
                   >
-                    Remove country
+                    {b.schengen ? "Remove Schengen trip" : "Remove country"}
                   </button>
                 </div>
+
+                {b.schengen && (
+                  <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50/50 p-4">
+                    <span className="field-label">Schengen countries travelled</span>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {(b.codes ?? []).map((c) => (
+                        <div key={c.key} className="flex items-center gap-2">
+                          <div className="min-w-0 flex-1">
+                            <CountrySelect
+                              name={`schengen-${b.key}-${c.key}`}
+                              defaultValue={c.code}
+                              onChange={(code) =>
+                                setBlock(b.key, { codes: (b.codes ?? []).map((x) => (x.key === c.key ? { ...x, code } : x)) })
+                              }
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            aria-label="Remove country"
+                            onClick={() => setBlock(b.key, { codes: (b.codes ?? []).filter((x) => x.key !== c.key) })}
+                            className="grid size-8 shrink-0 place-items-center rounded-full text-ink-soft hover:bg-white hover:text-danger"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setBlock(b.key, { codes: [...(b.codes ?? []), { key: nextKey(), code: "" }] })}
+                      className="mt-3 text-sm font-semibold text-navy-2 hover:underline"
+                    >
+                      + Add Schengen country
+                    </button>
+                    {(b.codes ?? []).some((c) => c.code && !isSchengen(c.code)) && (
+                      <p className="mt-1 text-xs font-medium text-amber-700">Some countries chosen here are not in the Schengen Area.</p>
+                    )}
+                  </div>
+                )}
 
                 <div className="mt-4 overflow-x-auto">
                   <table className="w-full min-w-[760px] text-sm">
@@ -379,10 +512,10 @@ export function RecordForm({
                         <tr key={v.key}>
                           <td className="py-1 pr-2 text-ink-soft">{vi + 1}</td>
                           <td className="py-1 pr-2">
-                            <input type="date" value={v.departureDate} onChange={(e) => setVisit(b.key, v.key, { departureDate: e.target.value })} className="field !py-2" />
+                            <DateInput value={v.departureDate} onChange={(e) => setVisit(b.key, v.key, { departureDate: e.target.value })} className="field !py-2" />
                           </td>
                           <td className="py-1 pr-2">
-                            <input type="date" value={v.returnDate} onChange={(e) => setVisit(b.key, v.key, { returnDate: e.target.value })} className="field !py-2" />
+                            <DateInput value={v.returnDate} onChange={(e) => setVisit(b.key, v.key, { returnDate: e.target.value })} className="field !py-2" />
                           </td>
                           <td className="py-1 pr-2">
                             <input value={v.purpose} list="purpose-options" onChange={(e) => setVisit(b.key, v.key, { purpose: e.target.value })} className="field !py-2" placeholder="Tour" />
@@ -424,13 +557,26 @@ export function RecordForm({
         </div>
 
         <div className="border-t border-line bg-paper/60 px-6 py-4">
-          <button type="button" onClick={() => setBlocks((list) => [...list, emptyCountry()])} className="btn btn-ghost">
-            + Add country
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setBlocks((list) => [...list, emptyCountry()])} className="btn btn-ghost">
+              + Add country
+            </button>
+            <button type="button" onClick={() => setBlocks((list) => [...list, emptySchengen()])} className="btn btn-ghost">
+              🇪🇺 + Add Schengen trip
+            </button>
+          </div>
         </div>
-        {updateId && (
+        {updateId ? (
           <div className="px-6 pb-6">
-            <PartButton part="record" label="Save immigration record" />
+            <PartButton part="record" label="💾 Save immigration record" />
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-3 border-t border-line px-6 py-5">
+            <button type="button" onClick={save} disabled={saving} className="btn btn-primary !px-6 !py-3">
+              {saving ? "Saving…" : "💾 Save immigration record"}
+            </button>
+            {error && <p className="text-sm font-medium text-danger">{error}</p>}
+            {saved && <p className="text-sm font-medium text-ok">{saved}</p>}
           </div>
         )}
       </section>
@@ -446,12 +592,12 @@ export function RecordForm({
         ))}
       </datalist>
 
-      <div className="sticky bottom-4 z-20 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-card/95 p-4 shadow-xl backdrop-blur">
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-card p-4 shadow-sm">
         <button type="button" onClick={save} disabled={saving} className="btn btn-primary !px-6 !py-3">
           {saving ? "Saving…" : saveLabel}
         </button>
         <span className="text-sm text-ink-soft">
-          {blocks.filter((b) => b.countryCode).length} countries · {visitCount} visits
+          {blocks.reduce((n, b) => n + (b.schengen ? (b.codes ?? []).filter((c) => c.code).length : b.countryCode ? 1 : 0), 0)} countries · {visitCount} visits
         </span>
         {error && <p className="text-sm font-medium text-danger">{error}</p>}
         {saved && <p className="text-sm font-medium text-ok">{saved}</p>}

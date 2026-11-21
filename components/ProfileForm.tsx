@@ -1,5 +1,6 @@
 "use client";
 
+import { DateInput } from "./DateInput";
 import { useActionState } from "react";
 import type { FormState } from "@/lib/actions";
 import type { Profile } from "@/lib/data";
@@ -48,7 +49,7 @@ export function ProfileForm({
         </label>
         <label>
           <span className="field-label">Date of birth (age is calculated)</span>
-          <input type="date" name="dateOfBirth" readOnly={locked(profile?.dateOfBirth)} defaultValue={profile?.dateOfBirth ?? ""} className={`field ${locked(profile?.dateOfBirth) ? lockClass : ""}`} />
+          <DateInput name="dateOfBirth" readOnly={locked(profile?.dateOfBirth)} defaultValue={profile?.dateOfBirth ?? ""} className={`field ${locked(profile?.dateOfBirth) ? lockClass : ""}`} />
         </label>
         <label>
           <span className="field-label">Sex</span>
@@ -93,11 +94,11 @@ export function ProfileForm({
         </label>
         <label>
           <span className="field-label">Passport issue date</span>
-          <input type="date" name="passportIssueDate" readOnly={locked(profile?.passportIssueDate)} defaultValue={profile?.passportIssueDate ?? ""} className={`field ${locked(profile?.passportIssueDate) ? lockClass : ""}`} />
+          <DateInput name="passportIssueDate" readOnly={locked(profile?.passportIssueDate)} defaultValue={profile?.passportIssueDate ?? ""} className={`field ${locked(profile?.passportIssueDate) ? lockClass : ""}`} />
         </label>
         <label>
           <span className="field-label">Passport expiry date</span>
-          <input type="date" name="passportExpiryDate" readOnly={locked(profile?.passportExpiryDate)} defaultValue={profile?.passportExpiryDate ?? ""} className={`field ${locked(profile?.passportExpiryDate) ? lockClass : ""}`} />
+          <DateInput name="passportExpiryDate" readOnly={locked(profile?.passportExpiryDate)} defaultValue={profile?.passportExpiryDate ?? ""} className={`field ${locked(profile?.passportExpiryDate) ? lockClass : ""}`} />
         </label>
         <div className="sm:col-span-2">
           <span className="field-label">Previous passport numbers (up to 10)</span>

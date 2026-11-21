@@ -1,5 +1,6 @@
 "use client";
 
+import { DateInput } from "./DateInput";
 import { useActionState, useEffect, useRef, useState } from "react";
 import type { FormState } from "@/lib/actions";
 import type { Trip } from "@/lib/data";
@@ -53,11 +54,11 @@ export function TripForm({
         </label>
         <label>
           <span className="field-label">Departure date *</span>
-          <input type="date" name="departureDate" required defaultValue={trip?.departureDate ?? ""} className="field" />
+          <DateInput name="departureDate" required defaultValue={trip?.departureDate ?? ""} className="field" />
         </label>
         <label>
           <span className="field-label">Arrival (return) date</span>
-          <input type="date" name="returnDate" defaultValue={trip?.returnDate ?? ""} className="field" />
+          <DateInput name="returnDate" defaultValue={trip?.returnDate ?? ""} className="field" />
         </label>
         <label>
           <span className="field-label">Passport used</span>

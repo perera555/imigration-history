@@ -1,6 +1,6 @@
 import "server-only";
 import { getDb } from "./db";
-import { countryName } from "./countries";
+import { countryName, isSchengen } from "./countries";
 
 export type Profile = {
   id: string;
@@ -156,7 +156,37 @@ export async function getVisa(id: string): Promise<Visa | null> {
   return rows[0] ?? null;
 }
 
-export type VisaState = { label: string; tone: "valid" | "expired" | "upcoming" | "closed"; detail: string | null };
+// ---------- boarding passes ----------
+
+export type BoardingPass = {
+  id: string;
+  profileId: string;
+  tripId: string | null;
+  direction: string | null;
+  airline: string | null;
+  flightNumber: string | null;
+  fromAirport: string | null;
+  toAirport: string | null;
+  flightDate: string | null;
+  seat: string | null;
+  bookingRef: string | null;
+  notes: string | null;
+  fileName: string | null;
+  mime: string | null;
+  hasFile: boolean;
+};
+
+export async function getBoardingPasses(profileId: string): Promise<BoardingPass[]> {
+  if (!isUuid(profileId)) return [];
+  const sql = await getDb();
+  return sql<BoardingPass[]>`
+    select id, profile_id, trip_id, direction, airline, flight_number, from_airport, to_airport,
+           flight_date, seat, booking_ref, notes, file_name, mime, (data is not null) as has_file
+    from boarding_passes where profile_id = ${profileId}
+    order by flight_date desc nulls first, created_at desc`;
+}
+
+export type VisaState ={ label: string; tone: "valid" | "expired" | "upcoming" | "closed"; detail: string | null };
 
 /** Valid / Expired / Not yet valid, or a manual status like "Used" or "Cancelled". */
 export function visaState(visa: Pick<Visa, "issueDate" | "expiryDate" | "status">, today = new Date()): VisaState {
@@ -185,6 +215,47 @@ export function groupByCountry(trips: Trip[]): CountryGroup[] {
     group.visits.push(trip);
   }
   return [...groups.values()];
+}
+
+export type DisplayVisit = Trip & { /** Schengen visit: the Schengen countries travelled on these dates. */ countries?: string[] };
+export type DisplayGroup = {
+  countryCode: string;
+  countryName: string;
+  schengen: boolean;
+  visits: DisplayVisit[];
+};
+
+/**
+ * History grouped for display: one group per country, except Schengen countries, which form
+ * one "Schengen Area" group; trips to Schengen countries on the same dates are one visit
+ * listing every country travelled (e.g. Netherlands, Belgium, France).
+ */
+export function groupForDisplay(trips: Trip[]): DisplayGroup[] {
+  const groups: DisplayGroup[] = [];
+  let schengen: DisplayGroup | null = null;
+  const sorted = [...trips].sort((a, b) => a.departureDate.localeCompare(b.departureDate));
+  for (const trip of sorted) {
+    if (isSchengen(trip.countryCode)) {
+      if (!schengen) {
+        schengen = { countryCode: "EU", countryName: "Schengen Area", schengen: true, visits: [] };
+        groups.push(schengen);
+      }
+      const same = schengen.visits.find((v) => v.departureDate === trip.departureDate && v.returnDate === trip.returnDate);
+      if (same) {
+        if (!same.countries!.includes(trip.countryCode)) same.countries!.push(trip.countryCode);
+      } else {
+        schengen.visits.push({ ...trip, countries: [trip.countryCode] });
+      }
+      continue;
+    }
+    let group = groups.find((g) => !g.schengen && g.countryCode === trip.countryCode);
+    if (!group) {
+      group = { countryCode: trip.countryCode, countryName: countryName(trip.countryCode), schengen: false, visits: [] };
+      groups.push(group);
+    }
+    group.visits.push(trip);
+  }
+  return groups;
 }
 
 export function tripDays(trip: Pick<Trip, "departureDate" | "returnDate">): number | null {
@@ -277,4 +348,15 @@ export function formatShortDate(value: string | null): string {
     year: "numeric",
     timeZone: "UTC",
   });
+}
+
+/** Trip choices for linking a boarding pass, e.g. "Thailand · 10 Dec 2013 → 12 Dec 2013". */
+export function boardingTrips(trips: Trip[]): { id: string; label: string; date: string }[] {
+  return [...trips]
+    .sort((a, b) => b.departureDate.localeCompare(a.departureDate))
+    .map((t) => ({
+      id: t.id,
+      label: `${countryName(t.countryCode)} · ${formatShortDate(t.departureDate)} → ${formatShortDate(t.returnDate)}`,
+      date: `${t.departureDate}|${t.returnDate ?? ""}`,
+    }));
 }

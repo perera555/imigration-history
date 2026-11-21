@@ -3,8 +3,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { requireAuth } from "@/lib/session";
-import { getProfile, getTrips, getVisas, travelStats } from "@/lib/data";
+import { getProfile, getTrips, getVisas, getBoardingPasses, boardingTrips, travelStats } from "@/lib/data";
 import { VisaList } from "@/components/VisaList";
+import { BoardingPassSection } from "@/components/BoardingPassSection";
 import { TravelCard } from "@/components/TravelCard";
 import { HistoryTable, StatsBar } from "@/components/HistoryTable";
 import { logout } from "@/lib/actions";
@@ -27,9 +28,9 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
   const session = await requireAuth();
   if (session.role === "admin") redirect("/admin");
   const { welcome } = await searchParams;
-  const [profile, trips, visas] = session.profileId
-    ? await Promise.all([getProfile(session.profileId), getTrips(session.profileId), getVisas(session.profileId)])
-    : [null, [], []];
+  const [profile, trips, visas, passes] = session.profileId
+    ? await Promise.all([getProfile(session.profileId), getTrips(session.profileId), getVisas(session.profileId), getBoardingPasses(session.profileId)])
+    : [null, [], [], []];
 
   return (
     <div className="space-y-8">
@@ -77,6 +78,7 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
             <HistoryTable trips={trips} />
           </section>
           <VisaList profileId={profile.id} holder={profile} visas={visas} trips={trips} canViewDocument emptyHint="No visas yet. Add one in Step 3 above." />
+          <BoardingPassSection profileId={profile.id} passes={passes} trips={boardingTrips(trips)} canDelete={false} />
         </>
       ) : (
         <div className="panel p-10 text-center text-ink-soft">

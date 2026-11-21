@@ -6,7 +6,7 @@ import { requireProfileAccess } from "@/lib/session";
 import { getProfile, getTrips, getVisas, groupByCountry } from "@/lib/data";
 import { VisaCountryManager } from "@/components/VisaCountryManager";
 import { VisaList } from "@/components/VisaList";
-import { RecordForm } from "@/components/RecordForm";
+import { UpdateRecordForm } from "@/components/UpdateRecordForm";
 import { JumpNav } from "@/components/JumpNav";
 import { HashScroll } from "@/components/HashScroll";
 
@@ -68,12 +68,10 @@ async function UpdateRecord({
           ]}
         />
       </div>
-      <RecordForm
+      <UpdateRecordForm
         // Remount with fresh database data after every save.
-        key={`${profile.updatedAt.toISOString()}-${trips.length}-${trips.map((t) => t.id).join(",").length}`}
-        target={id}
+        formKey={`${profile.updatedAt.toISOString()}-${trips.length}-${trips.map((t) => t.id).join(",").length}`}
         updateId={id}
-        saveLabel="Save / Update record"
         initialProfile={{
           fullName: profile.fullName,
           dateOfBirth: profile.dateOfBirth,

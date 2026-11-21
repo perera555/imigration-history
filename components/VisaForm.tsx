@@ -1,5 +1,6 @@
 "use client";
 
+import { DateInput } from "./DateInput";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { readVisaDocument, saveVisa, type VisaSaveState } from "@/lib/visa-actions";
 import type { Visa } from "@/lib/data";
@@ -241,11 +242,11 @@ export function VisaForm({
         </label>
         <label>
           <span className="field-label">Issue date</span>
-          <input type="date" name="issueDate" value={f.issueDate} onChange={set("issueDate")} className="field" />
+          <DateInput name="issueDate" value={f.issueDate} onChange={set("issueDate")} className="field" />
         </label>
         <label>
           <span className="field-label">Expiry date</span>
-          <input type="date" name="expiryDate" value={f.expiryDate} onChange={set("expiryDate")} className="field" />
+          <DateInput name="expiryDate" value={f.expiryDate} onChange={set("expiryDate")} className="field" />
         </label>
         <label>
           <span className="field-label">Purpose</span>
@@ -260,11 +261,11 @@ export function VisaForm({
         </label>
         <label>
           <span className="field-label">Travel from</span>
-          <input type="date" name="travelFrom" value={f.travelFrom} onChange={set("travelFrom")} className="field" />
+          <DateInput name="travelFrom" value={f.travelFrom} onChange={set("travelFrom")} className="field" />
         </label>
         <label>
           <span className="field-label">Travel to</span>
-          <input type="date" name="travelTo" value={f.travelTo} onChange={set("travelTo")} className="field" />
+          <DateInput name="travelTo" value={f.travelTo} onChange={set("travelTo")} className="field" />
         </label>
         <label>
           <span className="field-label">Entries</span>
