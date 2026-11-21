@@ -75,7 +75,7 @@ async function UpdateRecord({
           items={[
             { id: "card", label: "🪪 Travel card" },
             { id: "record", label: "🌍 Immigration record" },
-            { id: "passport-pages", label: "📘 Passport pages" },
+            { id: "passport-pages", label: "📘 Passport PDFs" },
             { id: "stays", label: "🏨 Hotels & Airbnb" },
             { id: "visas", label: "🛂 Visas" },
             { id: "boarding", label: "✈ Boarding passes", primary: true },

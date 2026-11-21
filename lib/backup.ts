@@ -91,6 +91,7 @@ export type Scope =
   | { visaPageId: string }
   | { stayId: string }
   | { passportPageId: string }
+  | { passportDocumentId: string }
   | { passId: string }
   | { adminId: string };
 
@@ -133,6 +134,7 @@ function scopeQueries(sql: Sql, s: Scope): [BackupTable, Promise<Record<string, 
       ["visa_pages", sql`select * from visa_pages where visa_id = ${s.visaId}`],
     ];
   if ("visaPageId" in s) return [["visa_pages", sql`select * from visa_pages where id = ${s.visaPageId}`]];
+  if ("passportDocumentId" in s) return [["passport_documents", sql`select * from passport_documents where id = ${s.passportDocumentId}`]];
   if ("passportPageId" in s) return [["passport_pages", sql`select * from passport_pages where id = ${s.passportPageId}`]];
   if ("stayId" in s) return [["stays", sql`select * from stays where id = ${s.stayId}`]];
   if ("passId" in s) return [["boarding_passes", sql`select * from boarding_passes where id = ${s.passId}`]];

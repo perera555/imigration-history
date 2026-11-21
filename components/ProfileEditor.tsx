@@ -33,7 +33,7 @@ export function ProfileEditor({
           { id: "details", label: "🪪 Travel card details" },
           { id: "trips", label: "🌍 Immigration record" },
           { id: "recorded", label: "🧾 Recorded trips" },
-          { id: "passport-pages", label: "📘 Passport pages" },
+          { id: "passport-pages", label: "📘 Passport PDFs" },
           { id: "stays", label: "🏨 Hotels & Airbnb" },
           { id: "visas", label: "🛂 Visas" },
           { id: "boarding", label: "✈ Boarding passes", primary: true },

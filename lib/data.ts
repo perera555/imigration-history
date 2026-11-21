@@ -214,14 +214,15 @@ export async function getPassportPages(profileId: string): Promise<PassportPage[
     where profile_id = ${profileId} order by passport_number, page_no`;
 }
 
-export type PassportDocument = { id: string; passportNumber: string; fileName: string; size: number };
+export type PassportDocument = { id: string; passportNumber: string; fileName: string; size: number; pageCount: number | null; createdAt: string };
 
-/** Original whole-passport PDFs (one per passport number). */
+/** Whole-passport PDFs (one per passport number, all pages in one file). */
 export async function getPassportDocuments(profileId: string): Promise<PassportDocument[]> {
   if (!isUuid(profileId)) return [];
   const sql = await getDb();
   return sql<PassportDocument[]>`
-    select id, passport_number, file_name, size from passport_documents where profile_id = ${profileId}`;
+    select id, passport_number, file_name, size, page_count, created_at::date::text as created_at
+    from passport_documents where profile_id = ${profileId} and complete`;
 }
 
 // ---------- places stayed (hotels, Airbnb homes, …) ----------

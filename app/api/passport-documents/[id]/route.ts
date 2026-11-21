@@ -11,7 +11,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/passport-doc
 
   const sql = await getDb();
   const [doc] = await sql<{ profileId: string; fileName: string; mime: string; data: Buffer }[]>`
-    select profile_id, file_name, mime, data from passport_documents where id = ${id}`;
+    select profile_id, file_name, mime, data from passport_documents where id = ${id} and complete`;
   if (!doc) return new Response("Not found", { status: 404 });
   if (!canAccessProfile(session, doc.profileId)) return new Response("Forbidden", { status: 403 });
 
