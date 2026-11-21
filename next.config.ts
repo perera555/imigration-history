@@ -7,7 +7,8 @@ const pkg = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8")
 // Version of this build: package version + commit (Vercel) or build time. The app compares it
 // with the live version and offers "Update now" when a new version is published.
 const commit = (process.env.VERCEL_GIT_COMMIT_SHA ?? "").slice(0, 7);
-const APP_VERSION = `${pkg.version}${commit ? `+${commit}` : `+${Date.now().toString(36)}`}`;
+// Must be the same everywhere the config is loaded (server and browser bundles), so no timestamps.
+const APP_VERSION = `${pkg.version}+${commit || "local"}`;
 
 const nextConfig: NextConfig = {
   env: { NEXT_PUBLIC_APP_VERSION: APP_VERSION },
