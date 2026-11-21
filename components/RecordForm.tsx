@@ -501,87 +501,75 @@ export function RecordForm({
                   </div>
                 )}
 
-                <div className="mt-4 overflow-x-auto">
-                  <table className="w-full min-w-[760px] text-sm">
-                    <thead>
-                      <tr className="text-left text-[11px] uppercase tracking-[0.12em] text-ink-soft">
-                        <th className="pb-2 pr-2">#</th>
-                        <th className="pb-2 pr-2">Departure date *</th>
-                        <th className="pb-2 pr-2">Return date</th>
-                        <th className="pb-2 pr-2">Purpose</th>
-                        <th className="pb-2 pr-2">Passport used</th>
-                        <th className="pb-2" />
-                      </tr>
-                    </thead>
-                    {b.visits.map((v, vi) => (
-                      // One visit = two lines: dates / purpose / passport, then hotel, address and notes.
-                      <tbody key={v.key} className={vi ? "border-t border-line" : ""}>
-                        <tr>
-                          <td className="pt-2 pr-2 align-top text-ink-soft">{vi + 1}</td>
-                          <td className="py-1 pr-2">
+                {/* One card per visit: dates / purpose / passport, then a hotel strip and notes. */}
+                <div className="mt-4 space-y-4">
+                  {b.visits.map((v, vi) => {
+                    const lbl = "mb-2 block text-[10px] font-semibold uppercase leading-none tracking-[0.14em] text-ink-soft";
+                    return (
+                      <div key={v.key} className="relative rounded-2xl border border-line bg-white p-4 pl-12 shadow-[0_1px_0_rgba(0,0,0,0.03)] transition hover:border-gold/60 hover:shadow-md sm:p-5 sm:pl-14">
+                        <span className="absolute left-4 top-4 grid size-7 place-items-center rounded-full bg-navy text-xs font-bold text-gold-soft" aria-hidden>
+                          {vi + 1}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label="Remove visit"
+                          title="Remove this visit"
+                          onClick={() => setBlock(b.key, { visits: b.visits.length === 1 ? [emptyVisit()] : b.visits.filter((x) => x.key !== v.key) })}
+                          className="absolute right-3 top-3 grid size-8 place-items-center rounded-full text-lg text-ink-soft hover:bg-red-50 hover:text-danger"
+                        >
+                          ×
+                        </button>
+                        <div className="grid gap-x-4 gap-y-5 pr-8 sm:grid-cols-2 lg:grid-cols-4">
+                          <label>
+                            <span className={lbl}>✈ Departure *</span>
                             <DateInput value={v.departureDate} onChange={(e) => setVisit(b.key, v.key, { departureDate: e.target.value })} className="field !py-2" />
-                          </td>
-                          <td className="py-1 pr-2">
+                          </label>
+                          <label>
+                            <span className={lbl}>🏠 Return</span>
                             <DateInput value={v.returnDate} onChange={(e) => setVisit(b.key, v.key, { returnDate: e.target.value })} className="field !py-2" />
-                          </td>
-                          <td className="py-1 pr-2">
+                          </label>
+                          <label>
+                            <span className={lbl}>🎯 Purpose</span>
                             <input value={v.purpose} list="purpose-options" onChange={(e) => setVisit(b.key, v.key, { purpose: e.target.value })} className="field !py-2" placeholder="Tour" />
-                          </td>
-                          <td className="py-1 pr-2">
+                          </label>
+                          <label>
+                            <span className={lbl}>🛂 Passport used</span>
                             <input
                               value={v.passportNumber}
                               list="passport-options"
                               onChange={(e) => setVisit(b.key, v.key, { passportNumber: e.target.value.toUpperCase() })}
                               className="field !py-2 font-mono uppercase"
                             />
-                          </td>
-                          <td className="py-1">
-                            <button
-                              type="button"
-                              aria-label="Remove visit"
-                              onClick={() =>
-                                setBlock(b.key, { visits: b.visits.length === 1 ? [emptyVisit()] : b.visits.filter((x) => x.key !== v.key) })
-                              }
-                              className="grid size-9 place-items-center rounded-full text-ink-soft hover:bg-paper-2 hover:text-danger"
-                            >
-                              ×
-                            </button>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td />
-                          <td colSpan={4} className="pb-3 pr-2 pt-1">
-                            <div className="grid gap-2 sm:grid-cols-3">
-                              <label>
-                                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-soft">🏨 Hotel / Airbnb (optional)</span>
-                                <input
-                                  value={v.stayedAt ?? ""}
-                                  list="stayed-options"
-                                  onChange={(e) => setVisit(b.key, v.key, { stayedAt: e.target.value })}
-                                  className="field !py-2"
-                                  placeholder="e.g. PJ Watergate"
-                                />
-                              </label>
-                              <label>
-                                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-soft">Hotel address (optional)</span>
-                                <input
-                                  value={v.stayedAddress ?? ""}
-                                  onChange={(e) => setVisit(b.key, v.key, { stayedAddress: e.target.value })}
-                                  className="field !py-2"
-                                  placeholder="Street, city"
-                                />
-                              </label>
-                              <label>
-                                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-soft">Notes</span>
-                                <input value={v.notes} onChange={(e) => setVisit(b.key, v.key, { notes: e.target.value })} className="field !py-2" />
-                              </label>
-                            </div>
-                          </td>
-                          <td />
-                        </tr>
-                      </tbody>
-                    ))}
-                  </table>
+                          </label>
+                        </div>
+                        <div className="mt-5 grid gap-x-4 gap-y-5 rounded-xl bg-gradient-to-r from-gold/10 via-paper/60 to-transparent p-4 sm:grid-cols-2 lg:grid-cols-3">
+                          <label>
+                            <span className={lbl}>🏨 Hotel / Airbnb (optional)</span>
+                            <input
+                              value={v.stayedAt ?? ""}
+                              list="stayed-options"
+                              onChange={(e) => setVisit(b.key, v.key, { stayedAt: e.target.value })}
+                              className="field !py-2"
+                              placeholder="e.g. PJ Watergate"
+                            />
+                          </label>
+                          <label>
+                            <span className={lbl}>📍 Hotel address (optional)</span>
+                            <input
+                              value={v.stayedAddress ?? ""}
+                              onChange={(e) => setVisit(b.key, v.key, { stayedAddress: e.target.value })}
+                              className="field !py-2"
+                              placeholder="Street, city"
+                            />
+                          </label>
+                          <label className="sm:col-span-2 lg:col-span-1">
+                            <span className={lbl}>📝 Notes</span>
+                            <input value={v.notes} onChange={(e) => setVisit(b.key, v.key, { notes: e.target.value })} className="field !py-2" />
+                          </label>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
                 <button type="button" onClick={() => setBlock(b.key, { visits: [...b.visits, emptyVisit()] })} className="mt-3 text-sm font-semibold text-navy-2 hover:underline">
                   + Add another visit to {b.countryCode ? "this country" : "this country"}
