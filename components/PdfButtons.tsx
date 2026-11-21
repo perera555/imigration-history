@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react";
 
 const PARTS = [
   { key: "card", label: "Travel card", hint: "Photo and personal details" },
-  { key: "record", label: "Immigration record", hint: "All countries and visits" },
-  { key: "visas", label: "Visa record", hint: "All visas, incl. Schengen" },
-  { key: "boarding", label: "Boarding passes", hint: "Flights and uploaded boarding passes" },
+  { key: "record", label: "Immigration record", hint: "Table of all countries and visits" },
+  { key: "stays", label: "Hotels & Airbnb", hint: "Table of every place stayed" },
+  { key: "visas", label: "Visa record", hint: "Table of all visas, incl. Schengen" },
+  { key: "boarding", label: "Boarding passes", hint: "Table of flights + real-size passes" },
 ] as const;
 
 type PartKey = (typeof PARTS)[number]["key"];
@@ -14,7 +15,8 @@ type PartKey = (typeof PARTS)[number]["key"];
 /** "PDF" button: asks which parts to include, then View (new tab) or Download. */
 export function PdfButtons({ profileId }: { profileId: string }) {
   const [open, setOpen] = useState(false);
-  const [chosen, setChosen] = useState<Record<PartKey, boolean>>({ card: true, record: true, visas: true, boarding: false });
+  const [chosen, setChosen] = useState<Record<PartKey, boolean>>({ card: true, record: true, stays: true, visas: true, boarding: true });
+  const allOn = PARTS.every((p) => chosen[p.key]);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,7 +45,16 @@ export function PdfButtons({ profileId }: { profileId: string }) {
       {open && (
         <div className="absolute right-0 top-12 z-50 w-72 rounded-2xl border border-line bg-card p-4 text-ink shadow-2xl">
           <p className="font-semibold">Which parts do you want?</p>
-          <p className="mb-3 text-xs text-ink-soft">Each part starts on its own page, so it prints page by page.</p>
+          <p className="mb-3 text-xs text-ink-soft">Each part is a table on its own page, so it prints page by page.</p>
+          <label className="mb-1 flex cursor-pointer items-center gap-2.5 rounded-xl bg-paper-2 px-2 py-1.5 text-sm font-semibold">
+            <input
+              type="checkbox"
+              checked={allOn}
+              onChange={(e) => setChosen(Object.fromEntries(PARTS.map((p) => [p.key, e.target.checked])) as Record<PartKey, boolean>)}
+              className="size-4 accent-navy"
+            />
+            All data (everything)
+          </label>
           <div className="space-y-2">
             {PARTS.map((p) => (
               <label key={p.key} className="flex cursor-pointer items-start gap-2.5 rounded-xl px-2 py-1.5 hover:bg-paper-2">

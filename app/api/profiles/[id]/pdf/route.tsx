@@ -1,5 +1,6 @@
 import { renderToBuffer } from "@react-pdf/renderer";
-import { getProfile, getTrips, getVisas, getBoardingPasses, boardingTrips } from "@/lib/data";
+import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, boardingTrips } from "@/lib/data";
+import { canAccessProfile, getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { flagPng, isSchengen } from "@/lib/countries";
 import { ImmigrationPdf, type PdfBoardingPass } from "@/lib/pdf/ImmigrationPdf";
@@ -19,18 +20,32 @@ export async function GET(request: Request, ctx: RouteContext<"/api/profiles/[id
   // ?view=1 opens the PDF in the browser; otherwise it downloads.
   const url = new URL(request.url);
   const inline = url.searchParams.get("view") === "1";
-  // ?parts=card,record,visas chooses what to include (default: all). ?only=visas = card + visas.
+  // ?parts=card,record,stays,visas,boarding chooses what to include (default: everything). ?only=visas = card + visas.
   const requested = (url.searchParams.get("parts") ?? "").split(",").map((p) => p.trim());
+  const ALL = ["card", "record", "stays", "visas", "boarding"];
   const parts =
     url.searchParams.get("only") === "visas"
       ? { card: true, record: false, visas: true }
-      : requested.some((p) => ["card", "record", "visas", "boarding"].includes(p))
-        ? { card: requested.includes("card"), record: requested.includes("record"), visas: requested.includes("visas"), boarding: requested.includes("boarding") }
-        : { card: true, record: true, visas: true, boarding: false };
+      : requested.some((p) => ALL.includes(p))
+        ? {
+            card: requested.includes("card"),
+            record: requested.includes("record"),
+            stays: requested.includes("stays"),
+            visas: requested.includes("visas"),
+            boarding: requested.includes("boarding"),
+          }
+        : { card: true, record: true, stays: true, visas: true, boarding: true };
   const only = parts.record ? undefined : "visas";
   const { id } = await ctx.params;
-  const [profile, trips, visas, passes] = await Promise.all([getProfile(id), getTrips(id), getVisas(id), getBoardingPasses(id)]);
+  const [profile, trips, visas, passes, session] = await Promise.all([getProfile(id), getTrips(id), getVisas(id), getBoardingPasses(id), getSession()]);
   if (!profile) return Response.json({ error: "Not found" }, { status: 404 });
+  // Hotels and boarding passes are private: only the owner and admins get them in the PDF.
+  const canSeePrivate = !!session && canAccessProfile(session, id);
+  if (!canSeePrivate) {
+    parts.stays = false;
+    parts.boarding = false;
+  }
+  const stays = parts.stays ? await getStays(id) : [];
 
   const codes = [
     ...new Set([
@@ -54,7 +69,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/profiles/[id
 
   const generatedOn = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
   const buffer = await renderToBuffer(
-    <ImmigrationPdf profile={profile} trips={trips} visas={visas} parts={parts} boarding={boarding} flags={flags} generatedOn={generatedOn} />,
+    <ImmigrationPdf profile={profile} trips={trips} visas={visas} parts={parts} boarding={boarding} stays={stays} flags={flags} generatedOn={generatedOn} />,
   );
 
   const fileName = `${only ? "Visas" : "Immigration-History"}-${profile.fullName.replace(/[^A-Za-z0-9]+/g, "-")}.pdf`;

@@ -15,7 +15,9 @@ import {
   type Trip,
   type Visa,
   type BoardingPass,
+  type Stay,
 } from "@/lib/data";
+import { stayNights } from "@/lib/stay-kinds";
 import { countryName, isSchengen } from "@/lib/countries";
 import { BoardingPassView } from "./BoardingPassPdf";
 
@@ -100,7 +102,7 @@ function mrz(profile: Profile) {
   return [top.padEnd(44, "<").slice(0, 44), bottom.padEnd(44, "<").slice(0, 44)];
 }
 
-export type PdfParts = { card: boolean; record: boolean; visas: boolean; boarding?: boolean };
+export type PdfParts = { card: boolean; record: boolean; visas: boolean; boarding?: boolean; stays?: boolean };
 export type PdfBoardingPass = BoardingPass & { image: string | null; tripLabel: string | null };
 
 export function ImmigrationPdf({
@@ -111,7 +113,10 @@ export function ImmigrationPdf({
   visas = [],
   parts = { card: true, record: true, visas: true },
   boarding = [],
+  stays = [],
 }: {
+  /** Hotels / Airbnb homes stayed. */
+  stays?: Stay[];
   /** Boarding passes (with an embedded image when the upload was a photo). */
   boarding?: PdfBoardingPass[];
   /** Which parts to include (each starts on its own page). */
@@ -202,6 +207,102 @@ export function ImmigrationPdf({
       </View>
     </View>
   );
+  // Hotels & Airbnb table: full stays, plus hotels typed on visits in the immigration record.
+  const stayRows = [
+    ...stays.map((st) => ({
+      key: st.id,
+      country: st.countryCode,
+      name: st.name,
+      kind: st.kind,
+      city: st.city,
+      address: st.address,
+      checkIn: st.checkIn,
+      checkOut: st.checkOut,
+      booking: st.bookingRef,
+      notes: st.notes,
+    })),
+    ...trips
+      .filter((t) => t.stayedAt && !stays.some((st) => st.tripId === t.id && st.name.toLowerCase() === t.stayedAt!.toLowerCase()))
+      .map((t) => ({
+        key: `t-${t.id}`,
+        country: t.countryCode,
+        name: t.stayedAt!,
+        kind: "From the immigration record",
+        city: t.city,
+        address: null,
+        checkIn: t.departureDate,
+        checkOut: t.returnDate,
+        booking: null,
+        notes: null,
+      })),
+  ].sort((a, b) => (a.checkIn ?? "").localeCompare(b.checkIn ?? ""));
+  const staysSection = (
+    <View>
+      <Text style={s.sectionTitle}>Hotels &amp; Airbnb Stays</Text>
+      <View style={s.thead} fixed>
+        <Text style={[s.th, { width: "15%" }]}>COUNTRY</Text>
+        <Text style={[s.th, { width: "27%" }]}>HOTEL / HOME</Text>
+        <Text style={[s.th, { width: "12%" }]}>CITY</Text>
+        <Text style={[s.th, { width: "14%" }]}>CHECK-IN</Text>
+        <Text style={[s.th, { width: "14%" }]}>CHECK-OUT</Text>
+        <Text style={[s.th, { width: "6%" }]}>NIGHTS</Text>
+        <Text style={[s.th, { width: "12%" }]}>BOOKING</Text>
+      </View>
+      {stayRows.length === 0 && (
+        <View style={[s.group, { padding: 12 }]}>
+          <Text style={{ color: MUTED }}>No hotels or Airbnb homes recorded yet.</Text>
+        </View>
+      )}
+      {stayRows.map((r, i) => {
+        const nights = stayNights(r);
+        return (
+          <View key={r.key} style={[s.group, i % 2 ? { backgroundColor: PAPER } : {}]} wrap={false}>
+            <Text style={[s.cell, { width: "15%", fontFamily: "Helvetica-Bold" }]}>{r.country ? countryName(r.country) : "—"}</Text>
+            <View style={[s.cell, { width: "27%" }]}>
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>{r.name}</Text>
+              <Text style={s.note}>{r.kind}</Text>
+              {r.address ? <Text style={s.note}>{r.address}</Text> : null}
+              {r.notes ? <Text style={s.note}>{r.notes}</Text> : null}
+            </View>
+            <Text style={[s.cell, { width: "12%" }]}>{r.city || "—"}</Text>
+            <Text style={[s.cell, { width: "14%" }]}>{r.checkIn ? formatDate(r.checkIn) : "—"}</Text>
+            <Text style={[s.cell, { width: "14%" }]}>{r.checkOut ? formatDate(r.checkOut) : "—"}</Text>
+            <Text style={[s.cell, { width: "6%" }]}>{nights ?? "—"}</Text>
+            <Text style={[s.cell, { width: "12%", fontFamily: "Courier" }]}>{r.booking || "—"}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+
+  // Boarding passes as a table (all flights at a glance), before the real-size passes.
+  const boardingTable = (
+    <View style={{ marginBottom: 14 }}>
+      <View style={s.thead}>
+        <Text style={[s.th, { width: "14%" }]}>DATE</Text>
+        <Text style={[s.th, { width: "9%" }]}>FLIGHT</Text>
+        <Text style={[s.th, { width: "16%" }]}>AIRLINE</Text>
+        <Text style={[s.th, { width: "11%" }]}>FROM - TO</Text>
+        <Text style={[s.th, { width: "6%" }]}>SEAT</Text>
+        <Text style={[s.th, { width: "9%" }]}>PNR</Text>
+        <Text style={[s.th, { width: "10%" }]}>FLIGHT TYPE</Text>
+        <Text style={[s.th, { width: "25%" }]}>TRIP</Text>
+      </View>
+      {boarding.map((b, i) => (
+        <View key={`row-${b.id}`} style={[s.group, i % 2 ? { backgroundColor: PAPER } : {}]} wrap={false}>
+          <Text style={[s.cell, { width: "14%" }]}>{b.flightDate ? formatDate(b.flightDate) : "—"}</Text>
+          <Text style={[s.cell, { width: "9%", fontFamily: "Courier-Bold" }]}>{b.flightNumber || "—"}</Text>
+          <Text style={[s.cell, { width: "16%" }]}>{b.airline || "—"}</Text>
+          <Text style={[s.cell, { width: "11%" }]}>{`${b.fromAirport || "---"} > ${b.toAirport || "---"}`}</Text>
+          <Text style={[s.cell, { width: "6%" }]}>{b.seat || "—"}</Text>
+          <Text style={[s.cell, { width: "9%", fontFamily: "Courier" }]}>{b.bookingRef || "—"}</Text>
+          <Text style={[s.cell, { width: "10%" }]}>{b.direction || "—"}</Text>
+          <Text style={[s.cell, { width: "25%" }]}>{b.tripLabel?.replace(/→/g, "to") ?? "Current / upcoming trip"}</Text>
+        </View>
+      ))}
+    </View>
+  );
+
   const footer = (
     <View style={s.footer} fixed>
       <Text>{profile.fullName} · Private &amp; confidential</Text>
@@ -337,7 +438,14 @@ export function ImmigrationPdf({
           {footer}
         </Page>
       )}
-      {/* Last part: visa record */}
+      {parts.stays && (
+        <Page size="A4" style={s.page}>
+          {!parts.card && !parts.record && titleRow}
+          {staysSection}
+          {footer}
+        </Page>
+      )}
+      {/* Visa record */}
       {parts.visas && (
         <Page size="A4" style={s.page}>
           {!parts.card && !parts.record && titleRow}
@@ -352,6 +460,7 @@ export function ImmigrationPdf({
           <Text style={s.sectionTitle}>Boarding Passes</Text>
           <Text style={[s.note, { marginBottom: 10 }]}>Actual size 203 x 83 mm. Print at 100% (no "fit to page").</Text>
           {boarding.length === 0 && <Text style={{ color: MUTED }}>No boarding passes uploaded yet.</Text>}
+          {boarding.length > 0 && boardingTable}
           {boarding.map((b) => (
             <View key={b.id} wrap={false} style={{ marginBottom: 14 }}>
               <BoardingPassView pass={b} passenger={profile.fullName} tripLabel={b.tripLabel} />
