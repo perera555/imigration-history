@@ -6,13 +6,14 @@ import { listProfiles } from "@/lib/data";
 import { deleteProfile, logout } from "@/lib/actions";
 import { ConfirmButton } from "@/components/SubmitButton";
 import { UpdateButton } from "@/components/UpdateButton";
-import { AppUpdatePanel } from "@/components/UpdateChecker";
+import { AppUpdatePanel } from "@/components/AppUpdatePanel";
 
 export const metadata: Metadata = { title: "Admin" };
 
 export default function AdminPage() {
   return (
     <div className="space-y-8">
+      <AppUpdatePanel />
       <div className="flex flex-wrap items-end gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Admin panel</p>
@@ -40,7 +41,6 @@ export default function AdminPage() {
       <Suspense fallback={<div className="panel h-48 animate-pulse" />}>
         <ProfileTable />
       </Suspense>
-      <AppUpdatePanel />
     </div>
   );
 }

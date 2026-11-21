@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import { requireAuth } from "@/lib/session";
 import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, boardingTrips, travelStats } from "@/lib/data";
 import { StaySection } from "@/components/StaySection";
-import { AppUpdatePanel } from "@/components/UpdateChecker";
+import { AppUpdatePanel } from "@/components/AppUpdatePanel";
 import { VisaList } from "@/components/VisaList";
 import { BoardingPassSection } from "@/components/BoardingPassSection";
 import { TravelCard } from "@/components/TravelCard";
@@ -42,6 +42,7 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
 
   return (
     <div className="space-y-8">
+      <AppUpdatePanel />
       <div className="flex flex-wrap items-end gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">My account</p>
@@ -94,8 +95,6 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
           Your account isn&apos;t linked to a travel record yet. Please contact an admin.
         </div>
       )}
-
-      <AppUpdatePanel />
 
       <section id="password" className="panel scroll-mt-24 p-6 sm:p-8">
         <h2 className="mb-4 font-serif text-xl font-bold text-navy">Change password</h2>
