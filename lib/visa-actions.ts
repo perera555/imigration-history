@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { getDb } from "./db";
 import { saveRestorePoint } from "./backup";
+import { flash } from "./flash";
 import { isUuid } from "./data";
 import { isCountryCode, NATIONALITIES } from "./countries";
 import { requireAdmin, requireProfileAccess } from "./session";
@@ -101,6 +102,7 @@ export async function deleteVisaPage(pageId: string) {
   const sql = await getDb();
   await saveRestorePoint(sql, { visaPageId: pageId }, "Deleted a visa page photo", session.email);
   await sql`delete from visa_pages where id = ${pageId}`;
+  await flash("Visa page removed successfully");
   refresh();
 }
 
@@ -217,6 +219,7 @@ export async function saveVisa(profileId: string, visaId: string | null, _: Visa
     }
     await tx`update profiles set updated_at = now() where id = ${profileId}`;
   });
+  await flash(visaId ? "Visa saved successfully" : "Visa added successfully");
   refresh();
   return { ok: visaId ? "Visa updated." : "Visa added.", id: savedId ?? undefined };
 }
@@ -228,5 +231,6 @@ export async function deleteVisa(visaId: string) {
   const sql = await getDb();
   await saveRestorePoint(sql, { visaId }, "Deleted a visa (with its document)", session.email);
   await sql`delete from visas where id = ${visaId}`;
+  await flash("Visa deleted successfully");
   refresh();
 }

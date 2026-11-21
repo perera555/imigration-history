@@ -17,6 +17,7 @@ import {
 import { hashPassword, newResetToken, sha256, validatePassword, verifyPassword } from "./password";
 import { sendEmail } from "./email";
 import { saveRestorePoint } from "./backup";
+import { flash } from "./flash";
 
 export type FormState = { error?: string; ok?: string } | undefined;
 
@@ -35,7 +36,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DUMMY_HASH =
   "scrypt$00000000000000000000000000000000$" + "0".repeat(128);
 
-type AdminRow = { id: string; email: string; passwordHash: string; role: string };
+type AdminRow = { id: string; email: string; passwordHash: string; role: string; name: string };
 
 export async function login(_: FormState, form: FormData): Promise<FormState> {
   const email = String(form.get("email") ?? "").trim().toLowerCase();
@@ -44,11 +45,12 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
 
   const sql = await getDb();
   await ensureFirstAdmin(sql); // recreates the owner account if no admin exists
-  const [admin] = await sql<AdminRow[]>`select id, email, password_hash, role from admins where email = ${email}`;
+  const [admin] = await sql<AdminRow[]>`select id, email, password_hash, role, name from admins where email = ${email}`;
   const ok = await verifyPassword(password, admin?.passwordHash ?? DUMMY_HASH);
   if (!admin || !ok) return { error: "Incorrect email or password." };
 
   await createSession({ adminId: admin.id, email: admin.email }, form.get("remember") === "on");
+  await flash(`Signed in as ${admin.name || admin.email}${admin.role === "admin" ? " (admin)" : ""}`, "info");
   redirect(admin.role === "admin" ? "/admin" : "/account");
 }
 
@@ -79,6 +81,7 @@ export async function register(_: FormState, form: FormData): Promise<FormState>
   if (!accountId) return { error: "An account with that email already exists. Sign in instead." };
 
   await createSession({ adminId: accountId, email }, true);
+  await flash(`Account created. Welcome, ${name}!`);
   redirect("/account?welcome=1");
 }
 
@@ -98,6 +101,7 @@ export async function changeOwnPassword(_: FormState, form: FormData): Promise<F
 
 export async function logout() {
   await deleteSession();
+  await flash("Signed out successfully", "info");
   redirect("/login");
 }
 
@@ -178,6 +182,7 @@ export async function addAdmin(_: FormState, form: FormData): Promise<FormState>
     values (${email}, ${name}, ${await hashPassword(password)}, 'admin')
     on conflict (email) do nothing returning id`;
   if (!rows.length) return { error: "An account with that email already exists." };
+  await flash(`Admin ${email} added successfully`);
   refresh();
   return { ok: `Admin ${email} added.` };
 }
@@ -191,6 +196,7 @@ export async function setAdminPassword(adminId: string, _: FormState, form: Form
   const sql = await getDb();
   const rows = await sql`update admins set password_hash = ${await hashPassword(password)} where id = ${adminId} returning id`;
   if (!rows.length) return { error: "Admin not found." };
+  await flash("Password updated successfully");
   return { ok: "Password updated." };
 }
 
@@ -209,6 +215,7 @@ export async function deleteAdmin(adminId: string) {
       await tx`delete from admins where id = ${adminId}`;
     }
   });
+  await flash("Account removed successfully");
   refresh();
 }
 
@@ -267,6 +274,7 @@ export async function createProfile(_: FormState, form: FormData): Promise<FormS
   if ("error" in parsed) return { error: parsed.error };
   const sql = await getDb();
   const [row] = await sql<{ id: string }[]>`insert into profiles ${sql(parsed.values)} returning id`;
+  await flash(`Record for ${parsed.values.fullName} created`);
   redirect(`/admin/profiles/${row.id}?created=1`);
 }
 
@@ -278,6 +286,7 @@ export async function updateProfile(id: string, _: FormState, form: FormData): P
   const sql = await getDb();
   const values = parsed.values;
   await sql`update profiles set ${sql(values)}, updated_at = now() where id = ${id}`;
+  await flash("Travel card saved successfully");
   refresh();
   return { ok: "Profile saved." };
 }
@@ -290,6 +299,7 @@ export async function deleteProfile(id: string) {
   if (!p) return;
   await saveRestorePoint(sql, { profileId: id }, `Deleted traveller ${p.fullName || "(no name)"} (with all trips, visas, boarding passes)`, session.email);
   await sql`delete from profiles where id = ${id}`;
+  await flash(`Record of ${p.fullName || "traveller"} deleted successfully`);
   redirect("/admin");
 }
 
@@ -332,6 +342,7 @@ export async function addTrip(profileId: string, _: FormState, form: FormData): 
       and departure_date = ${departureDate} and return_date is not distinct from ${returnDate}`;
   if (dup.length) return { error: "This visit is already in the record." };
   await sql`insert into trips ${sql({ ...parsed.values, profileId })}`;
+  await flash("Visit added successfully");
   refresh();
   return { ok: "Trip added." };
 }
@@ -347,6 +358,7 @@ export async function updateTrip(tripId: string, _: FormState, form: FormData): 
   const [row] = await sql<{ profileId: string }[]>`
     update trips set ${sql(parsed.values)} where id = ${tripId} returning profile_id`;
   if (!row) return { error: "Trip not found." };
+  await flash("Visit saved successfully");
   await sql`update profiles set updated_at = now() where id = ${row.profileId}`;
   redirect(`/admin/profiles/${row.profileId}#trips`);
 }
@@ -546,6 +558,9 @@ export async function updateRecord(
       else await tx`insert into trips ${tx({ ...t, profileId })}`;
     }
   });
+  await flash(
+    part === "card" ? "Travel card saved successfully" : part === "record" ? `Immigration record saved successfully (${trips.length} visits)` : "Record saved successfully",
+  );
   refresh();
   return { profileId, skipped: merged };
 }
@@ -607,6 +622,7 @@ export async function saveImport(
   if (fresh.length) {
     await sql`insert into trips ${sql(fresh.map((t) => ({ ...t, profileId })))}`;
   }
+  await flash(`Record saved successfully${fresh.length ? ` (${fresh.length} visit${fresh.length === 1 ? "" : "s"} added)` : ""}`);
   return { profileId, added: fresh.length, skipped };
 }
 
@@ -619,5 +635,6 @@ export async function deleteTrip(tripId: string) {
   await saveRestorePoint(sql, { tripIds: [tripId] }, "Deleted a visit from the immigration record", session.email);
   const [row] = await sql<{ profileId: string }[]>`delete from trips where id = ${tripId} returning profile_id`;
   if (row) await sql`update profiles set updated_at = now() where id = ${row.profileId}`;
+  await flash("Visit deleted successfully");
   refresh();
 }

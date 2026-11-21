@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { InstallButton } from "@/components/InstallButton";
 import { HeaderAccount } from "@/components/HeaderAccount";
 import { OfflineBanner, OnlinePill } from "@/components/OnlineDot";
+import { Toaster } from "@/components/Toaster";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           </div>
           <OfflineBanner />
         </header>
+        <Toaster />
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:py-10">{children}</main>
         <footer className="mt-8 border-t border-line bg-navy text-white">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-6">

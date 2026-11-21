@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { getDb } from "./db";
 import { requireAdmin } from "./session";
+import { flash } from "./flash";
 import {
   BACKUP_TABLES,
   parseBackup,
@@ -73,6 +74,7 @@ export async function createRestorePoint(): Promise<PointState> {
     console.error("Restore point failed:", error);
     return { error: "Couldn't create the restore point. Please try again." };
   }
+  await flash("Restore point created successfully");
   refresh();
   return { ok: "Restore point created." };
 }
@@ -97,6 +99,7 @@ export async function restoreFromPoint(id: string, how: string): Promise<PointSt
       count.skipped++;
     }
   }
+  await flash(`Records restored successfully (${count.added} brought back)`);
   refresh();
   return {
     ok: `Restored: ${count.added} brought back${m === "exact" ? `, ${count.updated} put back to the saved version` : ""}, ${count.skipped} already there.`,
@@ -108,5 +111,6 @@ export async function deleteRestorePoint(id: string) {
   if (!isUuid(id)) return;
   const sql = await getDb();
   await sql`delete from restore_points where id = ${id}`;
+  await flash("Restore point deleted successfully");
   refresh();
 }

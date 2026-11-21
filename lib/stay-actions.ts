@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { getDb } from "./db";
 import { saveRestorePoint } from "./backup";
+import { flash } from "./flash";
 import { isUuid } from "./data";
 import { STAY_KINDS } from "./stay-kinds";
 import { isCountryCode } from "./countries";
@@ -120,6 +121,7 @@ export async function saveStay(profileId: string, stayId: string | null, _: Stay
     await sql`insert into stays ${sql({ ...values, ...fileValues, profileId })}`;
   }
   await sql`update profiles set updated_at = now() where id = ${profileId}`;
+  await flash(stayId ? `${values.name} saved successfully` : `${values.name} added successfully`);
   refresh();
   return { ok: stayId ? "Stay updated." : "Stay added." };
 }
@@ -131,5 +133,6 @@ export async function deleteStay(stayId: string) {
   const sql = await getDb();
   await saveRestorePoint(sql, { stayId }, "Deleted a hotel / Airbnb stay", session.email);
   await sql`delete from stays where id = ${stayId}`;
+  await flash("Stay deleted successfully");
   refresh();
 }

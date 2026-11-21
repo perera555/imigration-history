@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { getDb } from "./db";
 import { saveRestorePoint } from "./backup";
+import { flash } from "./flash";
 import { isUuid } from "./data";
 import { requireAdmin, requireProfileAccess } from "./session";
 import type { BoardingDetails } from "./boarding-reader";
@@ -116,6 +117,7 @@ export async function saveBoardingPass(
   } else {
     await sql`insert into boarding_passes ${sql({ ...values, ...fileValues, profileId })}`;
   }
+  await flash(passId ? "Boarding pass saved successfully" : "Boarding pass added successfully");
   refresh();
   return { ok: passId ? "Boarding pass updated." : "Boarding pass added." };
 }
@@ -127,5 +129,6 @@ export async function deleteBoardingPass(passId: string) {
   const sql = await getDb();
   await saveRestorePoint(sql, { passId }, "Deleted a boarding pass", session.email);
   await sql`delete from boarding_passes where id = ${passId}`;
+  await flash("Boarding pass deleted successfully");
   refresh();
 }
