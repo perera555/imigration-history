@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { createRestorePoint, deleteRestorePoint, restoreFromPoint, type RestorePointInfo } from "@/lib/backup-actions";
+import { useToastOn } from "@/components/Toaster";
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -12,6 +13,7 @@ export function RestorePoints({ points }: { points: RestorePointInfo[] }) {
   const [pending, start] = useTransition();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok?: string; error?: string }>({});
+  useToastOn(null, msg.error);
 
   const run = (id: string | null, fn: () => Promise<{ ok?: string; error?: string } | undefined | void>) => {
     setBusyId(id);

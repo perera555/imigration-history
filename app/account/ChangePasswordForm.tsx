@@ -1,5 +1,7 @@
 "use client";
 
+import { useToastOn } from "@/components/Toaster";
+
 import { useActionState, useEffect, useRef } from "react";
 import { changeOwnPassword } from "@/lib/actions";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -7,6 +9,7 @@ import { PasswordInput } from "@/components/PasswordInput";
 
 export function ChangePasswordForm() {
   const [state, action] = useActionState(changeOwnPassword, undefined);
+  useToastOn(state?.ok, state?.error);
   const ref = useRef<HTMLFormElement>(null);
   useEffect(() => {
     if (state?.ok) ref.current?.reset();

@@ -7,6 +7,7 @@ import { InstallButton } from "@/components/InstallButton";
 import { HeaderAccount } from "@/components/HeaderAccount";
 import { OfflineBanner, OnlinePill } from "@/components/OnlineDot";
 import { Toaster } from "@/components/Toaster";
+import { AppVersion, UpdateChecker } from "@/components/UpdateChecker";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -55,12 +56,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <OfflineBanner />
         </header>
         <Toaster />
+        <UpdateChecker />
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:py-10">{children}</main>
         <footer className="mt-8 border-t border-line bg-navy text-white">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-6">
             <div className="mr-auto">
               <p className="font-serif text-base font-semibold">Immigration History</p>
               <p className="text-xs text-white/60">Personal immigration record · Private &amp; confidential</p>
+              <p className="mt-1 text-[11px] text-white/40">
+                <AppVersion />
+              </p>
             </div>
             <Link href="/admin" className="btn btn-gold">
               <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>

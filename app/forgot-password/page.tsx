@@ -1,5 +1,7 @@
 "use client";
 
+import { useToastOn } from "@/components/Toaster";
+
 import { useActionState } from "react";
 import Link from "next/link";
 import { forgotPassword } from "@/lib/actions";
@@ -8,6 +10,7 @@ import { AuthCard } from "@/components/AuthCard";
 
 export default function ForgotPasswordPage() {
   const [state, action] = useActionState(forgotPassword, undefined);
+  useToastOn(state?.ok, state?.error);
   return (
     <AuthCard eyebrow="Account recovery" title="Forgot password" subtitle="Enter your admin email and we'll send you a reset link.">
       <form action={action} className="mt-8 space-y-4 text-left">

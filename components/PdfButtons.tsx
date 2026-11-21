@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { toast } from "./Toaster";
 
 const PARTS = [
   { key: "card", label: "Travel card", hint: "Photo and personal details" },
@@ -77,7 +78,14 @@ export function PdfButtons({ profileId }: { profileId: string }) {
                 <a href={`${href}&view=1`} target="_blank" rel="noopener" className="btn btn-ghost flex-1" onClick={() => setOpen(false)}>
                   👁 View
                 </a>
-                <a href={href} className="btn btn-primary flex-1" onClick={() => setOpen(false)}>
+                <a
+                  href={href}
+                  className="btn btn-primary flex-1"
+                  onClick={() => {
+                    setOpen(false);
+                    toast("Preparing your PDF… the download starts in a moment", "info");
+                  }}
+                >
                   ⬇ Download
                 </a>
               </>

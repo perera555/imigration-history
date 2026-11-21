@@ -10,6 +10,7 @@ import { Flag } from "./Flag";
 import { EMPTY_PROFILE } from "@/lib/record";
 import { NationalitySelect } from "./NationalitySelect";
 import { flagSvg, isSchengen } from "@/lib/countries";
+import { useToastOn } from "./Toaster";
 
 type Visit = {
   key: number;
@@ -188,6 +189,8 @@ export function RecordForm({
   const [blocks, setBlocks] = useState<CountryBlock[]>(() => toBlocks(initialTrips ?? []));
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
+  // Success pop-ups come from the server ("Record saved successfully"); errors pop up here.
+  useToastOn(null, error);
   const [saving, startSaving] = useTransition();
 
   const setBlock = (key: number, patch: Partial<CountryBlock>) =>
@@ -247,6 +250,7 @@ export function RecordForm({
 
   // Update mode: save the travel card and the immigration record separately.
   const [partMsg, setPartMsg] = useState<{ card?: { ok?: string; error?: string }; record?: { ok?: string; error?: string } }>({});
+  useToastOn(null, partMsg.card?.error ?? partMsg.record?.error);
   const [partSaving, setPartSaving] = useState<"card" | "record" | null>(null);
 
   async function savePart(part: "card" | "record") {

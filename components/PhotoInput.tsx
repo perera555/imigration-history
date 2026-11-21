@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useToastOn } from "./Toaster";
 
 /** Picks an image, resizes it in the browser to ≤600px JPEG, and submits it as a data URL. */
 export function PhotoInput({
@@ -18,6 +19,7 @@ export function PhotoInput({
     onChange?.(value);
   };
   const [error, setError] = useState("");
+  useToastOn(null, error);
 
   async function onFile(file: File | undefined) {
     setError("");

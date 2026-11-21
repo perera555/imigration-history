@@ -1,5 +1,7 @@
 "use client";
 
+import { useToastOn } from "@/components/Toaster";
+
 import { useActionState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -17,6 +19,7 @@ export function LoginForm() {
   const fromAdmin = params.get("as") === "admin";
   const justReset = params.get("reset") === "1";
   const [state, action] = useActionState(login, undefined);
+  useToastOn(state?.ok, state?.error);
 
   return (
     <AuthCard

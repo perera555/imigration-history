@@ -9,6 +9,7 @@ import { isSchengen } from "@/lib/countries";
 import { SubmitButton } from "./SubmitButton";
 import { DocumentPicker, isImageName } from "./DocumentPicker";
 import { VisaPages, uploadVisaPages } from "./VisaPages";
+import { useToastOn } from "./Toaster";
 
 const PURPOSES = [
   "Tourism",
@@ -107,6 +108,7 @@ export function VisaForm({
   const set = (k: keyof Fields) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setF((x) => ({ ...x, [k]: e.target.value }));
 
+  useToastOn(readMsg.ok, readMsg.error ?? state?.error);
   // Extra pages picked for a new visa: uploaded right after the visa is first saved.
   const [queued, setQueued] = useState<File[]>([]);
   const [pageMsg, setPageMsg] = useState("");

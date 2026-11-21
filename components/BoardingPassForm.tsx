@@ -7,6 +7,7 @@ import type { BoardingPass } from "@/lib/data";
 import { SubmitButton } from "./SubmitButton";
 import { parseBcbp } from "@/lib/bcbp";
 import { DocumentPicker, isImageName } from "./DocumentPicker";
+import { useToastOn } from "./Toaster";
 
 export type TripOption = { id: string; label: string; date: string };
 
@@ -60,6 +61,7 @@ export function BoardingPassForm({
   useEffect(() => {
     if (state?.ok) onDone?.();
   }, [state, onDone]);
+  useToastOn(readMsg.ok, readMsg.error ?? state?.error);
 
   const scanRef = useRef<HTMLInputElement>(null);
 

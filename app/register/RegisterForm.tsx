@@ -1,5 +1,7 @@
 "use client";
 
+import { useToastOn } from "@/components/Toaster";
+
 import { useActionState } from "react";
 import Link from "next/link";
 import { register } from "@/lib/actions";
@@ -9,6 +11,7 @@ import { PasswordInput } from "@/components/PasswordInput";
 
 export function RegisterForm() {
   const [state, action] = useActionState(register, undefined);
+  useToastOn(state?.ok, state?.error);
   return (
     <AuthCard
       eyebrow="Step 1 of 2"

@@ -1,5 +1,7 @@
 "use client";
 
+import { useToastOn } from "@/components/Toaster";
+
 import { useActionState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -10,6 +12,7 @@ import { PasswordInput } from "@/components/PasswordInput";
 export function ResetForm() {
   const token = useSearchParams().get("token") ?? "";
   const [state, action] = useActionState(resetPassword.bind(null, token), undefined);
+  useToastOn(state?.ok, state?.error);
 
   if (!token) {
     return (

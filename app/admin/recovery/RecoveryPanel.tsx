@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { restoreRows } from "@/lib/backup-actions";
+import { useToastOn } from "@/components/Toaster";
 
 type Line = { table: string; row: Record<string, unknown> };
 type Result = Record<string, { added: number; updated: number; skipped: number }>;
@@ -15,6 +16,10 @@ export function RecoveryPanel() {
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
+  useToastOn(
+    result && !error ? `Restore finished: ${Object.values(result).reduce((n, r) => n + r.added + r.updated, 0)} records brought back` : null,
+    error,
+  );
   const [mode, setMode] = useState<"missing" | "exact">("missing");
 
   async function restore() {

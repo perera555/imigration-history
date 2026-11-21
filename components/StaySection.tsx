@@ -10,6 +10,7 @@ import { CountrySearch } from "./CountrySearch";
 import { DateInput } from "./DateInput";
 import { DocumentPicker, isImageName } from "./DocumentPicker";
 import { ConfirmButton, SubmitButton } from "./SubmitButton";
+import { useToastOn } from "./Toaster";
 
 export type StayTrip = { id: string; label: string; date: string; countryCode: string; purpose: string | null; city: string | null; stayedAt?: string | null; stayedAddress?: string | null };
 
@@ -94,6 +95,7 @@ function StayForm({
 
   const [reading, startReading] = useTransition();
   const [readMsg, setReadMsg] = useState<{ ok?: string; error?: string }>({});
+  useToastOn(readMsg.ok, readMsg.error ?? state?.error);
   function readBooking() {
     const file = fileRef.current?.files?.[0];
     if (!file) return setReadMsg({ error: "Choose the booking confirmation first (📷 / 🖼 above)." });

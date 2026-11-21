@@ -8,6 +8,7 @@ import type { Visa } from "@/lib/data";
 import { VisaForm } from "./VisaForm";
 import { ConfirmButton } from "./SubmitButton";
 import { CountrySearch } from "./CountrySearch";
+import { useToastOn } from "./Toaster";
 
 type Group = {
   key: string;
@@ -28,6 +29,7 @@ type Group = {
 function BulkVisaPhotos({ profileId, countryCode, visaType, title }: { profileId: string; countryCode: string; visaType: string; title: string }) {
   const ref = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState<{ busy?: string; ok?: string; error?: string }>({});
+  useToastOn(msg.ok, msg.error);
   async function go(list: FileList | null) {
     const files = [...(list ?? [])];
     if (!files.length) return;

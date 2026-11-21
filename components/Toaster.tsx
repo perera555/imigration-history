@@ -1,76 +1,78 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import hotToast, { Toaster as HotToaster } from "react-hot-toast";
 
-type Toast = { id: number; message: string; tone: "ok" | "info" | "error" };
+type Tone = "ok" | "info" | "error";
 
-/** Shows a pop-up anywhere in the app: window.dispatchEvent(new CustomEvent("toast", { detail: { message } })). */
-export function toast(message: string, tone: Toast["tone"] = "ok") {
-  window.dispatchEvent(new CustomEvent("toast", { detail: { message, tone } }));
+/** Pop-up message anywhere in the app (top right). */
+export function toast(message: string, tone: Tone = "ok") {
+  if (tone === "error") hotToast.error(message);
+  else if (tone === "info") hotToast(message, { icon: "👋" });
+  else hotToast.success(message);
+}
+
+/** Shows a component's own success / error message as a pop-up too, whenever it changes. */
+export function useToastOn(ok?: string | null, error?: string | null) {
+  useEffect(() => {
+    if (ok) toast(ok.replace(/^✓\s*/, ""));
+  }, [ok]);
+  useEffect(() => {
+    if (error) toast(error, "error");
+  }, [error]);
 }
 
 /**
- * Pop-up messages ("✓ Record saved", "Signed in as …", "Record deleted successfully").
- * Server actions leave a short-lived "flash" cookie; it is read here and removed.
+ * Pop-up messages for the whole app, top right ("Signed in as …", "Record saved successfully",
+ * "Record deleted successfully"). Server actions leave a short-lived "flash" cookie; it is read here
+ * and removed, so messages also appear after a redirect (sign in, sign out, delete).
  */
 export function Toaster() {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-
   useEffect(() => {
-    let n = 0;
-    const show = (message: string, tone: Toast["tone"]) => {
-      const id = ++n;
-      setToasts((t) => [...t.slice(-2), { id, message, tone }]);
-      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4500);
-    };
     const readCookie = () => {
       const m = document.cookie.match(/(?:^|;\s*)flash=([^;]+)/);
       if (!m) return;
       document.cookie = "flash=; Max-Age=0; path=/";
+      let raw = m[1];
       try {
-        const v = JSON.parse(decodeURIComponent(decodeURIComponent(m[1])));
-        if (v?.message) show(String(v.message), v.tone ?? "ok");
+        raw = decodeURIComponent(raw);
+        raw = decodeURIComponent(raw);
+      } catch {
+        /* already decoded */
+      }
+      try {
+        const v = JSON.parse(raw);
+        if (v?.message) toast(String(v.message), v.tone ?? "ok");
       } catch {
         /* ignore a broken cookie */
       }
     };
-    const onEvent = (e: Event) => {
-      const d = (e as CustomEvent).detail;
-      if (d?.message) show(String(d.message), d.tone ?? "ok");
-    };
     readCookie();
     // Server actions set the cookie without a full page load: check often (cheap).
     const timer = setInterval(readCookie, 600);
-    window.addEventListener("toast", onEvent);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener("toast", onEvent);
-    };
+    return () => clearInterval(timer);
   }, []);
 
-  if (!toasts.length) return null;
   return (
-    <div className="pointer-events-none fixed inset-x-4 top-20 z-[60] flex flex-col items-center gap-2 sm:inset-x-auto sm:right-6 sm:items-end" role="status" aria-live="polite">
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          className={`toast-in pointer-events-auto flex max-w-sm items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-semibold shadow-2xl ${
-            t.tone === "error"
-              ? "border-red-200 bg-red-50 text-red-800"
-              : t.tone === "info"
-                ? "border-white/10 bg-navy text-white"
-                : "border-emerald-200 bg-emerald-50 text-emerald-900"
-          }`}
-        >
-          <span className={`grid size-7 shrink-0 place-items-center rounded-full text-base ${t.tone === "error" ? "bg-red-100" : t.tone === "info" ? "bg-white/10" : "bg-emerald-100"}`} aria-hidden>
-            {t.tone === "error" ? "!" : t.tone === "info" ? "👋" : "✓"}
-          </span>
-          <span>{t.message}</span>
-          <button type="button" onClick={() => setToasts((x) => x.filter((y) => y.id !== t.id))} className="ml-1 text-current/60 hover:text-current" aria-label="Close">
-            ×
-          </button>
-        </div>
-      ))}
-    </div>
+    <HotToaster
+      position="top-right"
+      gutter={10}
+      containerStyle={{ top: 76, right: 16 }}
+      toastOptions={{
+        duration: 4500,
+        style: {
+          borderRadius: "16px",
+          padding: "12px 16px",
+          fontWeight: 600,
+          fontSize: "14px",
+          color: "#0f1b2d",
+          background: "#fffdf8",
+          border: "1px solid #e3d6b4",
+          boxShadow: "0 18px 40px -12px rgba(11,31,58,0.35)",
+        },
+        success: { iconTheme: { primary: "#1d7a4e", secondary: "#ffffff" } },
+        error: { duration: 6000, iconTheme: { primary: "#b4232f", secondary: "#ffffff" } },
+      }}
+    />
   );
 }

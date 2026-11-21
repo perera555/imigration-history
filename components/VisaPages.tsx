@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { addVisaPage, deleteVisaPage } from "@/lib/visa-actions";
 import { prepareUpload } from "@/lib/upload-prep";
 import type { Visa } from "@/lib/data";
+import { useToastOn } from "./Toaster";
 
 /** Uploads files one by one as extra pages of a visa. Returns how many failed. */
 export async function uploadVisaPages(visaId: string, files: File[], onProgress?: (done: number) => void) {
@@ -44,6 +45,7 @@ export function VisaPages({
   const cameraRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok?: string; error?: string }>({});
+  useToastOn(msg.ok, msg.error);
 
   async function add(list: FileList | null) {
     const files = [...(list ?? [])];

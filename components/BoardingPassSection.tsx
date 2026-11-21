@@ -5,6 +5,7 @@ import { deleteBoardingPass, readBoardingPass, saveBoardingPass } from "@/lib/bo
 import { parseBcbp } from "@/lib/bcbp";
 import { prepareUpload } from "@/lib/upload-prep";
 import { CountrySearch } from "./CountrySearch";
+import { useToastOn } from "./Toaster";
 import type { BoardingPass } from "@/lib/data";
 import { BoardingPassForm, type TripOption } from "./BoardingPassForm";
 import { ConfirmButton } from "./SubmitButton";
@@ -44,6 +45,7 @@ async function detailsFrom(profileId: string, file: File): Promise<Record<string
 function BulkBoardingPasses({ profileId }: { profileId: string }) {
   const ref = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState<{ busy?: string; ok?: string; error?: string }>({});
+  useToastOn(msg.ok, msg.error);
   async function go(list: FileList | null) {
     const files = [...(list ?? [])];
     if (!files.length) return;
