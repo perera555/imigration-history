@@ -119,6 +119,7 @@ export function VisaForm({
   const [readMsg, setReadMsg] = useState<{ ok?: string; error?: string }>({});
   const [reading, startReading] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
+  const formEl = useRef<HTMLFormElement>(null);
   /** The document chosen last (kept when the browser empties the file box after sending the form). */
   const lastFile = useRef<File | null>(null);
   const set = (k: keyof Fields) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -160,6 +161,8 @@ export function VisaForm({
   const [pageMsg, setPageMsg] = useState("");
   useEffect(() => {
     if (!state?.ok) return;
+    // Saved an existing visa: fold its form back into the short row (open again with "Update").
+    if (visa) formEl.current?.closest("details")?.removeAttribute("open");
     if (!visa && state.id && queued.length) {
       const files = queued;
       setQueued([]);
@@ -240,7 +243,7 @@ export function VisaForm({
   }
 
   return (
-    <form action={action} className="space-y-6">
+    <form ref={formEl} action={action} className="space-y-6">
       {/* 1. Document */}
       <div className="rounded-2xl border border-dashed border-line bg-paper/50 p-4">
         <DocumentPicker
