@@ -45,3 +45,6 @@ next-env.d.ts
 !.env.example
 .vercel
 .env*
+
+# local development database (npm run dev / npm run db)
+/.localdb/
