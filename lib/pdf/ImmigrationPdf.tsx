@@ -238,8 +238,10 @@ export function ImmigrationPdf({
   ].sort((a, b) => (a.checkIn ?? "").localeCompare(b.checkIn ?? ""));
   const staysSection = (
     <View>
-      <Text style={s.sectionTitle}>Hotels &amp; Airbnb Stays</Text>
-      <View style={s.thead} fixed>
+      <Text style={s.sectionTitle} minPresenceAhead={60}>
+        Hotels &amp; Airbnb Stays
+      </Text>
+      <View style={s.thead}>
         <Text style={[s.th, { width: "15%" }]}>COUNTRY</Text>
         <Text style={[s.th, { width: "27%" }]}>HOTEL / HOME</Text>
         <Text style={[s.th, { width: "12%" }]}>CITY</Text>
@@ -442,30 +444,20 @@ export function ImmigrationPdf({
           </View>
         </View>
 
-        {/* Immigration record continues right below the card (no empty space) */}
+        {/* Everything flows on without empty space: immigration record → visa record → hotels */}
         {parts.record && <View style={{ marginTop: 14 }}>{recordBody(false)}</View>}
+        {parts.visas && visasSection}
+        {parts.stays && <View style={{ marginTop: 18 }}>{staysSection}</View>}
         {footer}
       </Page>
       )}
-      {parts.record && !parts.card && (
+      {!parts.card && (parts.record || parts.visas || parts.stays) && (
         <Page size="A4" style={s.page}>
           {titleRow}
-          {recordBody(true)}
-          {footer}
-        </Page>
-      )}
-      {parts.stays && (
-        <Page size="A4" style={s.page}>
-          {!parts.card && !parts.record && titleRow}
-          {staysSection}
-          {footer}
-        </Page>
-      )}
-      {/* Visa record */}
-      {parts.visas && (
-        <Page size="A4" style={s.page}>
-          {!parts.card && !parts.record && titleRow}
-          {visasSection}
+          {/* The record's table header repeats on each page only when nothing follows it. */}
+          {parts.record && recordBody(!parts.visas && !parts.stays)}
+          {parts.visas && visasSection}
+          {parts.stays && <View style={{ marginTop: parts.record || parts.visas ? 18 : 0 }}>{staysSection}</View>}
           {footer}
         </Page>
       )}
