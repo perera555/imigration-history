@@ -224,9 +224,10 @@ export function VisaCountryManager({
                     {v.visaType || "Visa"}
                     {v.visaNumber && <span className="font-mono"> · {v.visaNumber}</span>}
                   </span>
-                  {canDelete && (
+                  {/* Owner or admin can delete a visa (a restore point is saved first) */}
+                  {(
                     <form action={deleteVisa.bind(null, v.id)} className="ml-auto">
-                      <ConfirmButton message="Delete this visa and its document?" className="btn btn-danger !py-1">
+                      <ConfirmButton message="Delete this visa and its document? (You can get it back from Backup & recovery.)" className="btn btn-danger !py-1">
                         Delete
                       </ConfirmButton>
                     </form>

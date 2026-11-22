@@ -81,7 +81,7 @@ export function VisaPdfImport({ profileId }: { profileId: string }) {
         const jpg = (await renderPageAsImage(pdf, n, { width: 1400, format: "jpeg", quality: 0.85 })) as Uint8Array;
         const image = new File([new Uint8Array(jpg)], `visa-page-${n}.jpg`, { type: "image/jpeg" });
         const looksLikeVisa = !!details && !!(details.visaNumber || details.visaType || details.issueDate || details.expiryDate || details.countryCode);
-        found.push({ page: n, image, preview: URL.createObjectURL(image), details, country: details?.countryCode ?? "", include: looksLikeVisa || !details });
+        found.push({ page: n, image, preview: URL.createObjectURL(image), details, country: details?.countryCode ?? "", include: looksLikeVisa });
       }
       setItems(found);
       toast(`${found.length} page${found.length === 1 ? "" : "s"} read. Check the country for each visa, then press Add visas.`, "info");
@@ -93,7 +93,20 @@ export function VisaPdfImport({ profileId }: { profileId: string }) {
   }
 
   async function save() {
-    const chosen = items.filter((i) => i.include && !i.result?.ok);
+    // Same visa twice in this PDF (same number, or same country + dates): keep the first one only.
+    const seen = new Set<string>();
+    const repeated = new Set<number>();
+    for (const it of items) {
+      if (!it.include || it.result?.ok) continue;
+      const d = it.details;
+      const key = d?.visaNumber ? `n:${d.visaNumber}` : d?.issueDate || d?.expiryDate ? `d:${it.country}|${d?.issueDate}|${d?.expiryDate}` : null;
+      if (key && seen.has(key)) {
+        repeated.add(it.page);
+        update(it.page, { include: false, result: { ok: false, text: "Same visa as an earlier page (not added twice)" } });
+      }
+      if (key) seen.add(key);
+    }
+    const chosen = items.filter((i) => i.include && !i.result?.ok && !repeated.has(i.page));
     const missing = chosen.filter((i) => !i.country);
     if (missing.length) return toast(`Choose the country for page ${missing.map((m) => m.page).join(", ")}.`, "error");
     let added = 0;

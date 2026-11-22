@@ -141,10 +141,15 @@ export async function addVisaFromPage(
     notes: "Imported from a visa pages PDF. Please check the details.",
   };
   const sql = await getDb();
-  if (values.visaNumber) {
-    const dup = await sql`select 1 from visas where profile_id = ${profileId} and visa_number = ${values.visaNumber}`;
-    if (dup.length) return { skipped: `Visa ${values.visaNumber} is already in the record.` };
-  }
+  // No duplicates: same visa number, or (without a number) same country with the same issue or expiry date.
+  const dup = values.visaNumber
+    ? await sql`select 1 from visas where profile_id = ${profileId} and visa_number = ${values.visaNumber}`
+    : values.issueDate || values.expiryDate
+      ? await sql`select 1 from visas where profile_id = ${profileId} and trim(country_code) = ${code}
+          and ((${values.issueDate}::date is not null and issue_date = ${values.issueDate}::date)
+            or (${values.expiryDate}::date is not null and expiry_date = ${values.expiryDate}::date))`
+      : [];
+  if (dup.length) return { skipped: values.visaNumber ? `Visa ${values.visaNumber} is already in your record.` : "This visa is already in your record." };
   await sql.begin(async (tx) => {
     const [row] = await tx<{ id: string }[]>`insert into visas ${tx(values)} returning id`;
     await tx`insert into visa_documents ${tx({
@@ -292,11 +297,13 @@ export async function saveVisa(profileId: string, visaId: string | null, _: Visa
   return { ok: visaId ? "Visa updated." : "Visa added.", id: savedId ?? undefined };
 }
 
-/** Deleting is admin-only, like trips. */
+/** Deletes a visa with its document and pages: the record's owner or an admin (a restore point is saved first). */
 export async function deleteVisa(visaId: string) {
-  const session = await requireAdmin();
+  const session = await requireAuth();
   if (!isUuid(visaId)) return;
   const sql = await getDb();
+  const [owner] = await sql<{ profileId: string }[]>`select profile_id from visas where id = ${visaId}`;
+  if (!owner || !canAccessProfile(session, owner.profileId)) return;
   await saveRestorePoint(sql, { visaId }, "Deleted a visa (with its document)", session.email);
   await sql`delete from visas where id = ${visaId}`;
   await flash("Visa deleted successfully");

@@ -3,6 +3,8 @@ import { countryName, isSchengen } from "@/lib/countries";
 import { formatDate, formatShortDate, visaState, type Profile, type Trip, type Visa } from "@/lib/data";
 import { Flag } from "./Flag";
 import { DeleteAttachmentButton } from "./DeleteAttachmentButton";
+import { ConfirmButton } from "./SubmitButton";
+import { deleteVisa } from "@/lib/visa-actions";
 
 const TONE: Record<string, string> = {
   valid: "bg-emerald-600 text-white",
@@ -149,6 +151,13 @@ export function VisaCard({
           <Link href={`/admin/profiles/${visa.profileId}/${editPage}#visa-${visa.id}`} className="btn btn-primary !py-1.5 text-xs">
             ✏️ Update visa
           </Link>
+          {canDelete && (
+            <form action={deleteVisa.bind(null, visa.id)}>
+              <ConfirmButton message="Delete this visa and its document? (You can get it back from Backup & recovery.)" className="btn btn-danger !py-1.5 text-xs">
+                🗑 Delete visa
+              </ConfirmButton>
+            </form>
+          )}
         </div>
         {canViewDocument && visa.hasDocument && /\.(png|jpe?g|webp)$/i.test(visa.documentName ?? "") && (
           <a href={`/api/visas/${visa.id}/document`} target="_blank" rel="noopener" title="Open full size">

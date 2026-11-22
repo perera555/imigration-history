@@ -55,7 +55,7 @@ export function ProfileDetail({
       </section>
 
       {/* Visas: shown below the immigration record */}
-      <VisaList profileId={profile.id} holder={profile} visas={visas} trips={trips} />
+      <VisaList profileId={profile.id} holder={profile} visas={visas} trips={trips} canViewDocument={showDocuments} canDelete={showDocuments} />
     </div>
   );
 }
