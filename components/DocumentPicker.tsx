@@ -17,6 +17,7 @@ export function DocumentPicker({
   label,
   saved,
   onPicked,
+  onDelete,
 }: {
   name: string;
   inputRef: React.RefObject<HTMLInputElement | null>;
@@ -24,7 +25,10 @@ export function DocumentPicker({
   /** Already saved file, shown until a new one is picked. */
   saved?: { url: string; name: string | null; image: boolean } | null;
   onPicked?: (file: File) => void;
+  /** Shown as "🗑 Delete photo" for a saved file (admins). */
+  onDelete?: () => Promise<unknown>;
 }) {
+  const [deleting, setDeleting] = useState(false);
   const cameraRef = useRef<HTMLInputElement>(null);
   const [picked, setPicked] = useState<{ name: string; url: string | null; size: number } | null>(null);
 
@@ -90,6 +94,39 @@ export function DocumentPicker({
               </a>
             )}
           </div>
+          {picked ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (inputRef.current) inputRef.current.value = "";
+                setPicked(null);
+              }}
+              className="ml-auto rounded-full px-3 py-1.5 text-xs font-semibold text-ink-soft hover:bg-paper-2"
+              title="Don't use this file"
+            >
+              ✕ Remove
+            </button>
+          ) : (
+            saved &&
+            onDelete && (
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={async () => {
+                  if (!confirm("Delete this photo / document? The rest of the details are kept. (You can get it back from Backup & recovery.)")) return;
+                  setDeleting(true);
+                  try {
+                    await onDelete();
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                className="btn btn-danger ml-auto !px-3 !py-1.5 text-xs"
+              >
+                {deleting ? "Deleting…" : "🗑 Delete photo"}
+              </button>
+            )
+          )}
         </div>
       )}
     </div>

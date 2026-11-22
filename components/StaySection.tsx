@@ -11,6 +11,7 @@ import { DateInput } from "./DateInput";
 import { DocumentPicker, isImageName } from "./DocumentPicker";
 import { ConfirmButton, SubmitButton } from "./SubmitButton";
 import { useToastOn } from "./Toaster";
+import { deleteAttachment } from "@/lib/attachment-actions";
 
 export type StayTrip = { id: string; label: string; date: string; countryCode: string; purpose: string | null; city: string | null; stayedAt?: string | null; stayedAddress?: string | null };
 
@@ -55,6 +56,7 @@ function StayForm({
   allStays,
   startTrip,
   onDone,
+  canDelete = false,
 }: {
   profileId: string;
   stay?: Stay;
@@ -62,6 +64,7 @@ function StayForm({
   allStays: Stay[];
   startTrip?: string;
   onDone: () => void;
+  canDelete?: boolean;
 }) {
   const [state, action] = useActionState<StaySaveState, FormData>(saveStay.bind(null, profileId, stay?.id ?? null), undefined);
   const [f, setF] = useState<Fields>(() => {
@@ -254,6 +257,7 @@ function StayForm({
           inputRef={fileRef}
           label="Booking confirmation or photo (optional)"
           saved={stay?.hasFile ? { url: `/api/stays/${stay.id}/file`, name: stay.fileName, image: isImageName(stay.fileName, stay.mime) } : null}
+          onDelete={stay && canDelete ? () => deleteAttachment("stay", stay.id) : undefined}
         />
         <button type="button" onClick={readBooking} disabled={reading} className="btn btn-gold mt-3">
           {reading ? "Reading…" : "✨ Read details from booking (PDF)"}
@@ -378,7 +382,7 @@ export function StaySection({
         </div>
         {editing === s.id && (
           <div className="mt-4 border-t border-line pt-4">
-            <StayForm profileId={profileId} stay={s} trips={trips} allStays={stays} onDone={done("✓ Stay updated.")} />
+            <StayForm profileId={profileId} stay={s} trips={trips} allStays={stays} canDelete={canDelete} onDone={done("✓ Stay updated.")} />
           </div>
         )}
       </article>

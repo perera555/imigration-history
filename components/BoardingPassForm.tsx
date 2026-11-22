@@ -8,6 +8,7 @@ import { SubmitButton } from "./SubmitButton";
 import { parseBcbp } from "@/lib/bcbp";
 import { DocumentPicker, isImageName } from "./DocumentPicker";
 import { useToastOn } from "./Toaster";
+import { deleteAttachment } from "@/lib/attachment-actions";
 
 export type TripOption = { id: string; label: string; date: string };
 
@@ -45,11 +46,14 @@ export function BoardingPassForm({
   pass,
   trips,
   onDone,
+  canDelete = false,
 }: {
   profileId: string;
   pass?: BoardingPass;
   trips: TripOption[];
   onDone?: () => void;
+  /** Admins: "🗑 Delete photo" for the saved file. */
+  canDelete?: boolean;
 }) {
   const [state, action] = useActionState<BoardingSaveState, FormData>(saveBoardingPass.bind(null, profileId, pass?.id ?? null), undefined);
   const [f, setF] = useState<Fields>(() => fromPass(pass));
@@ -144,6 +148,7 @@ export function BoardingPassForm({
           inputRef={fileRef}
           label="Boarding pass photo or PDF"
           saved={pass?.hasFile ? { url: `/api/boarding/${pass.id}/file`, name: pass.fileName, image: isImageName(pass.fileName, pass.mime) } : null}
+          onDelete={pass && canDelete ? () => deleteAttachment("boarding", pass.id) : undefined}
         />
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" onClick={readDetails} disabled={reading} className="btn btn-gold">

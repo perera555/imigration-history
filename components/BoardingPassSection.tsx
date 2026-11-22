@@ -228,7 +228,7 @@ export function BoardingPassSection({
       </div>
       {editing === p.id && (
         <div className="rounded-2xl border border-line bg-white p-4">
-          <BoardingPassForm profileId={profileId} pass={p} trips={trips} onDone={() => setEditing(null)} />
+          <BoardingPassForm profileId={profileId} pass={p} trips={trips} canDelete={canDelete} onDone={() => setEditing(null)} />
         </div>
       )}
     </article>

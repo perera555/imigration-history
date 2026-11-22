@@ -1,6 +1,7 @@
 import "server-only";
 import { extractText, getDocumentProxy } from "unpdf";
 import { COUNTRIES, NATIONALITIES } from "./countries";
+import { alpha3ToAlpha2 } from "i18n-iso-countries";
 
 /** Details found in a visa document. Every field may be missing. */
 export type VisaDetails = {
@@ -68,11 +69,75 @@ function guessCountry(text: string, exclude: string | null): string | null {
 export async function readVisaPdf(bytes: Uint8Array, holderNationalityCode: string | null): Promise<VisaDetails | null> {
   const pdf = await getDocumentProxy(bytes);
   const { text } = await extractText(pdf, { mergePages: true });
+  return parseVisaText(String(text), holderNationalityCode);
+}
+
+/**
+ * The machine-readable zone at the bottom of a visa sticker (2 lines of letters, digits and "<"):
+ *   V<THASURNAME<<GIVEN<NAMES<<<…
+ *   AB1234567<8LKA8503183M2406049<<…   (visa no., nationality, birth date, sex, expiry date)
+ * Also works on OCR text, where "<" may come out as "«", "‹" or "K".
+ */
+function parseVisaMrz(text: string): { countryCode: string | null; visaNumber: string | null; expiryDate: string | null; passportNumber: string | null } | null {
+  const lines = text
+    .split(/\n/)
+    .map((l) =>
+      l
+        .toUpperCase()
+        .replace(/[«‹(\[{£€]/g, "<")
+        .replace(/\s+/g, "")
+        .replace(/[^A-Z0-9<]/g, "")
+        // OCR often reads runs of "<" filler as K / C / L.
+        .replace(/(?:<|K|C|L){4,}$/g, (m) => "<".repeat(m.length)),
+    )
+    .filter((l) => l.length >= 28);
+  const i = lines.findIndex((l) => /^V[A-Z<K]/.test(l) && /<{2,}/.test(l));
+  if (i < 0) return null;
+  const state = lines[i].slice(2, 5).replace(/[<K]+$/, "").replace(/</g, "");
+  const special: Record<string, string> = { D: "DE", GBR: "GB", UTO: "" };
+  const countryCode = (special[state] ?? alpha3ToAlpha2(state) ?? null) || null;
+  const l2 = lines[i + 1] ?? "";
+  // Second line: visa no. (9) + check digit + nationality (3) + birth date (6) + check + sex + expiry (6).
+  const m2 = l2.match(/^([A-Z0-9<]{9})[0-9<K]?[A-Z<]{3}(\d{6})[0-9<K]?[MFX<K](\d{6})/);
+  const ok = !!m2 && /\d/.test(m2[1]);
+  const yymmdd = (s: string, future: boolean) => {
+    if (!/^\d{6}$/.test(s)) return null;
+    const yy = Number(s.slice(0, 2));
+    const year = future ? 2000 + yy : yy > Number(String(new Date().getFullYear()).slice(2)) ? 1900 + yy : 2000 + yy;
+    const iso = `${year}-${s.slice(2, 4)}-${s.slice(4, 6)}`;
+    return Number.isNaN(Date.parse(iso)) ? null : iso;
+  };
+  return {
+    countryCode,
+    visaNumber: ok ? m2![1].replace(/</g, "") || null : null,
+    expiryDate: ok ? yymmdd(m2![3], true) : null,
+    passportNumber: null,
+  };
+}
+
+/** Visa details from the text of one visa page (or a whole e-visa). Null when there's almost no text. */
+export function parseVisaText(text: string, holderNationalityCode: string | null): VisaDetails | null {
   const t = String(text).replace(/[ \t]+/g, " ");
   if (t.replace(/\s/g, "").length < 40) return null;
+  const mrz = parseVisaMrz(String(text));
+  const details = parseVisaFields(t, holderNationalityCode);
+  if (!mrz) return details;
+  // The machine-readable lines are the most reliable source for country, number and expiry.
+  return {
+    ...details,
+    countryCode: mrz.countryCode ?? details.countryCode,
+    visaNumber: mrz.visaNumber ?? details.visaNumber,
+    expiryDate: mrz.expiryDate ?? details.expiryDate,
+  };
+}
+
+function parseVisaFields(t: string, holderNationalityCode: string | null): VisaDetails {
 
   const visaNumber =
-    t.match(/(?:visa|e-?visa|grant|application|reference|transaction|control)\s*(?:no\.?|number|#|ref\.?)\s*[:\-]?\s*([A-Z0-9][A-Z0-9\-/]{4,24})/i)?.[1] ?? null;
+    // e.g. "Visa No: …", "Grant reference number: …", "Application ref: …"; a visa number always has a digit.
+    t.match(
+      /(?:visa|e-?visa|grant|application|reference|transaction|control)(?:\s+reference)?\s*(?:no\.?|number|#|ref(?:erence)?\.?)(?:\s*(?:no\.?|number))?\s*[:\-]?\s*((?=[A-Z0-9\-/]*\d)[A-Z0-9][A-Z0-9\-/]{4,24})\b/i,
+    )?.[1] ?? null;
   const visaTypeRaw =
     t.match(/(?:visa\s*(?:type|category|class|subclass)|type of visa|category|subclass)\s*[:\-]?\s*([A-Za-z0-9 ()&\-/]{2,50}?)(?:\s{2,}|\n|$|\s+(?:visa\s*no|number|date|valid|entr|duration|passport))/i)?.[1] ?? null;
   const entriesRaw =

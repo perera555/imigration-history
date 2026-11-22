@@ -95,6 +95,71 @@ export async function addVisaPage(visaId: string, form: FormData): Promise<{ ok?
   return { ok: true };
 }
 
+/** Import from a multi-page PDF: reads the details on one visa page from its text (free, no AI). */
+export async function readVisaPageText(profileId: string, text: string): Promise<VisaDetails | null> {
+  if (!isUuid(profileId)) return null;
+  await requireProfileAccess(profileId);
+  const sql = await getDb();
+  const [p] = await sql<{ nationality: string | null }[]>`select nationality from profiles where id = ${profileId}`;
+  const holder = NATIONALITIES.find((n) => n.name.toLowerCase() === (p?.nationality ?? "").toLowerCase())?.code ?? null;
+  const { parseVisaText } = await import("./visa-reader");
+  return parseVisaText(String(text).slice(0, 20_000), holder);
+}
+
+/**
+ * Import from a multi-page PDF: creates one visa from one page, with the details read from it and
+ * the page image as its document. Skips a visa number that is already in the record.
+ */
+export async function addVisaFromPage(
+  profileId: string,
+  details: Partial<VisaDetails>,
+  form: FormData,
+): Promise<{ ok?: true; skipped?: string; error?: string }> {
+  if (!isUuid(profileId)) return { error: "Unknown record." };
+  await requireProfileAccess(profileId);
+  const code = String(details.countryCode ?? "").toUpperCase();
+  if (!isCountryCode(code)) return { error: "No country for this page." };
+  const file = form.get("document");
+  if (!checkFile(file)) return { error: fileError(file) };
+  const d = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+  const s = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
+  const values = {
+    profileId,
+    countryCode: code,
+    visaType: s(details.visaType, 80) ?? "",
+    visaFormat: s(details.visaFormat, 30),
+    visaNumber: s(details.visaNumber, 40)?.toUpperCase() ?? null,
+    issueDate: d(details.issueDate),
+    expiryDate: d(details.expiryDate),
+    travelFrom: d(details.travelFrom),
+    travelTo: d(details.travelTo),
+    purpose: s(details.purpose, 120),
+    entries: s(details.entries, 20),
+    stayDays: typeof details.stayDays === "number" && details.stayDays >= 0 && details.stayDays <= 3650 ? Math.round(details.stayDays) : null,
+    issuedAt: s(details.issuedAt, 120),
+    passportNumber: s(details.passportNumber, 30)?.toUpperCase() ?? null,
+    notes: "Imported from a visa pages PDF. Please check the details.",
+  };
+  const sql = await getDb();
+  if (values.visaNumber) {
+    const dup = await sql`select 1 from visas where profile_id = ${profileId} and visa_number = ${values.visaNumber}`;
+    if (dup.length) return { skipped: `Visa ${values.visaNumber} is already in the record.` };
+  }
+  await sql.begin(async (tx) => {
+    const [row] = await tx<{ id: string }[]>`insert into visas ${tx(values)} returning id`;
+    await tx`insert into visa_documents ${tx({
+      visaId: row.id,
+      fileName: file.name.slice(0, 120) || "visa-page.jpg",
+      mime: file.type,
+      size: file.size,
+      data: Buffer.from(await file.arrayBuffer()),
+    })}`;
+    await tx`update profiles set updated_at = now() where id = ${profileId}`;
+  });
+  refresh();
+  return { ok: true };
+}
+
 /** Removes one extra page (admins only, like other deletes; a restore point is saved first). */
 export async function deleteVisaPage(pageId: string) {
   const session = await requireAdmin();

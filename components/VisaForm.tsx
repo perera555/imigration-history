@@ -2,7 +2,9 @@
 
 import { DateInput } from "./DateInput";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { readVisaDocument, saveVisa, type VisaSaveState } from "@/lib/visa-actions";
+import { readVisaDocument, readVisaPageText, saveVisa, type VisaSaveState } from "@/lib/visa-actions";
+import { fileToImages, ocrImages } from "@/lib/ocr";
+import type { VisaDetails } from "@/lib/visa-reader";
 import type { Visa } from "@/lib/data";
 import { CountrySelect } from "./CountrySelect";
 import { isSchengen } from "@/lib/countries";
@@ -10,6 +12,7 @@ import { SubmitButton } from "./SubmitButton";
 import { DocumentPicker, isImageName } from "./DocumentPicker";
 import { VisaPages, uploadVisaPages } from "./VisaPages";
 import { useToastOn } from "./Toaster";
+import { deleteAttachment } from "@/lib/attachment-actions";
 
 const PURPOSES = [
   "Tourism",
@@ -136,8 +139,24 @@ export function VisaForm({
       const fd = new FormData();
       fd.append("document", file);
       const result = await readVisaDocument(profileId, fd);
-      if (!result || "error" in result) return setReadMsg({ error: result?.error ?? "Could not read the document." });
-      const d = result.details;
+      let d: VisaDetails | null = result && "ok" in result ? result.details : null;
+      let note = result && "ok" in result ? (result.note ?? "") : "";
+      // Scanned PDF or photo (no text inside): read it with text recognition in the browser.
+      if (!d || !Object.values(d).some((v) => v !== null)) {
+        try {
+          const texts = await ocrImages(await fileToImages(file, 4), (m) => setReadMsg({ ok: m }));
+          const fromScan = await readVisaPageText(profileId, texts.join("\n"));
+          if (fromScan && Object.values(fromScan).some((v) => v !== null)) {
+            d = fromScan;
+            note = "Read from the scan. Please check every detail before saving.";
+          }
+        } catch {
+          /* fall through to the message below */
+        }
+      }
+      if (!d || !Object.values(d).some((v) => v !== null)) {
+        return setReadMsg({ error: "Couldn't find visa details in this document, even by reading the scan. It is attached, so type the details below and save." });
+      }
       setF((x) => ({
         ...x,
         countryCode: d.countryCode ?? x.countryCode,
@@ -156,7 +175,7 @@ export function VisaForm({
       }));
       if (d.countryCode) setCountryKey((k) => k + 1);
       const found = Object.values(d).filter((v) => v !== null).length;
-      setReadMsg({ ok: `✓ ${found} detail${found === 1 ? "" : "s"} read from the document. ${result.note ?? ""}` });
+      setReadMsg({ ok: `✓ ${found} detail${found === 1 ? "" : "s"} read from the document. ${note}` });
     });
   }
 
@@ -169,6 +188,7 @@ export function VisaForm({
           inputRef={fileRef}
           label="Visa photo or document"
           saved={visa?.hasDocument ? { url: `/api/visas/${visa.id}/document`, name: visa.documentName, image: isImageName(visa.documentName) } : null}
+          onDelete={visa && canDeletePages ? () => deleteAttachment("visa", visa.id) : undefined}
         />
         <button type="button" onClick={readDetails} disabled={reading} className="btn btn-gold mt-3">
           {reading ? "Reading…" : "Read details from document"}

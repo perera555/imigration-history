@@ -9,6 +9,7 @@ import { VisaForm } from "./VisaForm";
 import { ConfirmButton } from "./SubmitButton";
 import { CountrySearch } from "./CountrySearch";
 import { useToastOn } from "./Toaster";
+import { VisaPdfImport } from "./VisaPdfImport";
 
 type Group = {
   key: string;
@@ -167,6 +168,8 @@ export function VisaCountryManager({
   );
 
   return (
+    <>
+    <VisaPdfImport profileId={profileId} />
     <CountrySearch>
     <div className="divide-y divide-line rounded-2xl border border-line bg-white">
       {groups.map((g, i) => {
@@ -255,5 +258,6 @@ export function VisaCountryManager({
       </section>
     </div>
     </CountrySearch>
+    </>
   );
 }
