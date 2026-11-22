@@ -161,6 +161,7 @@ export function VisaForm({
   const [pageMsg, setPageMsg] = useState("");
   useEffect(() => {
     if (!state?.ok) return;
+    lastFile.current = null; // saved with this visa; don't send it again on the next save
     // Saved an existing visa: fold its form back into the short row (open again with "Update").
     if (visa) formEl.current?.closest("details")?.removeAttribute("open");
     if (!visa && state.id && queued.length) {
@@ -243,7 +244,17 @@ export function VisaForm({
   }
 
   return (
-    <form ref={formEl} action={action} className="space-y-6">
+    <form
+      ref={formEl}
+      action={(fd) => {
+        // The file box may have been emptied after an earlier send (e.g. the next visa of the same
+        // document): always save the document that was chosen, so every visa keeps it.
+        const doc = fd.get("document");
+        if (!(doc instanceof File && doc.size > 0) && lastFile.current && fd.get("removeDocument") !== "on") fd.set("document", lastFile.current);
+        return action(fd);
+      }}
+      className="space-y-6"
+    >
       {/* 1. Document */}
       <div className="rounded-2xl border border-dashed border-line bg-paper/50 p-4">
         <DocumentPicker

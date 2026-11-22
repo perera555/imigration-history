@@ -264,8 +264,8 @@ export type VisaState ={ label: string; tone: "valid" | "expired" | "upcoming" |
 /** Valid / Expired / Not yet valid, or a manual status like "Used" or "Cancelled". */
 export function visaState(visa: Pick<Visa, "issueDate" | "expiryDate" | "status">, today = new Date()): VisaState {
   const t = today.toISOString().slice(0, 10);
-  // Past its expiry date = Expired, even when also marked e.g. "Used" (shown as a note).
-  if (visa.expiryDate && visa.expiryDate < t) return { label: "Expired", tone: "expired", detail: visa.status || null };
+  // Past its expiry date counts as expired; a visa marked e.g. "Used" just shows "Used" on its badge.
+  if (visa.expiryDate && visa.expiryDate < t) return { label: visa.status || "Expired", tone: "expired", detail: null };
   if (visa.status) return { label: visa.status, tone: "closed", detail: null };
   if (visa.issueDate && visa.issueDate > t) return { label: "Not yet valid", tone: "upcoming", detail: null };
   if (visa.expiryDate) {

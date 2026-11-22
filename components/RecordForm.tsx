@@ -1,7 +1,7 @@
 "use client";
 
 import { DateInput } from "./DateInput";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveImport, updateRecord, type ImportProfile, type ImportTrip } from "@/lib/actions";
 import { CountrySelect } from "./CountrySelect";
@@ -11,6 +11,11 @@ import { EMPTY_PROFILE } from "@/lib/record";
 import { CountryNameSelect, NationalitySelect } from "./NationalitySelect";
 import { flagSvg, isSchengen } from "@/lib/countries";
 import { useToastOn } from "./Toaster";
+
+const visitDate = (d: string) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(d)
+    ? new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })
+    : d;
 
 type Visit = {
   key: number;
@@ -193,6 +198,13 @@ export function RecordForm({
   const [saveTo, setSaveTo] = useState(target);
   const [profile, setProfile] = useState<ImportProfile>(initialProfile ?? EMPTY_PROFILE);
   const [blocks, setBlocks] = useState<CountryBlock[]>(() => toBlocks(initialTrips ?? []));
+  // Visit cards: a filled visit starts as a short row (open it with "Update"); a new, empty one starts open.
+  // Decided once per visit, so typing a date doesn't fold the card while it is being filled.
+  const visitOpen = useRef(new Map<string | number, boolean>());
+  const startsOpen = (key: string | number, departure: string) => {
+    if (!visitOpen.current.has(key)) visitOpen.current.set(key, !departure);
+    return visitOpen.current.get(key);
+  };
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
   // Success pop-ups come from the server ("Record saved successfully"); errors pop up here.
@@ -525,20 +537,44 @@ export function RecordForm({
                   {b.visits.map((v, vi) => {
                     const lbl = "mb-2 block text-[10px] font-semibold uppercase leading-none tracking-[0.14em] text-ink-soft";
                     return (
-                      <div key={v.key} className="relative rounded-2xl border border-line bg-white p-4 pl-12 shadow-[0_1px_0_rgba(0,0,0,0.03)] transition hover:border-gold/60 hover:shadow-md sm:p-5 sm:pl-14">
-                        <span className="absolute left-4 top-4 grid size-7 place-items-center rounded-full bg-navy text-xs font-bold text-gold-soft" aria-hidden>
-                          {vi + 1}
-                        </span>
-                        <button
-                          type="button"
-                          aria-label="Remove visit"
-                          title="Remove this visit"
-                          onClick={() => setBlock(b.key, { visits: b.visits.length === 1 ? [emptyVisit()] : b.visits.filter((x) => x.key !== v.key) })}
-                          className="absolute right-3 top-3 grid size-8 place-items-center rounded-full text-lg text-ink-soft hover:bg-red-50 hover:text-danger"
-                        >
-                          ×
-                        </button>
-                        <div className="grid gap-x-4 gap-y-5 pr-8 sm:grid-cols-2 lg:grid-cols-4">
+                      <details
+                        key={v.key}
+                        open={startsOpen(v.key, v.departureDate)}
+                        className="group rounded-2xl border border-line bg-white shadow-[0_1px_0_rgba(0,0,0,0.03)] transition hover:border-gold/60 open:shadow-md"
+                      >
+                        <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3 px-4 py-2.5 [&::-webkit-details-marker]:hidden">
+                          <span className="grid size-7 shrink-0 place-items-center rounded-full bg-navy text-xs font-bold text-gold-soft" aria-hidden>
+                            {vi + 1}
+                          </span>
+                          <span className="min-w-0 text-sm">
+                            <span className="font-semibold text-navy">
+                              {v.departureDate ? `${visitDate(v.departureDate)} → ${v.returnDate ? visitDate(v.returnDate) : "…"}` : "New visit: fill in the dates"}
+                            </span>
+                            {(v.purpose || v.stayedAt) && (
+                              <span className="text-ink-soft"> · {[v.purpose, v.stayedAt && `🏨 ${v.stayedAt}`].filter(Boolean).join(" · ")}</span>
+                            )}
+                          </span>
+                          <span className="ml-auto flex items-center gap-1">
+                            <span className="rounded-full bg-navy px-3 py-1 text-xs font-semibold text-gold-soft">
+                              <span className="group-open:hidden">✏️ Update ▾</span>
+                              <span className="hidden group-open:inline">Close ▴</span>
+                            </span>
+                            <button
+                              type="button"
+                              aria-label="Remove visit"
+                              title="Remove this visit"
+                              onClick={(e) => {
+                                e.preventDefault(); // don't open/close the row
+                                setBlock(b.key, { visits: b.visits.length === 1 ? [emptyVisit()] : b.visits.filter((x) => x.key !== v.key) });
+                              }}
+                              className="grid size-8 place-items-center rounded-full text-lg text-ink-soft hover:bg-red-50 hover:text-danger"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        </summary>
+                        <div className="border-t border-line p-4 sm:p-5">
+                        <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
                           <label>
                             <span className={lbl}>✈ Departure *</span>
                             <DateInput value={v.departureDate} onChange={(e) => setVisit(b.key, v.key, { departureDate: e.target.value })} className="field !py-2" />
@@ -586,7 +622,8 @@ export function RecordForm({
                             <input value={v.notes} onChange={(e) => setVisit(b.key, v.key, { notes: e.target.value })} className="field !py-2" />
                           </label>
                         </div>
-                      </div>
+                        </div>
+                      </details>
                     );
                   })}
                 </div>

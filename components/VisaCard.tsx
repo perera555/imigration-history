@@ -73,7 +73,7 @@ export function VisaCard({
     <article className="visa-card flex flex-col rounded-3xl">
       {/* Compact by default: click the visa to see every detail, the trips and the document. */}
       <details className="group">
-      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+      <summary className="block cursor-pointer list-none [&::-webkit-details-marker]:hidden [&::marker]:[content:'']">
       <header className="flex items-start gap-4 border-b border-[#e3d6b4] p-5">
         <Flag code={visa.countryCode} className="h-11 w-16 rounded-md" />
         <div className="min-w-0 flex-1">
@@ -90,7 +90,7 @@ export function VisaCard({
           {visa.purpose && <p className="text-xs text-ink-soft">Purpose: {visa.purpose}</p>}
         </div>
         <div className="text-right">
-          <span className={`inline-block rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${TONE[state.tone]}`}>
+          <span className={`inline-block rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${TONE[state.tone === "expired" && state.label !== "Expired" ? "closed" : state.tone]}`}>
             {state.label}
           </span>
           {state.detail && (
