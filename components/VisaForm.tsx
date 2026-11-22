@@ -50,6 +50,13 @@ type Fields = {
   notes: string;
 };
 
+/** Days from one date to another, both included; null when either is missing or the order is wrong. */
+function stayBetween(from: string, to: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return null;
+  const days = Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1;
+  return days >= 1 && days <= 3650 ? days : null;
+}
+
 const fromVisa = (v?: Visa, defaultPassport?: string | null, defaultCountry?: string, defaultType?: string): Fields => ({
   countryCode: v?.countryCode ?? defaultCountry ?? "",
   visaType: v?.visaType ?? defaultType ?? "",
@@ -109,7 +116,15 @@ export function VisaForm({
   const [reading, startReading] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
   const set = (k: keyof Fields) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-    setF((x) => ({ ...x, [k]: e.target.value }));
+    setF((x) => {
+      const next = { ...x, [k]: e.target.value };
+      // Stay (days) from Travel from → Travel to, counting both days (24 May → 22 Jul = 60 days).
+      if (k === "travelFrom" || k === "travelTo") {
+        const days = stayBetween(next.travelFrom, next.travelTo);
+        if (days !== null) next.stayDays = String(days);
+      }
+      return next;
+    });
 
   useToastOn(readMsg.ok, readMsg.error ?? state?.error);
   // Extra pages picked for a new visa: uploaded right after the visa is first saved.
@@ -170,7 +185,10 @@ export function VisaForm({
         travelTo: d.travelTo ?? x.travelTo,
         purpose: d.purpose ?? x.purpose,
         entries: d.entries ?? x.entries,
-        stayDays: d.stayDays != null ? String(d.stayDays) : x.stayDays,
+        stayDays:
+          d.stayDays != null
+            ? String(d.stayDays)
+            : String(stayBetween(d.travelFrom ?? x.travelFrom, d.travelTo ?? x.travelTo) ?? x.stayDays),
         issuedAt: d.issuedAt ?? x.issuedAt,
         passportNumber: d.passportNumber ?? x.passportNumber,
       }));
@@ -318,7 +336,7 @@ export function VisaForm({
         </label>
         <label>
           <span className="field-label">Stay (days)</span>
-          <input type="number" min={0} max={3650} name="stayDays" value={f.stayDays} onChange={set("stayDays")} className="field" />
+          <input type="number" min={0} max={3650} name="stayDays" value={f.stayDays} onChange={set("stayDays")} className="field" placeholder="Filled from the travel dates" />
         </label>
         <label>
           <span className="field-label">Passport used</span>

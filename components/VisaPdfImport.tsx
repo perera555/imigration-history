@@ -154,8 +154,7 @@ export function VisaPdfImport({ profileId }: { profileId: string }) {
         let details: VisaDetails | null = null;
         try {
           const png = (await renderPageAsImage(pdf, n, { width: 3000, format: "png" })) as Uint8Array;
-          const [ocr] = await ocrImages([new Blob([new Uint8Array(png)], { type: "image/png" })], (m) => setBusy(`Page ${n} of ${pages}: ${m}`));
-          if ((ocr ?? "").replace(/\s/g, "").length >= 40) details = await readVisaPageText(profileId, ocr);
+          const [ocr] = await ocrImages([new Blob([new Uint8Array(png)], { type: "image/png" })], (m) => setBusy(`Page ${n} of ${pages}: ${m}`));          if ((ocr ?? "").replace(/\s/g, "").length >= 40) details = await readVisaPageText(profileId, ocr);
         } catch {
           /* nothing read */
         }
