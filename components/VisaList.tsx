@@ -97,7 +97,7 @@ export function VisaList({
                     {g.visas.length} visa{g.visas.length === 1 ? "" : "s"}
                   </span>
                 </header>
-                <div className="grid gap-5 p-4 sm:p-5 lg:grid-cols-2">
+                <div className="grid items-start gap-5 p-4 sm:p-5 lg:grid-cols-2">
                   {g.visas.map((v) => (
                     <VisaCard key={v.id} visa={v} holder={holder} trips={trips} canViewDocument={canViewDocument} canDelete={canDelete} editPage={editPage} />
                   ))}

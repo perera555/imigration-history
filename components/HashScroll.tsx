@@ -12,6 +12,8 @@ export function HashScroll() {
       const el = document.getElementById(id);
       if (el || ++tries > 20) clearInterval(timer);
       if (!el) return;
+      // A collapsed visa (<details>): open it so its form shows.
+      if (el instanceof HTMLDetailsElement) el.open = true;
       const header = document.querySelector("header")?.getBoundingClientRect().height ?? 0;
       window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - header - 16, behavior: "smooth" });
       el.classList.add("ring-2", "ring-gold");

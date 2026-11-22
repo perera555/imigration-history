@@ -63,6 +63,9 @@ export function VisaCard({
 
   return (
     <article className="visa-card flex flex-col rounded-3xl">
+      {/* Compact by default: click the visa to see every detail, the trips and the document. */}
+      <details className="group">
+      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
       <header className="flex items-start gap-4 border-b border-[#e3d6b4] p-5">
         <Flag code={visa.countryCode} className="h-11 w-16 rounded-md" />
         <div className="min-w-0 flex-1">
@@ -85,6 +88,19 @@ export function VisaCard({
           {state.detail && <p className="mt-1 text-[11px] font-medium text-emerald-700">{state.detail}</p>}
         </div>
       </header>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[#e3d6b4] bg-white/40 px-5 py-2.5 text-sm">
+        {visa.visaNumber && <span className="font-mono font-semibold text-navy">No. {visa.visaNumber}</span>}
+        <span className="text-ink-soft tabular-nums">
+          {visa.issueDate || visa.expiryDate ? `${visa.issueDate ? formatShortDate(visa.issueDate) : "…"} → ${visa.expiryDate ? formatShortDate(visa.expiryDate) : "…"}` : "No dates yet"}
+        </span>
+        {visa.entries && <span className="text-ink-soft">{visa.entries} entry</span>}
+        {visa.hasDocument && <span className="text-ink-soft">📎 document</span>}
+        <span className="ml-auto rounded-full bg-navy px-3 py-1 text-xs font-semibold text-gold-soft">
+          <span className="group-open:hidden">▾ Show details</span>
+          <span className="hidden group-open:inline">▴ Hide details</span>
+        </span>
+      </div>
+      </summary>
 
       {holder && (
         <div className="flex items-center gap-4 border-b border-[#e3d6b4] bg-white/40 px-5 py-4">
@@ -171,7 +187,7 @@ export function VisaCard({
             src={`/api/visas/${visa.id}/document#toolbar=0&navpanes=0&view=FitH`}
             title={`${visa.documentName ?? "Visa"} (PDF)`}
             loading="lazy"
-            className="h-64 w-full rounded-xl border-0 bg-paper shadow-[0_0_0_1px_rgba(0,0,0,0.08)]"
+            className="h-[28rem] w-full rounded-xl border-0 bg-paper shadow-[0_0_0_1px_rgba(0,0,0,0.08)]"
           />
         )}
         {canViewDocument && visa.pages?.length > 0 && (
@@ -204,6 +220,7 @@ export function VisaCard({
         )}
         <p className="truncate rounded-lg bg-navy/[0.04] px-3 py-1.5 font-mono text-[10px] tracking-[0.2em] text-ink-soft">{mrz}</p>
       </div>
+      </details>
     </article>
   );
 }

@@ -26,6 +26,9 @@ type Group = {
   addLabel: string;
 };
 
+const shortDate = (d: string) =>
+  new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+
 /** "📷 Add several visa photos": one new visa per chosen photo, for this country. */
 function BulkVisaPhotos({ profileId, countryCode, visaType, title }: { profileId: string; countryCode: string; visaType: string; title: string }) {
   const ref = useRef<HTMLInputElement>(null);
@@ -215,24 +218,38 @@ export function VisaCountryManager({
             </header>
 
             {own.map((v, n) => (
-              <div key={v.id} id={`visa-${v.id}`} className="mt-4 rounded-2xl border border-line bg-white p-5 transition-shadow">
+              // Compact row per saved visa; click "Update" to open its form.
+              <details key={v.id} id={`visa-${v.id}`} className="group mt-3 scroll-mt-24 rounded-2xl border border-line bg-white transition-shadow open:shadow-md">
+                <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+                  <span className="grid size-7 shrink-0 place-items-center rounded-full bg-navy text-xs font-bold text-gold-soft">{n + 1}</span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-navy">
+                      {g.key === "schengen" ? `Schengen visa (issued by ${countryName(v.countryCode)})` : `${v.visaType || "Visa"}`}
+                      {v.visaNumber && <span className="font-mono font-normal text-ink-soft"> · {v.visaNumber}</span>}
+                    </span>
+                    <span className="block text-xs text-ink-soft">
+                      {v.issueDate || v.expiryDate
+                        ? `${v.issueDate ? shortDate(v.issueDate) : "…"} → ${v.expiryDate ? shortDate(v.expiryDate) : "…"}`
+                        : "No dates yet"}
+                      {v.hasDocument ? " · 📎 document" : ""}
+                    </span>
+                  </span>
+                  <span className="ml-auto rounded-full bg-navy px-3 py-1 text-xs font-semibold text-gold-soft">
+                    <span className="group-open:hidden">✏️ Update ▾</span>
+                    <span className="hidden group-open:inline">Close ▴</span>
+                  </span>
+                </summary>
+                <div className="border-t border-line p-5">
                 <div className="mb-3 flex flex-wrap items-center gap-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gold">
-                    {g.key === "schengen" ? `Schengen visa (issued by ${countryName(v.countryCode)})` : `${g.title} visa`}
-                    {own.length > 1 ? ` ${n + 1} of ${own.length}` : ""} · update
+                    {g.title} visa{own.length > 1 ? ` ${n + 1} of ${own.length}` : ""} · update
                   </p>
-                  <span className="text-sm text-ink-soft">
-                    {v.visaType || "Visa"}
-                    {v.visaNumber && <span className="font-mono"> · {v.visaNumber}</span>}
-                  </span>
                   {/* Owner or admin can delete a visa (a restore point is saved first) */}
-                  {(
-                    <form action={deleteVisa.bind(null, v.id)} className="ml-auto">
-                      <ConfirmButton message="Delete this visa and its document? (You can get it back from Backup & recovery.)" className="btn btn-danger !py-1">
-                        Delete
-                      </ConfirmButton>
-                    </form>
-                  )}
+                  <form action={deleteVisa.bind(null, v.id)} className="ml-auto">
+                    <ConfirmButton message="Delete this visa and its document? (You can get it back from Backup & recovery.)" className="btn btn-danger !py-1">
+                      🗑 Delete visa
+                    </ConfirmButton>
+                  </form>
                 </div>
                 <VisaForm
                   canDeletePages={canDelete}
@@ -241,7 +258,8 @@ export function VisaCountryManager({
                   passports={passports}
                   schengenCountries={g.key === "schengen" ? g.codes.map((code) => ({ code, visits: g.perCountry[code] ?? 0 })) : undefined}
                 />
-              </div>
+                </div>
+              </details>
             ))}
 
             {adding === g.key ? (
