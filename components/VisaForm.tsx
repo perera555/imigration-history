@@ -85,7 +85,10 @@ export function VisaForm({
   schengenCountries,
   onDone,
   canDeletePages = false,
+  existingNumbers = [],
 }: {
+  /** Visa numbers already in the record: reading skips those visas (next visa in a multi-visa PDF). */
+  existingNumbers?: string[];
   /** Admins can remove single visa pages. */
   canDeletePages?: boolean;
   /** Schengen section: the Schengen countries travelled, shown as fields with their flags. */
@@ -157,14 +160,24 @@ export function VisaForm({
       const result = await readVisaDocument(profileId, fd);
       let d: VisaDetails | null = result && "ok" in result ? result.details : null;
       let note = result && "ok" in result ? (result.note ?? "") : "";
-      // Scanned PDF or photo (no text inside): read it with text recognition in the browser.
-      if (!d || !Object.values(d).some((v) => v !== null)) {
+      const known = new Set(existingNumbers.map((n) => n.toUpperCase()));
+      const isKnown = (x: VisaDetails | null) => !!x?.visaNumber && known.has(x.visaNumber.toUpperCase());
+      // Scanned PDF or photo (no text inside), or a visa that is already in the record (e.g. page 1 of a
+      // PDF with several visas): read each page and use the first visa that isn't saved yet.
+      if (!d || !Object.values(d).some((v) => v !== null) || isKnown(d)) {
         try {
-          const texts = await ocrImages(await fileToImages(file, 4), (m) => setReadMsg({ ok: m }));
-          const fromScan = await readVisaPageText(profileId, texts.join("\n"));
-          if (fromScan && Object.values(fromScan).some((v) => v !== null)) {
-            d = fromScan;
-            note = "Read from the scan. Please check every detail before saving.";
+          const texts = await ocrImages(await fileToImages(file, 6), (m) => setReadMsg({ ok: m }));
+          const pages: VisaDetails[] = [];
+          for (const t of texts) {
+            const p = await readVisaPageText(profileId, t);
+            if (p && Object.values(p).some((v) => v !== null)) pages.push(p);
+          }
+          const next = pages.find((p) => !isKnown(p));
+          if (next) {
+            d = next;
+            note = pages.length > 1 ? `Read from the scan (the next visa in this document that isn't saved yet). Please check every detail.` : "Read from the scan. Please check every detail before saving.";
+          } else if (pages.length && pages.every(isKnown)) {
+            return setReadMsg({ error: "Every visa in this document is already in your record. Choose another visa page, or type the details below." });
           }
         } catch {
           /* fall through to the message below */

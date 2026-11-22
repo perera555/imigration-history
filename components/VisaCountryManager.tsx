@@ -158,6 +158,7 @@ export function VisaCountryManager({
         defaultPassport={defaultPassport}
         defaultCountry={g?.addCountry ?? undefined}
         defaultType={g?.addType}
+        existingNumbers={visas.map((v) => v.visaNumber).filter((n): n is string => !!n)}
         schengenCountries={g?.key === "schengen" ? g.codes.map((code) => ({ code, visits: g.perCountry[code] ?? 0 })) : undefined}
         onDone={() => {
           setAdding(null);
@@ -243,7 +244,20 @@ export function VisaCountryManager({
               </div>
             ))}
 
-            {adding === g.key && addForm(g)}
+            {adding === g.key ? (
+              addForm(g)
+            ) : (
+              own.length > 0 && (
+                // Under the last visa, so the next one can be added right where you are after saving.
+                <button
+                  type="button"
+                  onClick={() => setAdding(g.key)}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gold/60 bg-gold/5 px-4 py-3 text-sm font-semibold text-navy transition hover:bg-gold/10"
+                >
+                  {g.key === "schengen" ? "+ Add another Schengen visa" : `+ Add another ${g.title} visa`}
+                </button>
+              )
+            )}
           </section>
         );
       })}
