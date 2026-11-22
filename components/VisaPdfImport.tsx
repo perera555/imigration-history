@@ -19,6 +19,22 @@ type PageItem = {
   result?: { ok: boolean; text: string };
 };
 
+const EMPTY: Partial<VisaDetails> = {
+  countryCode: null,
+  visaType: null,
+  visaFormat: null,
+  visaNumber: null,
+  issueDate: null,
+  expiryDate: null,
+  travelFrom: null,
+  travelTo: null,
+  purpose: null,
+  entries: null,
+  stayDays: null,
+  issuedAt: null,
+  passportNumber: null,
+};
+
 const shortDate = (d: string | null) =>
   d ? new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : null;
 
@@ -133,10 +149,34 @@ export function VisaPdfImport({ profileId }: { profileId: string }) {
                     <input type="checkbox" checked={it.include} disabled={!!it.result?.ok} onChange={(e) => update(it.page, { include: e.target.checked })} className="size-4 accent-navy" />
                     Page {it.page}: add as a visa
                   </label>
-                  <p className="text-xs text-ink-soft">{facts.length ? facts.join(" · ") : "No details could be read — you can fill them in after adding."}</p>
-                  <div className="max-w-sm">
-                    <CountrySelect key={`${it.page}-${it.country}`} name={`importCountry${it.page}`} defaultValue={it.country} onChange={(c) => update(it.page, { country: c })} />
-                    {!it.country && it.include && <p className="mt-1 text-xs font-medium text-amber-700">Choose the country of this visa.</p>}
+                  <p className="text-xs text-ink-soft">{facts.length ? `Read from the page: ${facts.join(" · ")}` : "No details could be read from this page — type them below."}</p>
+                  {/* The visa form for this page: filled from the page, change anything before adding */}
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="sm:col-span-2 lg:col-span-1">
+                      <span className="field-label">Country *</span>
+                      <CountrySelect key={`${it.page}-${it.country}`} name={`importCountry${it.page}`} defaultValue={it.country} onChange={(c) => update(it.page, { country: c })} />
+                      {!it.country && it.include && <p className="mt-1 text-xs font-medium text-amber-700">Choose the country of this visa.</p>}
+                    </div>
+                    {(
+                      [
+                        ["visaType", "Visa type", "text"],
+                        ["visaNumber", "Visa number", "text"],
+                        ["entries", "Entries", "text"],
+                        ["issueDate", "Issue date", "date"],
+                        ["expiryDate", "Expiry date", "date"],
+                      ] as const
+                    ).map(([key, label, type]) => (
+                      <label key={key}>
+                        <span className="field-label">{label}</span>
+                        <input
+                          type={type}
+                          value={(d?.[key] as string | null) ?? ""}
+                          disabled={!!it.result?.ok}
+                          onChange={(e) => update(it.page, { details: { ...(EMPTY as VisaDetails), ...(d ?? {}), [key]: e.target.value || null } })}
+                          className="field !py-1.5 text-sm"
+                        />
+                      </label>
+                    ))}
                   </div>
                   {it.result && <p className={`text-sm font-medium ${it.result.ok ? "text-ok" : "text-danger"}`}>{it.result.ok ? "✓ " : ""}{it.result.text}</p>}
                 </div>
