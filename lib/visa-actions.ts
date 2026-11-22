@@ -95,6 +95,34 @@ export async function addVisaPage(visaId: string, form: FormData): Promise<{ ok?
   return { ok: true };
 }
 
+/**
+ * Import from a multi-page PDF: reads every visa on one scanned page image with Claude AI.
+ * Returns { ai: false } when AI reading isn't set up (no ANTHROPIC_API_KEY) so the browser uses free OCR.
+ */
+export async function readVisaPageImage(profileId: string, form: FormData): Promise<{ ai: false } | { ai: true; visas: VisaDetails[]; error?: string }> {
+  if (!isUuid(profileId)) return { ai: false };
+  await requireProfileAccess(profileId);
+  if (!process.env.ANTHROPIC_API_KEY) return { ai: false };
+  const file = form.get("page");
+  if (!(file instanceof File) || file.size === 0 || file.size > MAX_DOC_BYTES || !file.type.startsWith("image/")) return { ai: true, visas: [], error: "Bad page image." };
+  try {
+    const { extractVisasOnPage } = await import("./extract");
+    const visas = await extractVisasOnPage(Buffer.from(await file.arrayBuffer()), file.type);
+    return {
+      ai: true,
+      visas: visas.map((v) => ({
+        ...v,
+        countryCode: v.countryCode && isCountryCode(v.countryCode.toUpperCase()) ? v.countryCode.toUpperCase() : null,
+        visaNumber: v.visaNumber?.toUpperCase().replace(/\s+/g, "") ?? null,
+        passportNumber: v.passportNumber?.toUpperCase().replace(/\s+/g, "") ?? null,
+      })),
+    };
+  } catch (error) {
+    console.error("Visa page AI reading failed:", error);
+    return { ai: true, visas: [], error: "AI reading failed for this page." };
+  }
+}
+
 /** Import from a multi-page PDF: reads the details on one visa page from its text (free, no AI). */
 export async function readVisaPageText(profileId: string, text: string): Promise<VisaDetails | null> {
   if (!isUuid(profileId)) return null;

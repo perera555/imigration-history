@@ -62,6 +62,41 @@ const VisaSchema = z.object({
   passportNumber: z.string().nullable(),
 });
 
+const PageVisasSchema = z.object({ visas: z.array(VisaSchema) });
+
+/**
+ * Reads EVERY visa on one passport page / visa document image with Claude (a page can hold several
+ * visa stickers). Entry / exit stamps are not visas and are left out. Needs ANTHROPIC_API_KEY.
+ */
+export async function extractVisasOnPage(bytes: Buffer, mediaType: string): Promise<z.infer<typeof VisaSchema>[]> {
+  const client = new Anthropic();
+  const response = await client.messages.parse({
+    model: "claude-opus-5-5",
+    max_tokens: 6000,
+    output_config: { effort: "low", format: zodOutputFormat(PageVisasSchema) },
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: { type: "base64", media_type: mediaType as "image/png" | "image/jpeg" | "image/webp" | "image/gif", data: bytes.toString("base64") },
+          },
+          {
+            type: "text",
+            text:
+              "This is a scanned passport page or visa document. List every VISA on it (visa stickers, e-visas, grant notices, visas on arrival); " +
+              "a page can hold more than one. Do not list entry/exit stamps as visas. For each visa give the issuing country as an ISO 3166-1 alpha-2 code, " +
+              "dates as YYYY-MM-DD, and use null for anything not shown; never guess. If there is no visa on the page, return an empty list.",
+          },
+        ],
+      },
+    ],
+  });
+  if (response.stop_reason === "refusal" || !response.parsed_output) throw new Error("Could not read the page.");
+  return response.parsed_output.visas;
+}
+
 /** Reads a visa (sticker photo, e-visa, grant letter) with Claude. Needs ANTHROPIC_API_KEY. */
 export async function extractVisa(bytes: Buffer, mediaType: string): Promise<z.infer<typeof VisaSchema>> {
   const client = new Anthropic();
