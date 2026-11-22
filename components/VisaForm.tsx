@@ -131,8 +131,9 @@ export function VisaForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
-  function readDetails() {
-    const file = fileRef.current?.files?.[0];
+  /** Reads the visa details; runs by itself as soon as a file is chosen (and from the button). */
+  function readDetails(picked?: File) {
+    const file = picked ?? fileRef.current?.files?.[0];
     if (!file) return setReadMsg({ error: "Choose the visa document first." });
     setReadMsg({});
     startReading(async () => {
@@ -186,12 +187,13 @@ export function VisaForm({
         <DocumentPicker
           name="document"
           inputRef={fileRef}
+          onPicked={(f) => readDetails(f)}
           label="Visa photo or document"
           saved={visa?.hasDocument ? { url: `/api/visas/${visa.id}/document`, name: visa.documentName, image: isImageName(visa.documentName) } : null}
           onDelete={visa ? () => deleteAttachment("visa", visa.id) : undefined}
         />
-        <button type="button" onClick={readDetails} disabled={reading} className="btn btn-gold mt-3">
-          {reading ? "Reading…" : "Read details from document"}
+        <button type="button" onClick={() => readDetails()} disabled={reading} className="btn btn-gold mt-3">
+          {reading ? "Reading the document…" : "↻ Read details again"}
         </button>
         {visa?.hasDocument && (
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">

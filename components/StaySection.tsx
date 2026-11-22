@@ -99,8 +99,9 @@ function StayForm({
   const [reading, startReading] = useTransition();
   const [readMsg, setReadMsg] = useState<{ ok?: string; error?: string }>({});
   useToastOn(readMsg.ok, readMsg.error ?? state?.error);
-  function readBooking() {
-    const file = fileRef.current?.files?.[0];
+  /** Reads the booking; runs by itself when a PDF is chosen (and from the button). */
+  function readBooking(picked?: File) {
+    const file = picked ?? fileRef.current?.files?.[0];
     if (!file) return setReadMsg({ error: "Choose the booking confirmation first (📷 / 🖼 above)." });
     setReadMsg({});
     startReading(async () => {
@@ -258,9 +259,10 @@ function StayForm({
           label="Booking confirmation or photo (optional)"
           saved={stay?.hasFile ? { url: `/api/stays/${stay.id}/file`, name: stay.fileName, image: isImageName(stay.fileName, stay.mime) } : null}
           onDelete={stay ? () => deleteAttachment("stay", stay.id) : undefined}
+          onPicked={(f) => f.type === "application/pdf" && readBooking(f)}
         />
-        <button type="button" onClick={readBooking} disabled={reading} className="btn btn-gold mt-3">
-          {reading ? "Reading…" : "✨ Read details from booking (PDF)"}
+        <button type="button" onClick={() => readBooking()} disabled={reading} className="btn btn-gold mt-3">
+          {reading ? "Reading the booking…" : "↻ Read details again"}
         </button>
         {readMsg.ok && <p className="mt-2 text-sm font-medium text-ok">{readMsg.ok}</p>}
         {readMsg.error && <p className="mt-2 text-sm font-medium text-danger">{readMsg.error}</p>}
