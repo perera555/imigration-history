@@ -1,19 +1,19 @@
-Cuse serverC;
+"use server";
 
-import { refresh } from Cnext/cacheC;
-import { getDb } from C./dbC;
-import { saveRestorePoint } from C./backupC;
-import { flash } from C./flashC;
-import { isUuid } from C./dataC;
-import { isCountryCode, NATIONALITIES } from C./countriesC;
-import { canAccessProfile, requireAdmin, requireAuth, requireProfileAccess } from C./sessionC;
-import type { VisaDetails } from C./visa-readerC;
+import { refresh } from "next/cache";
+import { getDb } from "./db";
+import { saveRestorePoint } from "./backup";
+import { flash } from "./flash";
+import { isUuid } from "./data";
+import { isCountryCode, NATIONALITIES } from "./countries";
+import { canAccessProfile, requireAdmin, requireAuth, requireProfileAccess } from "./session";
+import type { VisaDetails } from "./visa-reader";
 
-const DOC_TYPES = [Capplication/pdfC, Cimage/pngC, Cimage/jpegC, Cimage/webpC];
+const DOC_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
 const MAX_DOC_BYTES = 8 * 1024 * 1024;
 const isDate = (v: string | null) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
 const text = (form: FormData, key: string, max = 200) => {
-  const v = String(form.get(key) ?? CC).trim();
+  const v = String(form.get(key) ?? "").trim();
   return v ? v.slice(0, max) : null;
 };
 
@@ -26,45 +26,45 @@ function stayFromDates(from: string | null, to: string | null): number | null {
 
 export type VisaReadState = { error: string } | { ok: true; details: VisaDetails; note?: string } | undefined;
 
-/** CRead detailsC button: fills the visa form from an uploaded visa document. */
+/** "Read details" button: fills the visa form from an uploaded visa document. */
 export async function readVisaDocument(profileId: string, form: FormData): Promise<VisaReadState> {
-  if (!isUuid(profileId)) return { error: CUnknown record.C };
+  if (!isUuid(profileId)) return { error: "Unknown record." };
   await requireProfileAccess(profileId);
-  const file = form.get(CdocumentC);
-  if (!(file instanceof File) || file.size === 0) return { error: CChoose the visa document first.C };
-  if (!DOC_TYPES.includes(file.type)) return { error: CUpload a PDF, PNG, JPG or WEBP file.C };
-  if (file.size > MAX_DOC_BYTES) return { error: CFile is too large (max 8 MB).C };
+  const file = form.get("document");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose the visa document first." };
+  if (!DOC_TYPES.includes(file.type)) return { error: "Upload a PDF, PNG, JPG or WEBP file." };
+  if (file.size > MAX_DOC_BYTES) return { error: "File is too large (max 8 MB)." };
   const bytes = Buffer.from(await file.arrayBuffer());
 
   const sql = await getDb();
   const [p] = await sql<{ nationality: string | null }[]>`select nationality from profiles where id = ${profileId}`;
-  const holder = NATIONALITIES.find((n) => n.name.toLowerCase() === (p?.nationality ?? CC).toLowerCase())?.code ?? null;
+  const holder = NATIONALITIES.find((n) => n.name.toLowerCase() === (p?.nationality ?? "").toLowerCase())?.code ?? null;
 
-  if (file.type === Capplication/pdfC) {
+  if (file.type === "application/pdf") {
     try {
-      const { readVisaPdf } = await import(C./visa-readerC);
+      const { readVisaPdf } = await import("./visa-reader");
       const details = await readVisaPdf(new Uint8Array(bytes), holder);
       if (details && Object.values(details).some((v) => v !== null)) {
-        return { ok: true, details, note: CDetails read from the PDF. Please check them before saving.C };
+        return { ok: true, details, note: "Details read from the PDF. Please check them before saving." };
       }
     } catch (error) {
-      console.error(CVisa PDF reading failed:C, error);
+      console.error("Visa PDF reading failed:", error);
     }
   }
   if (process.env.ANTHROPIC_API_KEY) {
     try {
-      const { extractVisa } = await import(C./extractC);
+      const { extractVisa } = await import("./extract");
       const d = await extractVisa(bytes, file.type);
-      return { ok: true, details: { ...d, countryCode: d.countryCode?.toUpperCase() ?? null }, note: CDetails read from the document. Please check them before saving.C };
+      return { ok: true, details: { ...d, countryCode: d.countryCode?.toUpperCase() ?? null }, note: "Details read from the document. Please check them before saving." };
     } catch (error) {
-      console.error(CVisa AI reading failed:C, error);
+      console.error("Visa AI reading failed:", error);
     }
   }
   return {
     error:
-      file.type === Capplication/pdfC
-        ? CCouldn't find visa details in this PDF. The document is attached, so fill in the details below and save.C
-        : CPhotos can't be read automatically on this server yet. The photo is attached, so fill in the details below and save.C,
+      file.type === "application/pdf"
+        ? "Couldn't find visa details in this PDF. The document is attached, so fill in the details below and save."
+        : "Photos can't be read automatically on this server yet. The photo is attached, so fill in the details below and save.",
   };
 }
 
@@ -76,23 +76,23 @@ function checkFile(file: FormDataEntryValue | null): file is File {
 }
 const fileError = (file: FormDataEntryValue | null) =>
   !(file instanceof File) || file.size === 0
-    ? CChoose a photo or PDF.C
+    ? "Choose a photo or PDF."
     : !DOC_TYPES.includes(file.type)
-      ? CUse a JPEG, PNG, WEBP or PDF file.C
-      : CFile is too large (max 8 MB).C;
+      ? "Use a JPEG, PNG, WEBP or PDF file."
+      : "File is too large (max 8 MB).";
 
 /** Adds one extra page / photo to a visa (visa page, entry stamp, …). Users: own record only. */
 export async function addVisaPage(visaId: string, form: FormData): Promise<{ ok?: true; error?: string }> {
-  if (!isUuid(visaId)) return { error: CUnknown visa.C };
+  if (!isUuid(visaId)) return { error: "Unknown visa." };
   const sql = await getDb();
   const [v] = await sql<{ profileId: string }[]>`select profile_id from visas where id = ${visaId}`;
-  if (!v) return { error: CUnknown visa.C };
+  if (!v) return { error: "Unknown visa." };
   await requireProfileAccess(v.profileId);
-  const file = form.get(CpageC);
+  const file = form.get("page");
   if (!checkFile(file)) return { error: fileError(file) };
   await sql`insert into visa_pages ${sql({
     visaId,
-    fileName: file.name.slice(0, 120) || Cvisa-pageC,
+    fileName: file.name.slice(0, 120) || "visa-page",
     mime: file.type,
     size: file.size,
     data: Buffer.from(await file.arrayBuffer()),
@@ -110,23 +110,23 @@ export async function readVisaPageImage(profileId: string, form: FormData): Prom
   if (!isUuid(profileId)) return { ai: false };
   await requireProfileAccess(profileId);
   if (!process.env.ANTHROPIC_API_KEY) return { ai: false };
-  const file = form.get(CpageC);
-  if (!(file instanceof File) || file.size === 0 || file.size > MAX_DOC_BYTES || !file.type.startsWith(Cimage/C)) return { ai: true, visas: [], error: CBad page image.C };
+  const file = form.get("page");
+  if (!(file instanceof File) || file.size === 0 || file.size > MAX_DOC_BYTES || !file.type.startsWith("image/")) return { ai: true, visas: [], error: "Bad page image." };
   try {
-    const { extractVisasOnPage } = await import(C./extractC);
+    const { extractVisasOnPage } = await import("./extract");
     const visas = await extractVisasOnPage(Buffer.from(await file.arrayBuffer()), file.type);
     return {
       ai: true,
       visas: visas.map((v) => ({
         ...v,
         countryCode: v.countryCode && isCountryCode(v.countryCode.toUpperCase()) ? v.countryCode.toUpperCase() : null,
-        visaNumber: v.visaNumber?.toUpperCase().replace(/\s+/g, CC) ?? null,
-        passportNumber: v.passportNumber?.toUpperCase().replace(/\s+/g, CC) ?? null,
+        visaNumber: v.visaNumber?.toUpperCase().replace(/\s+/g, "") ?? null,
+        passportNumber: v.passportNumber?.toUpperCase().replace(/\s+/g, "") ?? null,
       })),
     };
   } catch (error) {
-    console.error(CVisa page AI reading failed:C, error);
-    return { ai: true, visas: [], error: CAI reading failed for this page.C };
+    console.error("Visa page AI reading failed:", error);
+    return { ai: true, visas: [], error: "AI reading failed for this page." };
   }
 }
 
@@ -136,8 +136,8 @@ export async function readVisaPageText(profileId: string, text: string): Promise
   await requireProfileAccess(profileId);
   const sql = await getDb();
   const [p] = await sql<{ nationality: string | null }[]>`select nationality from profiles where id = ${profileId}`;
-  const holder = NATIONALITIES.find((n) => n.name.toLowerCase() === (p?.nationality ?? CC).toLowerCase())?.code ?? null;
-  const { parseVisaText } = await import(C./visa-readerC);
+  const holder = NATIONALITIES.find((n) => n.name.toLowerCase() === (p?.nationality ?? "").toLowerCase())?.code ?? null;
+  const { parseVisaText } = await import("./visa-reader");
   return parseVisaText(String(text).slice(0, 20_000), holder);
 }
 
@@ -150,18 +150,18 @@ export async function addVisaFromPage(
   details: Partial<VisaDetails>,
   form: FormData,
 ): Promise<{ ok?: true; skipped?: string; error?: string }> {
-  if (!isUuid(profileId)) return { error: CUnknown record.C };
+  if (!isUuid(profileId)) return { error: "Unknown record." };
   await requireProfileAccess(profileId);
-  const code = String(details.countryCode ?? CC).toUpperCase();
-  if (!isCountryCode(code)) return { error: CNo country for this page.C };
-  const file = form.get(CdocumentC);
+  const code = String(details.countryCode ?? "").toUpperCase();
+  if (!isCountryCode(code)) return { error: "No country for this page." };
+  const file = form.get("document");
   if (!checkFile(file)) return { error: fileError(file) };
-  const d = (v: unknown) => (typeof v === CstringC && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
-  const s = (v: unknown, max: number) => (typeof v === CstringC && v.trim() ? v.trim().slice(0, max) : null);
+  const d = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+  const s = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
   const values = {
     profileId,
     countryCode: code,
-    visaType: s(details.visaType, 80) ?? CC,
+    visaType: s(details.visaType, 80) ?? "",
     visaFormat: s(details.visaFormat, 30),
     visaNumber: s(details.visaNumber, 40)?.toUpperCase() ?? null,
     issueDate: d(details.issueDate),
@@ -171,12 +171,12 @@ export async function addVisaFromPage(
     purpose: s(details.purpose, 120),
     entries: s(details.entries, 20),
     stayDays:
-      typeof details.stayDays === CnumberC && details.stayDays >= 0 && details.stayDays <= 3650
+      typeof details.stayDays === "number" && details.stayDays >= 0 && details.stayDays <= 3650
         ? Math.round(details.stayDays)
         : stayFromDates(d(details.travelFrom), d(details.travelTo)),
     issuedAt: s(details.issuedAt, 120),
     passportNumber: s(details.passportNumber, 30)?.toUpperCase() ?? null,
-    notes: CImported from a visa pages PDF. Please check the details.C,
+    notes: "Imported from a visa pages PDF. Please check the details.",
   };
   const sql = await getDb();
   // No duplicates: same visa number, or (without a number) same country with the same issue or expiry date.
@@ -187,12 +187,12 @@ export async function addVisaFromPage(
           and ((${values.issueDate}::date is not null and issue_date = ${values.issueDate}::date)
             or (${values.expiryDate}::date is not null and expiry_date = ${values.expiryDate}::date))`
       : [];
-  if (dup.length) return { skipped: values.visaNumber ? `Visa ${values.visaNumber} is already in your record.` : CThis visa is already in your record.C };
+  if (dup.length) return { skipped: values.visaNumber ? `Visa ${values.visaNumber} is already in your record.` : "This visa is already in your record." };
   await sql.begin(async (tx) => {
     const [row] = await tx<{ id: string }[]>`insert into visas ${tx(values)} returning id`;
     await tx`insert into visa_documents ${tx({
       visaId: row.id,
-      fileName: file.name.slice(0, 120) || Cvisa-page.jpgC,
+      fileName: file.name.slice(0, 120) || "visa-page.jpg",
       mime: file.type,
       size: file.size,
       data: Buffer.from(await file.arrayBuffer()),
@@ -211,28 +211,28 @@ export async function deleteVisaPage(pageId: string) {
   const sql = await getDb();
   const [owner] = await sql<{ profileId: string }[]>`select v.profile_id from visa_pages p join visas v on v.id = p.visa_id where p.id = ${pageId}`;
   if (!owner || !canAccessProfile(session, owner.profileId)) return;
-  await saveRestorePoint(sql, { visaPageId: pageId }, CDeleted a visa page photoC, session.email);
+  await saveRestorePoint(sql, { visaPageId: pageId }, "Deleted a visa page photo", session.email);
   await sql`delete from visa_pages where id = ${pageId}`;
-  await flash(CVisa page removed successfullyC);
+  await flash("Visa page removed successfully");
   refresh();
 }
 
-/** CAdd several visa photosC: makes one new visa for this country with the photo as its document. */
+/** "Add several visa photos": makes one new visa for this country with the photo as its document. */
 export async function addVisaFromPhoto(profileId: string, countryCode: string, visaType: string, form: FormData): Promise<{ ok?: true; error?: string }> {
-  if (!isUuid(profileId)) return { error: CUnknown record.C };
+  if (!isUuid(profileId)) return { error: "Unknown record." };
   await requireProfileAccess(profileId);
   const code = countryCode.toUpperCase();
-  if (!isCountryCode(code)) return { error: CUnknown country.C };
-  const file = form.get(CdocumentC);
+  if (!isCountryCode(code)) return { error: "Unknown country." };
+  const file = form.get("document");
   if (!checkFile(file)) return { error: fileError(file) };
   const sql = await getDb();
   await sql.begin(async (tx) => {
     const [row] = await tx<{ id: string }[]>`
-      insert into visas ${tx({ profileId, countryCode: code, visaType: visaType.slice(0, 80), notes: CAdded from a photo, please fill in the details.C })}
+      insert into visas ${tx({ profileId, countryCode: code, visaType: visaType.slice(0, 80), notes: "Added from a photo, please fill in the details." })}
       returning id`;
     await tx`insert into visa_documents ${tx({
       visaId: row.id,
-      fileName: file.name.slice(0, 120) || CvisaC,
+      fileName: file.name.slice(0, 120) || "visa",
       mime: file.type,
       size: file.size,
       data: Buffer.from(await file.arrayBuffer()),
@@ -245,56 +245,56 @@ export async function addVisaFromPhoto(profileId: string, countryCode: string, v
 
 /** Adds a visa (visaId = null) or updates one, with an optional document upload. Users: own record only. */
 export async function saveVisa(profileId: string, visaId: string | null, _: VisaSaveState, form: FormData): Promise<VisaSaveState> {
-  if (!isUuid(profileId) || (visaId && !isUuid(visaId))) return { error: CUnknown record.C };
+  if (!isUuid(profileId) || (visaId && !isUuid(visaId))) return { error: "Unknown record." };
   await requireProfileAccess(profileId);
 
-  const countryCode = text(form, CcountryCodeC, 2)?.toUpperCase() ?? CC;
-  if (!isCountryCode(countryCode)) return { error: CChoose the country that issued the visa.C };
-  const issueDate = text(form, CissueDateC, 10);
-  const expiryDate = text(form, CexpiryDateC, 10);
-  const travelFrom = text(form, CtravelFromC, 10);
-  const travelTo = text(form, CtravelToC, 10);
-  if (travelFrom && !isDate(travelFrom)) return { error: CTravel from date is not valid.C };
-  if (travelTo && !isDate(travelTo)) return { error: CTravel to date is not valid.C };
-  if (travelFrom && travelTo && travelTo < travelFrom) return { error: CTravel to can't be before travel from.C };
-  if (issueDate && !isDate(issueDate)) return { error: CIssue date is not valid.C };
-  if (expiryDate && !isDate(expiryDate)) return { error: CExpiry date is not valid.C };
-  if (issueDate && expiryDate && expiryDate < issueDate) return { error: CExpiry date can't be before the issue date.C };
-  const stayRaw = text(form, CstayDaysC, 4);
+  const countryCode = text(form, "countryCode", 2)?.toUpperCase() ?? "";
+  if (!isCountryCode(countryCode)) return { error: "Choose the country that issued the visa." };
+  const issueDate = text(form, "issueDate", 10);
+  const expiryDate = text(form, "expiryDate", 10);
+  const travelFrom = text(form, "travelFrom", 10);
+  const travelTo = text(form, "travelTo", 10);
+  if (travelFrom && !isDate(travelFrom)) return { error: "Travel from date is not valid." };
+  if (travelTo && !isDate(travelTo)) return { error: "Travel to date is not valid." };
+  if (travelFrom && travelTo && travelTo < travelFrom) return { error: "Travel to can't be before travel from." };
+  if (issueDate && !isDate(issueDate)) return { error: "Issue date is not valid." };
+  if (expiryDate && !isDate(expiryDate)) return { error: "Expiry date is not valid." };
+  if (issueDate && expiryDate && expiryDate < issueDate) return { error: "Expiry date can't be before the issue date." };
+  const stayRaw = text(form, "stayDays", 4);
   // Empty stay: work it out from Travel from → Travel to (both days counted).
   const stayDays = stayRaw ? Number(stayRaw) : stayFromDates(travelFrom, travelTo);
-  if (stayDays !== null && (!Number.isInteger(stayDays) || stayDays < 0 || stayDays > 3650)) return { error: CStay must be a number of days.C };
+  if (stayDays !== null && (!Number.isInteger(stayDays) || stayDays < 0 || stayDays > 3650)) return { error: "Stay must be a number of days." };
 
   const values = {
     countryCode,
-    visaType: text(form, CvisaTypeC, 80) ?? CC,
-    visaFormat: text(form, CvisaFormatC, 30),
-    visaNumber: text(form, CvisaNumberC, 40)?.toUpperCase() ?? null,
+    visaType: text(form, "visaType", 80) ?? "",
+    visaFormat: text(form, "visaFormat", 30),
+    visaNumber: text(form, "visaNumber", 40)?.toUpperCase() ?? null,
     issueDate,
     expiryDate,
     travelFrom,
     travelTo,
-    purpose: text(form, CpurposeC, 120),
-    entries: text(form, CentriesC, 20),
+    purpose: text(form, "purpose", 120),
+    entries: text(form, "entries", 20),
     stayDays,
-    issuedAt: text(form, CissuedAtC, 120),
-    passportNumber: text(form, CpassportNumberC, 30)?.toUpperCase() ?? null,
-    status: text(form, CstatusC, 30),
-    notes: text(form, CnotesC, 1000),    countriesTravelled: [
+    issuedAt: text(form, "issuedAt", 120),
+    passportNumber: text(form, "passportNumber", 30)?.toUpperCase() ?? null,
+    status: text(form, "status", 30),
+    notes: text(form, "notes", 1000),    countriesTravelled: [
       ...new Set(
         form
-          .getAll(CcountriesTravelledC)
+          .getAll("countriesTravelled")
           .map((v) => String(v).trim().toUpperCase())
           .filter((v) => isCountryCode(v)),
       ),
     ].slice(0, 40),
   };
 
-  const file = form.get(CdocumentC);
+  const file = form.get("document");
   const hasFile = file instanceof File && file.size > 0;
   if (hasFile) {
-    if (!DOC_TYPES.includes(file.type)) return { error: CDocument must be a PDF, PNG, JPG or WEBP file.C };
-    if (file.size > MAX_DOC_BYTES) return { error: CDocument is too large (max 8 MB).C };
+    if (!DOC_TYPES.includes(file.type)) return { error: "Document must be a PDF, PNG, JPG or WEBP file." };
+    if (file.size > MAX_DOC_BYTES) return { error: "Document is too large (max 8 MB)." };
   }
 
   const sql = await getDb();
@@ -308,7 +308,7 @@ export async function saveVisa(profileId: string, visaId: string | null, _: Visa
     let id = visaId;
     if (id) {
       const rows = await tx`update visas set ${tx(values)}, updated_at = now() where id = ${id} and profile_id = ${profileId} returning id`;
-      if (!rows.length) throw new Error(CVisa not found.C);
+      if (!rows.length) throw new Error("Visa not found.");
     } else {
       const [row] = await tx<{ id: string }[]>`insert into visas ${tx({ ...values, profileId })} returning id`;
       id = row.id;
@@ -317,7 +317,7 @@ export async function saveVisa(profileId: string, visaId: string | null, _: Visa
     if (hasFile) {
       const doc = {
         visaId: id,
-        fileName: (file as File).name.slice(0, 120) || CvisaC,
+        fileName: (file as File).name.slice(0, 120) || "visa",
         mime: (file as File).type,
         size: (file as File).size,
         data: Buffer.from(await (file as File).arrayBuffer()),
@@ -325,19 +325,19 @@ export async function saveVisa(profileId: string, visaId: string | null, _: Visa
       await tx`insert into visa_documents ${tx(doc)}
         on conflict (visa_id) do update set file_name = excluded.file_name, mime = excluded.mime,
           size = excluded.size, data = excluded.data, uploaded_at = now()`;
-    } else if (form.get(CremoveDocumentC) === ConC && id) {
+    } else if (form.get("removeDocument") === "on" && id) {
       await tx`delete from visa_documents where visa_id = ${id}`;
     }
     await tx`update profiles set updated_at = now() where id = ${profileId}`;
   });
-  await flash(visaId ? CVisa saved successfullyC : CVisa added successfullyC);
+  await flash(visaId ? "Visa saved successfully" : "Visa added successfully");
   refresh();
-  return { ok: visaId ? CVisa updated.C : CVisa added.C, id: savedId ?? undefined };
+  return { ok: visaId ? "Visa updated." : "Visa added.", id: savedId ?? undefined };
 }
 
 /** A visa with this number (same digits, with or without a letter in front) is already in the record. */
 async function sameNumberExists(sql: Awaited<ReturnType<typeof getDb>>, profileId: string, number: string) {
-  const digits = number.replace(/[^0-9]/g, CC).replace(/^0+/, CC);
+  const digits = number.replace(/[^0-9]/g, "").replace(/^0+/, "");
   const rows =
     digits.length >= 5
       ? await sql`select 1 from visas where profile_id = ${profileId}
@@ -348,7 +348,7 @@ async function sameNumberExists(sql: Awaited<ReturnType<typeof getDb>>, profileI
 
 /** Same visa? Same number (letters / leading zeros aside), or — without numbers — same country and dates. */
 function visaKey(v: { countryCode: string; visaNumber: string | null; issueDate: string | null; expiryDate: string | null }) {
-  const digits = (v.visaNumber ?? CC).toUpperCase().replace(/[^0-9]/g, CC).replace(/^0+/, CC);
+  const digits = (v.visaNumber ?? "").toUpperCase().replace(/[^0-9]/g, "").replace(/^0+/, "");
   if (digits.length >= 5) return `n:${digits}`;
   if (v.issueDate && v.expiryDate) return `d:${v.countryCode.trim()}|${v.issueDate}|${v.expiryDate}`;
   return null;
@@ -385,7 +385,7 @@ export async function removeDuplicateVisas(profileId: string): Promise<{ removed
       (a, b) => Number(b.hasDoc) - Number(a.hasDoc) || b.filled - a.filled || a.createdAt.getTime() - b.createdAt.getTime(),
     );
     for (const dup of extra) {
-      await saveRestorePoint(sql, { visaId: dup.id }, CRemoved a duplicate visa automaticallyC, session.email);
+      await saveRestorePoint(sql, { visaId: dup.id }, "Removed a duplicate visa automatically", session.email);
       await sql`delete from visas where id = ${dup.id}`;
       removed++;
     }
@@ -401,8 +401,8 @@ export async function deleteVisa(visaId: string) {
   const sql = await getDb();
   const [owner] = await sql<{ profileId: string }[]>`select profile_id from visas where id = ${visaId}`;
   if (!owner || !canAccessProfile(session, owner.profileId)) return;
-  await saveRestorePoint(sql, { visaId }, CDeleted a visa (with its document)C, session.email);
+  await saveRestorePoint(sql, { visaId }, "Deleted a visa (with its document)", session.email);
   await sql`delete from visas where id = ${visaId}`;
-  await flash(CVisa deleted successfullyC);
+  await flash("Visa deleted successfully");
   refresh();
 }
