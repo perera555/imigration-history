@@ -152,14 +152,20 @@ function issueFromDates(text: string, expiry: string | null): string | null {
 
 /** The printed visa number (a letter and 6–8 digits, e.g. "X 0012345"), ideally matching the digits in the MRZ. */
 function printedVisaNumber(text: string, digits: string | null): string | null {
-  const candidates = [...text.toUpperCase().matchAll(/\b([A-Z])\s?(\d{6,8})\b/g)].map((m) => ({ full: `${m[1]}${m[2]}`, digits: m[2] }));
-  if (digits) {
-    const tail = digits.replace(/^0+/, "");
-    const hit = candidates.find((c) => c.digits.endsWith(tail) || tail.endsWith(c.digits.replace(/^0+/, "")));
-    if (hit) return hit.full;
-    return digits;
-  }
-  return null;
+  if (!digits) return null;
+  const up = text.toUpperCase();
+  // Printed on the sticker: with a letter ("X 0012345") or, when OCR drops it, just the digits.
+  const lettered = [...up.matchAll(/\b([A-Z])\s?(\d{6,8})\b/g)].map((m) => ({ full: `${m[1]}${m[2]}`, digits: m[2] }));
+  const bare = [...up.matchAll(/(?<![A-Z0-9<])(\d{6,8})(?![0-9<])/g)].map((m) => ({ full: m[1], digits: m[1] }));
+  const strip = (s: string) => s.replace(/^0+/, "");
+  // The machine-read digits can carry an extra check digit at the end ("00123456" for "0012345").
+  const matches = (c: { digits: string }) => {
+    const a = strip(c.digits);
+    const b = strip(digits);
+    return a.length >= 5 && (a === b || b.startsWith(a) || b.endsWith(a) || a.endsWith(b));
+  };
+  const hit = lettered.find(matches) ?? bare.find(matches);
+  return hit ? hit.full : digits;
 }
 
 /** Visa details from the text of one visa page (or a whole e-visa). Null when there's almost no text. */
@@ -178,6 +184,8 @@ export function parseVisaText(text: string, holderNationalityCode: string | null
     expiryDate: mrz.expiryDate ?? details.expiryDate,
     travelTo: mrz.expiryDate ?? details.travelTo,
     passportNumber: mrz.passportNumber ?? details.passportNumber,
+    // A visa with the machine-readable lines is a sticker in the passport.
+    visaFormat: mrz.passportNumber || mrz.expiryDate ? "Paper visa" : details.visaFormat,
     // No issue date printed (e.g. "Valid from" only): use the start of validity.
     issueDate: details.issueDate ?? details.travelFrom ?? issueFromDates(t, mrz.expiryDate),
   };
@@ -224,9 +232,14 @@ function parseVisaFields(t: string, holderNationalityCode: string | null): VisaD
         : visaTypeRaw && !/^\d+\)?$/.test(visaTypeRaw.trim()) && !LABEL_WORDS.test(visaTypeRaw)
         ? visaTypeRaw.trim().replace(/\s+/g, " ")
       : /schengen/i.test(t) ? (/type\s*d\b|national visa/i.test(t) ? "Schengen visa (national, type D)" : "Schengen visa (short stay)") : null,
-    visaFormat: /\b(e-?visa|electronic visa|evisa|grant notice|visa grant|electronic travel authori[sz]ation|eta\b)/i.test(t)
-      ? /electronic travel authori[sz]ation|\beta\b/i.test(t) ? "ETA" : "e-Visa"
-      : /visa on arrival/i.test(t) ? "Visa on arrival" : null,
+    // Only clear wording counts (scanned pages are full of random letters such as "eta").
+    visaFormat: /electronic travel authori[sz](?:ation|ity)/i.test(t)
+      ? "ETA"
+      : /\b(e-visa|evisa|electronic visa|grant notice|visa grant number|we have granted you)\b/i.test(t)
+        ? "e-Visa"
+        : /visa on arrival/i.test(t)
+          ? "Visa on arrival"
+          : null,
     visaNumber: visaNumber ? visaNumber.toUpperCase() : null,
     issueDate: dateAfter(t, "date of issue|issue date|issued on|date issued|grant date|date of grant|granted on"),
     expiryDate:

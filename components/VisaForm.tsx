@@ -1,36 +1,36 @@
-"use client";
+Cuse clientC;
 
-import { DateInput } from "./DateInput";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { readVisaDocument, readVisaPageText, saveVisa, type VisaSaveState } from "@/lib/visa-actions";
-import { fileToImages, ocrImages } from "@/lib/ocr";
-import type { VisaDetails } from "@/lib/visa-reader";
-import type { Visa } from "@/lib/data";
-import { CountrySelect } from "./CountrySelect";
-import { isSchengen } from "@/lib/countries";
-import { SubmitButton } from "./SubmitButton";
-import { DocumentPicker, isImageName } from "./DocumentPicker";
-import { VisaPages, uploadVisaPages } from "./VisaPages";
-import { useToastOn } from "./Toaster";
-import { deleteAttachment } from "@/lib/attachment-actions";
+import { DateInput } from C./DateInputC;
+import { useActionState, useEffect, useRef, useState, useTransition } from CreactC;
+import { readVisaDocument, readVisaPageText, saveVisa, type VisaSaveState } from C@/lib/visa-actionsC;
+import { fileToImages, ocrImages } from C@/lib/ocrC;
+import type { VisaDetails } from C@/lib/visa-readerC;
+import type { Visa } from C@/lib/dataC;
+import { CountrySelect } from C./CountrySelectC;
+import { isSchengen } from C@/lib/countriesC;
+import { SubmitButton } from C./SubmitButtonC;
+import { DocumentPicker, isImageName } from C./DocumentPickerC;
+import { VisaPages, uploadVisaPages } from C./VisaPagesC;
+import { toast, useToastOn } from C./ToasterC;
+import { deleteAttachment } from C@/lib/attachment-actionsC;
 
 const PURPOSES = [
-  "Tourism",
-  "Business",
-  "Study",
-  "Work",
-  "Family visit",
-  "Medical",
-  "Transit",
-  "Conference / Training",
-  "Religious",
-  "Sports",
-  "Official / Diplomatic",
-  "Residence",
-  "Working holiday",
+  CTourismC,
+  CBusinessC,
+  CStudyC,
+  CWorkC,
+  CFamily visitC,
+  CMedicalC,
+  CTransitC,
+  CConference / TrainingC,
+  CReligiousC,
+  CSportsC,
+  COfficial / DiplomaticC,
+  CResidenceC,
+  CWorking holidayC,
 ];
 
-const TYPES = ["Schengen visa (short stay)", "Schengen visa (national, type D)", "Tourist", "Visit", "Business", "Student", "Work", "Transit", "Family", "Medical", "Working Holiday", "Resident", "e-Visa", "Visa on arrival", "ETA"];
+const TYPES = [CSchengen visa (short stay)C, CSchengen visa (national, type D)C, CTouristC, CVisitC, CBusinessC, CStudentC, CWorkC, CTransitC, CFamilyC, CMedicalC, CWorking HolidayC, CResidentC, Ce-VisaC, CVisa on arrivalC, CETAC];
 
 type Fields = {
   countryCode: string;
@@ -58,21 +58,22 @@ function stayBetween(from: string, to: string): number | null {
 }
 
 const fromVisa = (v?: Visa, defaultPassport?: string | null, defaultCountry?: string, defaultType?: string): Fields => ({
-  countryCode: v?.countryCode ?? defaultCountry ?? "",
-  visaType: v?.visaType ?? defaultType ?? "",
-  visaFormat: v?.visaFormat ?? "",
-  visaNumber: v?.visaNumber ?? "",
-  issueDate: v?.issueDate ?? "",
-  expiryDate: v?.expiryDate ?? "",
-  travelFrom: v?.travelFrom ?? "",
-  travelTo: v?.travelTo ?? "",
-  purpose: v?.purpose ?? "",
-  entries: v?.entries ?? "",
-  stayDays: v?.stayDays != null ? String(v.stayDays) : "",
-  issuedAt: v?.issuedAt ?? "",
-  passportNumber: v ? (v.passportNumber ?? "") : (defaultPassport ?? ""),
-  status: v?.status ?? "",
-  notes: v?.notes ?? "",
+  countryCode: v?.countryCode ?? defaultCountry ?? CC,
+  visaType: v?.visaType ?? defaultType ?? CC,
+  visaFormat: v?.visaFormat ?? CC,
+  visaNumber: v?.visaNumber ?? CC,
+  issueDate: v?.issueDate ?? CC,
+  expiryDate: v?.expiryDate ?? CC,
+  travelFrom: v?.travelFrom ?? CC,
+  travelTo: v?.travelTo ?? CC,
+  purpose: v?.purpose ?? CC,
+  entries: v?.entries ?? CC,
+  // Saved without a stay: work it out from the travel dates.
+  stayDays: v?.stayDays != null ? String(v.stayDays) : String(stayBetween(v?.travelFrom ?? CC, v?.travelTo ?? CC) ?? CC),
+  issuedAt: v?.issuedAt ?? CC,
+  passportNumber: v ? (v.passportNumber ?? CC) : (defaultPassport ?? CC),
+  status: v?.status ?? CC,
+  notes: v?.notes ?? CC,
 });
 
 export function VisaForm({
@@ -95,7 +96,7 @@ export function VisaForm({
   schengenCountries?: { code: string; visits: number }[];
   /** Pre-filled visa type for a new visa (e.g. Schengen). */
   defaultType?: string;
-  /** Pre-selected country for a new visa (e.g. "+ Add Thailand visa"). */
+  /** Pre-selected country for a new visa (e.g. C+ Add Thailand visaC). */
   defaultCountry?: string;
   profileId: string;
   visa?: Visa;
@@ -118,29 +119,53 @@ export function VisaForm({
   const [readMsg, setReadMsg] = useState<{ ok?: string; error?: string }>({});
   const [reading, startReading] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
+  /** The document chosen last (kept when the browser empties the file box after sending the form). */
+  const lastFile = useRef<File | null>(null);
   const set = (k: keyof Fields) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setF((x) => {
       const next = { ...x, [k]: e.target.value };
       // Stay (days) from Travel from → Travel to, counting both days (24 May → 22 Jul = 60 days).
-      if (k === "travelFrom" || k === "travelTo") {
+      if (k === CtravelFromC || k === CtravelToC) {
         const days = stayBetween(next.travelFrom, next.travelTo);
         if (days !== null) next.stayDays = String(days);
       }
       return next;
     });
 
-  useToastOn(readMsg.ok, readMsg.error ?? state?.error);
+  useToastOn(readMsg.ok, readMsg.error ?? (state?.error && !/already/i.test(state.error) ? state.error : null));
+
+  // Saving a visa that is already in the record: don't save it again — load the next visa from the document.
+  const skipNumbers = useRef<string[]>([]);
+  useEffect(() => {
+    if (!state?.error) return;
+    // The browser empties the file box when the form is sent: put the chosen document back.
+    const file = lastFile.current;
+    if (file && fileRef.current && !fileRef.current.files?.length) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileRef.current.files = dt.files;
+    }
+    if (!/already/i.test(state.error) || visa) return;
+    if (f.visaNumber) skipNumbers.current = [...skipNumbers.current, f.visaNumber];
+    if (file) {
+      toast(`Visa ${f.visaNumber || CC} is already saved — loading the next visa from this document…`, CinfoC);
+      readDetails(file);
+    } else {
+      toast(`Visa ${f.visaNumber || CC} is already saved, so it wasn't saved again.`, CinfoC);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
   // Extra pages picked for a new visa: uploaded right after the visa is first saved.
   const [queued, setQueued] = useState<File[]>([]);
-  const [pageMsg, setPageMsg] = useState("");
+  const [pageMsg, setPageMsg] = useState(CC);
   useEffect(() => {
     if (!state?.ok) return;
     if (!visa && state.id && queued.length) {
       const files = queued;
       setQueued([]);
-      setPageMsg(`Uploading ${files.length} page${files.length === 1 ? "" : "s"}…`);
+      setPageMsg(`Uploading ${files.length} page${files.length === 1 ? CC : CsC}…`);
       uploadVisaPages(state.id, files, (n) => setPageMsg(`Uploading pages… ${n} of ${files.length}`)).then((failed) => {
-        setPageMsg(failed ? `${failed} page(s) could not be added.` : "");
+        setPageMsg(failed ? `${failed} page(s) could not be added.` : CC);
         onDone?.();
       });
       return;
@@ -151,17 +176,20 @@ export function VisaForm({
 
   /** Reads the visa details; runs by itself as soon as a file is chosen (and from the button). */
   function readDetails(picked?: File) {
-    const file = picked ?? fileRef.current?.files?.[0];
-    if (!file) return setReadMsg({ error: "Choose the visa document first." });
+    const file = picked ?? fileRef.current?.files?.[0] ?? lastFile.current ?? undefined;
+    if (file) lastFile.current = file;
+    if (!file) return setReadMsg({ error: CChoose the visa document first.C });
     setReadMsg({});
     startReading(async () => {
       const fd = new FormData();
-      fd.append("document", file);
+      fd.append(CdocumentC, file);
       const result = await readVisaDocument(profileId, fd);
-      let d: VisaDetails | null = result && "ok" in result ? result.details : null;
-      let note = result && "ok" in result ? (result.note ?? "") : "";
-      const known = new Set(existingNumbers.map((n) => n.toUpperCase()));
-      const isKnown = (x: VisaDetails | null) => !!x?.visaNumber && known.has(x.visaNumber.toUpperCase());
+      let d: VisaDetails | null = result && CokC in result ? result.details : null;
+      let note = result && CokC in result ? (result.note ?? CC) : CC;
+      // Same visa if the digits match (printed with a letter in front, machine-read without it).
+      const digitsOf = (n: string) => n.replace(/[^0-9]/g, CC).replace(/^0+/, CC);
+      const known = new Set([...existingNumbers, ...skipNumbers.current].map(digitsOf).filter((d) => d.length >= 5));
+      const isKnown = (x: VisaDetails | null) => !!x?.visaNumber && known.has(digitsOf(x.visaNumber));
       // Scanned PDF or photo (no text inside), or a visa that is already in the record (e.g. page 1 of a
       // PDF with several visas): read each page and use the first visa that isn't saved yet.
       if (!d || !Object.values(d).some((v) => v !== null) || isKnown(d)) {
@@ -175,16 +203,16 @@ export function VisaForm({
           const next = pages.find((p) => !isKnown(p));
           if (next) {
             d = next;
-            note = pages.length > 1 ? `Read from the scan (the next visa in this document that isn't saved yet). Please check every detail.` : "Read from the scan. Please check every detail before saving.";
+            note = pages.length > 1 ? `Read from the scan (the next visa in this document that isn't saved yet). Please check every detail.` : CRead from the scan. Please check every detail before saving.C;
           } else if (pages.length && pages.every(isKnown)) {
-            return setReadMsg({ error: "Every visa in this document is already in your record. Choose another visa page, or type the details below." });
+            return setReadMsg({ error: CEvery visa in this document is already in your record. Choose another visa page, or type the details below.C });
           }
         } catch {
           /* fall through to the message below */
         }
       }
       if (!d || !Object.values(d).some((v) => v !== null)) {
-        return setReadMsg({ error: "Couldn't find visa details in this document, even by reading the scan. It is attached, so type the details below and save." });
+        return setReadMsg({ error: CCouldn't find visa details in this document, even by reading the scan. It is attached, so type the details below and save.C });
       }
       setF((x) => ({
         ...x,
@@ -207,63 +235,63 @@ export function VisaForm({
       }));
       if (d.countryCode) setCountryKey((k) => k + 1);
       const found = Object.values(d).filter((v) => v !== null).length;
-      setReadMsg({ ok: `✓ ${found} detail${found === 1 ? "" : "s"} read from the document. ${note}` });
+      setReadMsg({ ok: `✓ ${found} detail${found === 1 ? CC : CsC} read from the document. ${note}` });
     });
   }
 
   return (
-    <form action={action} className="space-y-6">
+    <form action={action} className=Cspace-y-6C>
       {/* 1. Document */}
-      <div className="rounded-2xl border border-dashed border-line bg-paper/50 p-4">
+      <div className=Crounded-2xl border border-dashed border-line bg-paper/50 p-4C>
         <DocumentPicker
-          name="document"
+          name=CdocumentC
           inputRef={fileRef}
           onPicked={(f) => readDetails(f)}
-          label="Visa photo or document"
+          label=CVisa photo or documentC
           saved={visa?.hasDocument ? { url: `/api/visas/${visa.id}/document`, name: visa.documentName, image: isImageName(visa.documentName) } : null}
-          onDelete={visa ? () => deleteAttachment("visa", visa.id) : undefined}
+          onDelete={visa ? () => deleteAttachment(CvisaC, visa.id) : undefined}
         />
-        <button type="button" onClick={() => readDetails()} disabled={reading} className="btn btn-gold mt-3">
-          {reading ? "Reading the document…" : "↻ Read details again"}
+        <button type=CbuttonC onClick={() => readDetails()} disabled={reading} className=Cbtn btn-gold mt-3C>
+          {reading ? CReading the document…C : C↻ Read details againC}
         </button>
         {visa?.hasDocument && (
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-            <label className="flex items-center gap-1.5 text-ink-soft">
-              <input type="checkbox" name="removeDocument" className="accent-navy" /> Remove it
+          <div className=Cmt-2 flex flex-wrap items-center gap-3 text-smC>
+            <label className=Cflex items-center gap-1.5 text-ink-softC>
+              <input type=CcheckboxC name=CremoveDocumentC className=Caccent-navyC /> Remove it
             </label>
           </div>
         )}
-        {readMsg.ok && <p className="mt-2 text-sm font-medium text-ok">{readMsg.ok}</p>}
-        {readMsg.error && <p className="mt-2 text-sm font-medium text-danger">{readMsg.error}</p>}
+        {readMsg.ok && <p className=Cmt-2 text-sm font-medium text-okC>{readMsg.ok}</p>}
+        {readMsg.error && <p className=Cmt-2 text-sm font-medium text-dangerC>{readMsg.error}</p>}
       </div>
 
       <VisaPages visaId={visa?.id} pages={visa?.pages} canDelete queued={visa ? undefined : queued} onQueue={setQueued} />
-      {pageMsg && <p className="text-sm font-medium text-navy-2">{pageMsg}</p>}
+      {pageMsg && <p className=Ctext-sm font-medium text-navy-2C>{pageMsg}</p>}
 
       {/* Countries travelled on this visa (Schengen: any number of countries) */}
       {showTravelled && (
-        <div className="rounded-2xl border border-sky-200 bg-sky-50/50 p-4">
-          <span className="field-label">Countries travelled on this visa</span>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className=Crounded-2xl border border-sky-200 bg-sky-50/50 p-4C>
+          <span className=Cfield-labelC>Countries travelled on this visa</span>
+          <div className=Cgrid gap-3 sm:grid-cols-2 lg:grid-cols-3C>
             {travelled.map((t) => (
-              <div key={t.key} className="flex items-center gap-2">
-                <div className="min-w-0 flex-1">
+              <div key={t.key} className=Cflex items-center gap-2C>
+                <div className=Cmin-w-0 flex-1C>
                   <CountrySelect
-                    name="countriesTravelled"
+                    name=CcountriesTravelledC
                     defaultValue={t.code}
                     onChange={(code) => setTravelled((list) => list.map((x) => (x.key === t.key ? { ...x, code } : x)))}
                   />
                 </div>
                 {visitsBy.get(t.code) ? (
-                  <span className="shrink-0 text-[11px] text-ink-soft">
-                    {visitsBy.get(t.code)} visit{visitsBy.get(t.code) === 1 ? "" : "s"}
+                  <span className=Cshrink-0 text-[11px] text-ink-softC>
+                    {visitsBy.get(t.code)} visit{visitsBy.get(t.code) === 1 ? CC : CsC}
                   </span>
                 ) : null}
                 <button
-                  type="button"
-                  aria-label="Remove country"
+                  type=CbuttonC
+                  aria-label=CRemove countryC
                   onClick={() => setTravelled((list) => list.filter((x) => x.key !== t.key))}
-                  className="grid size-8 shrink-0 place-items-center rounded-full text-ink-soft hover:bg-white hover:text-danger"
+                  className=Cgrid size-8 shrink-0 place-items-center rounded-full text-ink-soft hover:bg-white hover:text-dangerC
                 >
                   ×
                 </button>
@@ -271,36 +299,36 @@ export function VisaForm({
             ))}
           </div>
           <button
-            type="button"
-            onClick={() => setTravelled((list) => [...list, { key: Date.now(), code: "" }])}
-            className="mt-3 text-sm font-semibold text-navy-2 hover:underline"
+            type=CbuttonC
+            onClick={() => setTravelled((list) => [...list, { key: Date.now(), code: CC }])}
+            className=Cmt-3 text-sm font-semibold text-navy-2 hover:underlineC
           >
             + Add country
           </button>
-          <p className="mt-1 text-xs text-ink-soft">
+          <p className=Cmt-1 text-xs text-ink-softC>
             Add every country you travelled to on this visa. For a Schengen visa, list each Schengen country visited.
           </p>
         </div>
       )}
 
-      {/* 2. Details */}      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="sm:col-span-2 lg:col-span-1">
-          <span className="field-label">Country *</span>
-          <CountrySelect key={countryKey} name="countryCode" defaultValue={f.countryCode} onChange={(c) => setF((x) => ({ ...x, countryCode: c }))} />
+      {/* 2. Details */}      <div className=Cgrid gap-4 sm:grid-cols-2 lg:grid-cols-3C>
+        <div className=Csm:col-span-2 lg:col-span-1C>
+          <span className=Cfield-labelC>Country *</span>
+          <CountrySelect key={countryKey} name=CcountryCodeC defaultValue={f.countryCode} onChange={(c) => setF((x) => ({ ...x, countryCode: c }))} />
         </div>
         <label>
-          <span className="field-label">Visa type</span>
-          <input name="visaType" list="visa-types" value={f.visaType} onChange={set("visaType")} className="field" placeholder="Tourist, Student…" />
-          <datalist id="visa-types">
+          <span className=Cfield-labelC>Visa type</span>
+          <input name=CvisaTypeC list=Cvisa-typesC value={f.visaType} onChange={set(CvisaTypeC)} className=CfieldC placeholder=CTourist, Student…C />
+          <datalist id=Cvisa-typesC>
             {TYPES.map((t) => (
               <option key={t} value={t} />
             ))}
           </datalist>
         </label>
         <label>
-          <span className="field-label">Visa format</span>
-          <select name="visaFormat" value={f.visaFormat} onChange={set("visaFormat")} className="field">
-            <option value="">—</option>
+          <span className=Cfield-labelC>Visa format</span>
+          <select name=CvisaFormatC value={f.visaFormat} onChange={set(CvisaFormatC)} className=CfieldC>
+            <option value=CC>—</option>
             <option>e-Visa</option>
             <option>Paper visa</option>
             <option>Visa on arrival</option>
@@ -308,21 +336,21 @@ export function VisaForm({
           </select>
         </label>
         <label>
-          <span className="field-label">Visa number</span>
-          <input name="visaNumber" value={f.visaNumber} onChange={set("visaNumber")} className="field font-mono uppercase" />
+          <span className=Cfield-labelC>Visa number</span>
+          <input name=CvisaNumberC value={f.visaNumber} onChange={set(CvisaNumberC)} className=Cfield font-mono uppercaseC />
         </label>
         <label>
-          <span className="field-label">Issue date</span>
-          <DateInput name="issueDate" value={f.issueDate} onChange={set("issueDate")} className="field" />
+          <span className=Cfield-labelC>Issue date</span>
+          <DateInput name=CissueDateC value={f.issueDate} onChange={set(CissueDateC)} className=CfieldC />
         </label>
         <label>
-          <span className="field-label">Expiry date</span>
-          <DateInput name="expiryDate" value={f.expiryDate} onChange={set("expiryDate")} className="field" />
+          <span className=Cfield-labelC>Expiry date</span>
+          <DateInput name=CexpiryDateC value={f.expiryDate} onChange={set(CexpiryDateC)} className=CfieldC />
         </label>
         <label>
-          <span className="field-label">Purpose</span>
-          <select name="purpose" value={f.purpose} onChange={set("purpose")} className="field">
-            <option value="">—</option>
+          <span className=Cfield-labelC>Purpose</span>
+          <select name=CpurposeC value={f.purpose} onChange={set(CpurposeC)} className=CfieldC>
+            <option value=CC>—</option>
             {/* keep a value read from a document even if it isn't in the list */}
             {f.purpose && !PURPOSES.includes(f.purpose) && <option value={f.purpose}>{f.purpose}</option>}
             {PURPOSES.map((p) => (
@@ -331,62 +359,62 @@ export function VisaForm({
           </select>
         </label>
         <label>
-          <span className="field-label">Travel from</span>
-          <DateInput name="travelFrom" value={f.travelFrom} onChange={set("travelFrom")} className="field" />
+          <span className=Cfield-labelC>Travel from</span>
+          <DateInput name=CtravelFromC value={f.travelFrom} onChange={set(CtravelFromC)} className=CfieldC />
         </label>
         <label>
-          <span className="field-label">Travel to</span>
-          <DateInput name="travelTo" value={f.travelTo} onChange={set("travelTo")} className="field" />
+          <span className=Cfield-labelC>Travel to</span>
+          <DateInput name=CtravelToC value={f.travelTo} onChange={set(CtravelToC)} className=CfieldC />
         </label>
         <label>
-          <span className="field-label">Entries</span>
-          <select name="entries" value={f.entries} onChange={set("entries")} className="field">
-            <option value="">—</option>
+          <span className=Cfield-labelC>Entries</span>
+          <select name=CentriesC value={f.entries} onChange={set(CentriesC)} className=CfieldC>
+            <option value=CC>—</option>
             <option>Single</option>
             <option>Double</option>
             <option>Multiple</option>
           </select>
         </label>
         <label>
-          <span className="field-label">Stay (days)</span>
-          <input type="number" min={0} max={3650} name="stayDays" value={f.stayDays} onChange={set("stayDays")} className="field" placeholder="Filled from the travel dates" />
+          <span className=Cfield-labelC>Stay (days)</span>
+          <input type=CnumberC min={0} max={3650} name=CstayDaysC value={f.stayDays} onChange={set(CstayDaysC)} className=CfieldC placeholder=CFilled from the travel datesC />
         </label>
         <label>
-          <span className="field-label">Passport used</span>
-          <input name="passportNumber" list="visa-passports" value={f.passportNumber} onChange={set("passportNumber")} className="field font-mono uppercase" />
-          <datalist id="visa-passports">
+          <span className=Cfield-labelC>Passport used</span>
+          <input name=CpassportNumberC list=Cvisa-passportsC value={f.passportNumber} onChange={set(CpassportNumberC)} className=Cfield font-mono uppercaseC />
+          <datalist id=Cvisa-passportsC>
             {passports.map((p) => (
               <option key={p} value={p} />
             ))}
           </datalist>
         </label>
         <label>
-          <span className="field-label">Issued at</span>
-          <input name="issuedAt" value={f.issuedAt} onChange={set("issuedAt")} className="field" placeholder="Embassy / city" />
+          <span className=Cfield-labelC>Issued at</span>
+          <input name=CissuedAtC value={f.issuedAt} onChange={set(CissuedAtC)} className=CfieldC placeholder=CEmbassy / cityC />
         </label>
         <label>
-          <span className="field-label">Status</span>
-          <select name="status" value={f.status} onChange={set("status")} className="field">
-            <option value="">Automatic (Valid / Expired)</option>
+          <span className=Cfield-labelC>Status</span>
+          <select name=CstatusC value={f.status} onChange={set(CstatusC)} className=CfieldC>
+            <option value=CC>Automatic (Valid / Expired)</option>
             <option>Used</option>
             <option>Cancelled</option>
             <option>Refused</option>
           </select>
         </label>
-        <label className="sm:col-span-2">
-          <span className="field-label">Notes</span>
-          <input name="notes" value={f.notes} onChange={set("notes")} className="field" />
+        <label className=Csm:col-span-2C>
+          <span className=Cfield-labelC>Notes</span>
+          <input name=CnotesC value={f.notes} onChange={set(CnotesC)} className=CfieldC />
         </label>
       </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <SubmitButton pendingText="Saving…">{visa ? "Save visa" : "Add visa"}</SubmitButton>
+      <div className=Cflex flex-wrap items-center gap-3C>
+        <SubmitButton pendingText=CSaving…C>{visa ? CSave visaC : CAdd visaC}</SubmitButton>
         {onDone && (
-          <button type="button" onClick={onDone} className="btn btn-ghost">
+          <button type=CbuttonC onClick={onDone} className=Cbtn btn-ghostC>
             Cancel
           </button>
         )}
-        {state?.error && <p className="text-sm font-medium text-danger">{state.error}</p>}
-        {state?.ok && <p className="text-sm font-medium text-ok">✓ {state.ok}</p>}
+        {state?.error && <p className=Ctext-sm font-medium text-dangerC>{state.error}</p>}
+        {state?.ok && <p className=Ctext-sm font-medium text-okC>✓ {state.ok}</p>}
       </div>
     </form>
   );

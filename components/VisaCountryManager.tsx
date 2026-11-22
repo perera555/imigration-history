@@ -1,14 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { addVisaFromPhoto, deleteVisa } from "@/lib/visa-actions";
+import { useEffect, useRef, useState } from "react";
+import { addVisaFromPhoto, deleteVisa, removeDuplicateVisas } from "@/lib/visa-actions";
 import { prepareUpload } from "@/lib/upload-prep";
 import { countryName, flagSvg, isSchengen } from "@/lib/countries";
 import type { Visa } from "@/lib/data";
 import { VisaForm } from "./VisaForm";
 import { ConfirmButton } from "./SubmitButton";
 import { CountrySearch } from "./CountrySearch";
-import { useToastOn } from "./Toaster";
+import { toast, useToastOn } from "./Toaster";
 import { VisaPdfImport } from "./VisaPdfImport";
 
 type Group = {
@@ -92,6 +92,25 @@ export function VisaCountryManager({
   canDelete: boolean;
 }) {
   const [adding, setAdding] = useState<string | null>(null);
+
+  // Duplicates (same visa twice) are removed automatically, keeping the most complete copy.
+  const cleaned = useRef("");
+  useEffect(() => {
+    const seen = new Set<string>();
+    let dup = false;
+    for (const v of visas) {
+      const digits = (v.visaNumber ?? "").replace(/[^0-9]/g, "").replace(/^0+/, "");
+      const key = digits.length >= 5 ? `n:${digits}` : v.issueDate && v.expiryDate ? `d:${v.countryCode}|${v.issueDate}|${v.expiryDate}` : null;
+      if (key && seen.has(key)) dup = true;
+      if (key) seen.add(key);
+    }
+    const signature = visas.map((v) => v.id).join(",");
+    if (!dup || cleaned.current === signature) return;
+    cleaned.current = signature;
+    removeDuplicateVisas(profileId)
+      .then((r) => r.removed && toast(`${r.removed} duplicate visa${r.removed === 1 ? "" : "s"} removed automatically (you can get ${r.removed === 1 ? "it" : "them"} back from Backup & recovery)`))
+      .catch(() => {});
+  }, [visas, profileId]);
   const [addKey, setAddKey] = useState(0);
 
   // Build sections: Schengen countries together, every other country on its own.

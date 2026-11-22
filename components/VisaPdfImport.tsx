@@ -210,16 +210,24 @@ export function VisaPdfImport({ profileId }: { profileId: string }) {
   const toAdd = items.filter((i) => i.include && !i.result?.ok).length;
 
   return (
-    <div className="mb-5 rounded-2xl border-2 border-dashed border-gold/50 bg-gold/5 p-4 sm:p-5">
-      <div className="flex flex-wrap items-start gap-3">
-        <span className="text-2xl" aria-hidden>
+    // Small bar by default; opens on click, and stays open while pages are being read or reviewed.
+    <details open={!!busy || items.length > 0 || undefined} className="group mb-5 rounded-2xl border-2 border-dashed border-gold/50 bg-gold/5">
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-2.5 [&::-webkit-details-marker]:hidden">
+        <span className="text-lg" aria-hidden>
           📑
         </span>
+        <span className="text-sm font-semibold text-navy">Import visas from a PDF</span>
+        <span className="ml-auto text-xs font-semibold text-navy-2">
+          <span className="group-open:hidden">Open ▾</span>
+          <span className="hidden group-open:inline">Close ▴</span>
+        </span>
+      </summary>
+      <div className="border-t border-gold/30 p-4 sm:p-5">
+      <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-navy">Import visas from a PDF (several visa pages, any countries)</p>
           <p className="text-sm text-ink-soft">
-            Upload one PDF with your visa pages. Every visa is read and filled into its own form below. Check it, then press <b>Add visas</b>: each
-            visa is added to the visa section under its country, with its page saved as the document.
+            Upload one PDF with your visa pages (any countries). Every visa is read and filled into its own form below. Check it, then press
+            <b> Add visas</b>: each visa is added under its country, with its page saved as the document.
           </p>
         </div>
         <button type="button" disabled={!!busy} onClick={() => fileRef.current?.click()} className="btn btn-gold">
@@ -317,6 +325,7 @@ export function VisaPdfImport({ profileId }: { profileId: string }) {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </details>
   );
 }

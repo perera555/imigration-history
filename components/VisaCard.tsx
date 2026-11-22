@@ -26,6 +26,14 @@ export function tripsOnVisa(visa: Visa, trips: Trip[]) {
   );
 }
 
+/** Stay: as saved, or from Travel from → Travel to (both days counted). */
+function stayText(visa: Visa): string | null {
+  if (visa.stayDays) return `${visa.stayDays} days`;
+  if (!visa.travelFrom || !visa.travelTo) return null;
+  const days = Math.round((Date.parse(visa.travelTo) - Date.parse(visa.travelFrom)) / 86_400_000) + 1;
+  return days >= 1 ? `${days} days` : null;
+}
+
 function Item({ label, value, mono, wide }: { label: string; value: React.ReactNode; mono?: boolean; wide?: boolean }) {
   return (
     <div className={wide ? "col-span-2" : ""}>
@@ -85,7 +93,9 @@ export function VisaCard({
           <span className={`inline-block rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${TONE[state.tone]}`}>
             {state.label}
           </span>
-          {state.detail && <p className="mt-1 text-[11px] font-medium text-emerald-700">{state.detail}</p>}
+          {state.detail && (
+            <p className={`mt-1 text-[11px] font-medium ${state.tone === "valid" ? "text-emerald-700" : "text-ink-soft"}`}>{state.detail}</p>
+          )}
         </div>
       </header>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[#e3d6b4] bg-white/40 px-5 py-2.5 text-sm">
@@ -127,7 +137,7 @@ export function VisaCard({
       <dl className="grid grid-cols-2 gap-x-5 gap-y-3 p-5 sm:grid-cols-4">
         <Item label="Visa no." value={visa.visaNumber} mono />
         <Item label="Entries" value={visa.entries} />
-        <Item label="Stay" value={visa.stayDays ? `${visa.stayDays} days` : null} />
+        <Item label="Stay" value={stayText(visa)} />
         <Item label="Passport" value={visa.passportNumber ?? holder?.passportNumber} mono />
         <Item label="Issue date" value={visa.issueDate ? formatDate(visa.issueDate) : null} />
         <Item label="Expiry date" value={visa.expiryDate ? formatDate(visa.expiryDate) : null} />
