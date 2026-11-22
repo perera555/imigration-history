@@ -147,23 +147,35 @@ function parseVisaFields(t: string, holderNationalityCode: string | null): VisaD
   const entriesMap: Record<string, string> = { s: "Single", "1": "Single", single: "Single", d: "Double", "2": "Double", double: "Double", m: "Multiple", multiple: "Multiple" };
   const stay = t.match(/(?:duration of stay|length of stay|period of stay|stay(?: of| up to| period)?|max(?:imum)? stay)\s*[:\-]?\s*(?:of\s*)?(\d{1,3})\s*days?/i)?.[1];
 
+  // Full visa names first: "Student (subclass 500)", "granted you a Visitor (subclass 600) visa".
+  const namedType =
+    // The visa title only (1–4 capitalised words), e.g. "Temporary Skill Shortage (subclass 482)".
+    t.match(/\b((?:[A-Z][a-z'&\-]+\s+){0,3}[A-Z][a-z'&\-]+\s*\(subclass\s*\d{3}\))/)?.[1] ??
+    t.match(/granted you an?\s+([A-Za-z0-9'()&\- ]{3,60}?)\s+visa\b/i)?.[1] ??
+    null;
+
   return {
     countryCode: guessCountry(t, holderNationalityCode),
-    visaType: visaTypeRaw
-      ? visaTypeRaw.trim().replace(/\s+/g, " ")
+    visaType: namedType
+      ? namedType.trim().replace(/\s+/g, " ")
+      : visaTypeRaw && !/^\d+\)?$/.test(visaTypeRaw.trim())
+        ? visaTypeRaw.trim().replace(/\s+/g, " ")
       : /schengen/i.test(t) ? (/type\s*d\b|national visa/i.test(t) ? "Schengen visa (national, type D)" : "Schengen visa (short stay)") : null,
     visaFormat: /\b(e-?visa|electronic visa|evisa|grant notice|visa grant|electronic travel authori[sz]ation|eta\b)/i.test(t)
       ? /electronic travel authori[sz]ation|\beta\b/i.test(t) ? "ETA" : "e-Visa"
       : /visa on arrival/i.test(t) ? "Visa on arrival" : null,
     visaNumber: visaNumber ? visaNumber.toUpperCase() : null,
     issueDate: dateAfter(t, "date of issue|issue date|issued on|date issued|grant date|date of grant|granted on"),
-    expiryDate: dateAfter(t, "date of expiry|expiry date|expiration date|expires on|expires|visa expiry|visa valid until"),
+    expiryDate:
+      dateAfter(t, "date of expiry|expiry date|expiration date|expires on|expires|visa expiry|visa valid until|stay until|length of stay|period of stay until") ??
+      dateAfter(t, "must not arrive after|last date of entry"),
     travelFrom: dateAfter(t, "valid from|travel from|from date|start date|first entry|enter from|period of validity from"),
     travelTo: dateAfter(t, "valid until|valid till|valid to|travel until|travel to|until|end date|must not arrive after|last date of entry|enter before"),
     purpose: t.match(/(?:purpose of (?:visit|travel|entry)|purpose)\s*[:\-]?\s*([A-Za-z &\/-]{3,40}?)(?:\s{2,}|\n|$|\s+(?:visa|date|valid|entr|passport|duration))/i)?.[1]?.trim() ?? null,
     entries: entriesRaw ? entriesMap[entriesRaw.toLowerCase()] ?? null : null,
     stayDays: stay ? Number(stay) : null,
     issuedAt: t.match(/(?:place of issue|issued at|issuing (?:post|office|authority)|issued by)\s*[:\-]?\s*([A-Za-z ,.'-]{3,50}?)(?:\s{2,}|\n|$|\s+(?:date|visa|valid|passport))/i)?.[1]?.trim() ?? null,
-    passportNumber: t.match(/passport\s*(?:no\.?|number|#)\s*[:\-]?\s*([A-Z]{1,2}\d{6,9})/i)?.[1]?.toUpperCase() ?? null,
+    passportNumber:
+      t.match(/passport\s*(?:\((?:or )?other travel\s+document\)\s*)?(?:no\.?|number|#)\s*[:\-]?\s*([A-Z]{1,2}\d{6,9})/i)?.[1]?.toUpperCase() ?? null,
   };
 }

@@ -15,6 +15,8 @@ type Item = {
   id: string;
   page: number;
   image: File;
+  /** File saved as the visa's document (default: the page image). */
+  document?: File;
   preview: string;
   details: VisaDetails;
   /** How the details were found. */
@@ -76,6 +78,37 @@ export function VisaPdfImport({ profileId }: { profileId: string }) {
       const pdf = await getDocumentProxy(new Uint8Array(await file.arrayBuffer()));
       const { text } = await extractText(pdf, { mergePages: false });
       const pages = Math.min(pdf.numPages, 64);
+      const pageTexts = (text as string[]).slice(0, pages).map((t) => String(t ?? ""));
+
+      // An e-visa / grant notice over several pages (details on page 1, number on page 2, conditions…) is ONE visa:
+      // read all pages together and keep the original PDF as its document.
+      if (pages > 1 && pageTexts.every((t) => t.replace(/\s/g, "").length >= 40)) {
+        setBusy("Reading the visa document…");
+        const perPage = await Promise.all(pageTexts.map((t) => readVisaPageText(profileId, t)));
+        const numbers = new Set(perPage.map((d) => d?.visaNumber).filter(Boolean));
+        const countries = new Set(perPage.map((d) => d?.countryCode).filter(Boolean));
+        if (numbers.size <= 1 && countries.size <= 1) {
+          const merged = await readVisaPageText(profileId, pageTexts.join("\n"));
+          if (hasVisaInfo(merged)) {
+            const jpg = (await renderPageAsImage(pdf, 1, { width: 1600, format: "jpeg", quality: 0.88 })) as Uint8Array;
+            const image = new File([new Uint8Array(jpg)], "visa-page-1.jpg", { type: "image/jpeg" });
+            found.push({
+              id: "doc",
+              page: 1,
+              image,
+              document: file.size <= 4_000_000 ? file : undefined,
+              preview: URL.createObjectURL(image),
+              details: { ...EMPTY, ...merged! },
+              source: "text",
+              include: true,
+            });
+            setItems(found);
+            toast(`Visa document read (${pages} pages, one visa). Check it, then press Add visas.`, "ok");
+            return;
+          }
+        }
+      }
+
       for (let n = 1; n <= pages; n++) {
         setBusy(`Page ${n} of ${pages}: reading…`);
         const jpg = (await renderPageAsImage(pdf, n, { width: 1600, format: "jpeg", quality: 0.88 })) as Uint8Array;
@@ -164,7 +197,7 @@ export function VisaPdfImport({ profileId }: { profileId: string }) {
     for (const it of chosen) {
       setBusy(`Adding the visa from page ${it.page}…`);
       const fd = new FormData();
-      fd.append("document", await prepareUpload(it.image));
+      fd.append("document", it.document ?? (await prepareUpload(it.image)));
       const r = await addVisaFromPage(profileId, it.details, fd).catch(() => ({ error: "No answer from the server." }) as { error: string });
       if ("ok" in r && r.ok) {
         added++;
