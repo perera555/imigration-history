@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { startLocalDb, LOCAL_DB_PORT } from "./local-db.mjs";
+import { startLocalDb, portInUse, LOCAL_DB_PORT } from "./local-db.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -19,12 +19,24 @@ function usesLocalDb() {
 }
 
 let stopDb = null;
-if (usesLocalDb()) {
+const local = usesLocalDb();
+async function ensureDb(quiet = false) {
+  if (stopDb) return; // ours is running
   try {
-    stopDb = await startLocalDb();
+    stopDb = await startLocalDb({ quiet });
   } catch (error) {
     console.error("Could not start the local database:", error?.message ?? error);
   }
+}
+if (local) {
+  await ensureDb();
+  // Watchdog: if the database ever stops (e.g. another copy that was running closes), start it again.
+  setInterval(async () => {
+    if (!stopDb && !(await portInUse())) {
+      console.log("Local database stopped — starting it again…");
+      await ensureDb(true);
+    }
+  }, 10_000).unref();
 }
 
 const nextBin = path.join(root, "node_modules", "next", "dist", "bin", "next");
