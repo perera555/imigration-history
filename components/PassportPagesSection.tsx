@@ -147,7 +147,7 @@ export function PassportPagesSection({
                   >
                     {working ? "Uploading…" : doc ? "↻ Replace PDF" : "⬆ Upload passport PDF"}
                   </button>
-                  {doc && canDelete && (
+                  {doc && (
                     <button
                       type="button"
                       disabled={!!busy}

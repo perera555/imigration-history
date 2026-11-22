@@ -53,7 +53,7 @@ async function EditProfile({ params }: { params: PageProps<"/admin/profiles/[id]
       <ProfileEditor profile={profile} trips={trips} visas={visas} canDelete={session.role === "admin"} />
       <PassportPagesSection profileId={profile.id} current={profile.passportNumber} previous={profile.previousPassports} pages={passportPages} documents={passportDocs} canDelete={session.role === "admin"} />
       <StaySection profileId={profile.id} stays={stays} trips={boardingTrips(trips)} canDelete={session.role === "admin"} />
-      <VisaList profileId={profile.id} holder={profile} visas={visas} trips={trips} canViewDocument />
+      <VisaList profileId={profile.id} holder={profile} visas={visas} trips={trips} canViewDocument canDelete={session.role === "admin"} />
       <BoardingPassSection profileId={profile.id} holder={profile.fullName} passes={passes} trips={boardingTrips(trips)} canDelete={session.role === "admin"} />
     </div>
   );

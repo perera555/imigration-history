@@ -5,18 +5,26 @@ import { getDb } from "./db";
 import { saveRestorePoint } from "./backup";
 import { flash } from "./flash";
 import { isUuid } from "./data";
-import { requireAdmin } from "./session";
+import { canAccessProfile, requireAuth } from "./session";
 
 export type AttachmentKind = "visa" | "boarding" | "stay";
 
 /**
  * "🗑 Delete photo": removes only the uploaded photo / document and keeps the visa, boarding pass or
- * hotel stay itself. Admins only (like other deletes); a restore point is saved first.
+ * hotel stay itself. The record's owner or an admin; a restore point is saved first.
  */
 export async function deleteAttachment(kind: AttachmentKind, id: string): Promise<{ ok?: true; error?: string }> {
-  const session = await requireAdmin();
+  const session = await requireAuth();
   if (!isUuid(id)) return { error: "Unknown item." };
   const sql = await getDb();
+  // The record's owner or an admin may remove a file (a restore point is always saved first).
+  const [owner] =
+    kind === "visa"
+      ? await sql<{ profileId: string }[]>`select profile_id from visas where id = ${id}`
+      : kind === "boarding"
+        ? await sql<{ profileId: string }[]>`select profile_id from boarding_passes where id = ${id}`
+        : await sql<{ profileId: string }[]>`select profile_id from stays where id = ${id}`;
+  if (!owner || !canAccessProfile(session, owner.profileId)) return { error: "Not allowed." };
   if (kind === "visa") {
     await saveRestorePoint(sql, { visaId: id }, "Deleted a visa photo / document", session.email);
     await sql`delete from visa_documents where visa_id = ${id}`;

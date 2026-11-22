@@ -6,7 +6,7 @@ import { saveRestorePoint } from "./backup";
 import { flash } from "./flash";
 import { isUuid } from "./data";
 import { isCountryCode, NATIONALITIES } from "./countries";
-import { requireAdmin, requireProfileAccess } from "./session";
+import { canAccessProfile, requireAdmin, requireAuth, requireProfileAccess } from "./session";
 import type { VisaDetails } from "./visa-reader";
 
 const DOC_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
@@ -162,9 +162,12 @@ export async function addVisaFromPage(
 
 /** Removes one extra page (admins only, like other deletes; a restore point is saved first). */
 export async function deleteVisaPage(pageId: string) {
-  const session = await requireAdmin();
+  // The record's owner or an admin (a restore point is saved first).
+  const session = await requireAuth();
   if (!isUuid(pageId)) return;
   const sql = await getDb();
+  const [owner] = await sql<{ profileId: string }[]>`select v.profile_id from visa_pages p join visas v on v.id = p.visa_id where p.id = ${pageId}`;
+  if (!owner || !canAccessProfile(session, owner.profileId)) return;
   await saveRestorePoint(sql, { visaPageId: pageId }, "Deleted a visa page photo", session.email);
   await sql`delete from visa_pages where id = ${pageId}`;
   await flash("Visa page removed successfully");

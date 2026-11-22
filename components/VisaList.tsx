@@ -1,6 +1,20 @@
 import { visaState, type Profile, type Trip, type Visa } from "@/lib/data";
 import Link from "next/link";
 import { VisaCard } from "./VisaCard";
+import { countryName, flagSvg, isSchengen } from "@/lib/countries";
+
+/** Visas grouped by country (Schengen visas together), countries A–Z, newest visa first. */
+function byCountry(visas: Visa[]) {
+  const groups = new Map<string, { key: string; title: string; flag: string; visas: Visa[] }>();
+  for (const v of visas) {
+    const schengen = isSchengen(v.countryCode);
+    const key = schengen ? "schengen" : v.countryCode;
+    const g = groups.get(key) ?? { key, title: schengen ? "Schengen Area" : countryName(v.countryCode), flag: schengen ? "eu" : v.countryCode, visas: [] };
+    g.visas.push(v);
+    groups.set(key, g);
+  }
+  return [...groups.values()].sort((a, b) => a.title.localeCompare(b.title));
+}
 
 /** "Visas" section: totals and one visa card per visa, newest first. */
 export function VisaList({
@@ -11,7 +25,10 @@ export function VisaList({
   canViewDocument = false,
   editPage = "update",
   emptyHint = "No visas recorded yet.",
+  canDelete = false,
 }: {
+  /** Admins: "Delete PDF / photo" on each visa card. */
+  canDelete?: boolean;
   /** Shows "View / Download visas PDF" when given. */
   profileId?: string;
   /** Visa holder (from the travel card), shown on each visa card. */
@@ -68,9 +85,24 @@ export function VisaList({
               </div>
             ))}
           </div>
-          <div className="grid gap-5 lg:grid-cols-2">
-            {visas.map((v) => (
-              <VisaCard key={v.id} visa={v} holder={holder} trips={trips} canViewDocument={canViewDocument} editPage={editPage} />
+          {/* One box per country (Schengen countries together), with every visa for it inside */}
+          <div className="space-y-5">
+            {byCountry(visas).map((g) => (
+              <section key={g.key} className="panel overflow-hidden">
+                <header className="flex flex-wrap items-center gap-3 border-b border-line bg-paper/60 px-5 py-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={flagSvg(g.flag)} alt="" className="h-7 w-10 rounded object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.08)]" />
+                  <h3 className="font-serif text-lg font-bold text-navy">{g.title}</h3>
+                  <span className="ml-auto rounded-full bg-navy px-2.5 py-0.5 text-xs font-semibold text-gold-soft">
+                    {g.visas.length} visa{g.visas.length === 1 ? "" : "s"}
+                  </span>
+                </header>
+                <div className="grid gap-5 p-4 sm:p-5 lg:grid-cols-2">
+                  {g.visas.map((v) => (
+                    <VisaCard key={v.id} visa={v} holder={holder} trips={trips} canViewDocument={canViewDocument} canDelete={canDelete} editPage={editPage} />
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         </>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { countryName, isSchengen } from "@/lib/countries";
 import { formatDate, formatShortDate, visaState, type Profile, type Trip, type Visa } from "@/lib/data";
 import { Flag } from "./Flag";
+import { DeleteAttachmentButton } from "./DeleteAttachmentButton";
 
 const TONE: Record<string, string> = {
   valid: "bg-emerald-600 text-white",
@@ -40,7 +41,10 @@ export function VisaCard({
   trips,
   canViewDocument,
   editPage = "update",
+  canDelete = false,
 }: {
+  /** Admins: "Delete PDF / photo" for the visa's document. */
+  canDelete?: boolean;
   visa: Visa;
   holder?: Profile;
   trips: Trip[];
@@ -152,6 +156,15 @@ export function VisaCard({
             <img src={`/api/visas/${visa.id}/document`} alt="Visa photo" loading="lazy" className="max-h-56 w-full rounded-xl object-contain bg-paper shadow-[0_0_0_1px_rgba(0,0,0,0.08)]" />
           </a>
         )}
+        {/* PDF visa page: shown right on the card */}
+        {canViewDocument && visa.hasDocument && /\.pdf$/i.test(visa.documentName ?? "") && (
+          <iframe
+            src={`/api/visas/${visa.id}/document#toolbar=0&navpanes=0&view=FitH`}
+            title={`${visa.documentName ?? "Visa"} (PDF)`}
+            loading="lazy"
+            className="h-64 w-full rounded-xl border-0 bg-paper shadow-[0_0_0_1px_rgba(0,0,0,0.08)]"
+          />
+        )}
         {canViewDocument && visa.pages?.length > 0 && (
           <div>
             <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-soft">More pages ({visa.pages.length})</p>
@@ -177,6 +190,7 @@ export function VisaCard({
             <a href={`/api/visas/${visa.id}/document?download=1`} className="btn btn-ghost !py-1.5 text-xs">
               Download
             </a>
+            {canDelete && <DeleteAttachmentButton kind="visa" id={visa.id} />}
           </div>
         )}
         <p className="truncate rounded-lg bg-navy/[0.04] px-3 py-1.5 font-mono text-[10px] tracking-[0.2em] text-ink-soft">{mrz}</p>

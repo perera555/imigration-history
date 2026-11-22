@@ -1,80 +1,101 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { addVisaFromPage, readVisaPageText } from "@/lib/visa-actions";
 import { prepareUpload } from "@/lib/upload-prep";
 import { ocrImages } from "@/lib/ocr";
 import { countryName } from "@/lib/countries";
+import type { VisaDetails } from "@/lib/visa-reader";
 import { CountrySelect } from "./CountrySelect";
 import { toast } from "./Toaster";
 
-type Line = { page: number; text: string; ok: boolean };
+type PageItem = {
+  page: number;
+  image: File;
+  preview: string;
+  details: VisaDetails | null;
+  country: string;
+  include: boolean;
+  result?: { ok: boolean; text: string };
+};
+
+const shortDate = (d: string | null) =>
+  d ? new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : null;
 
 /**
- * "Import visas from a PDF": one PDF with several visa pages → one visa per page, with the details read
- * from each page (country, type, number, dates, entries…) and the page saved as that visa's document.
+ * "Import visas from a PDF": one PDF with several visa pages (any countries) → each page is read
+ * (text, or text recognition for scans), shown for review with its country, then saved as its own visa
+ * with the page as its document.
  */
 export function VisaPdfImport({ profileId }: { profileId: string }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [fallback, setFallback] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  const [report, setReport] = useState<Line[]>([]);
+  const [items, setItems] = useState<PageItem[]>([]);
 
-  async function run(file: File | undefined) {
+  // Free the page previews when they are no longer shown.
+  useEffect(() => () => items.forEach((i) => URL.revokeObjectURL(i.preview)), [items]);
+
+  const update = (page: number, patch: Partial<PageItem>) => setItems((list) => list.map((i) => (i.page === page ? { ...i, ...patch } : i)));
+
+  async function read(file: File | undefined) {
     if (!file) return;
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) return toast("Choose a PDF with the visa pages.", "error");
-    setReport([]);
-    const lines: Line[] = [];
+    setItems([]);
+    const found: PageItem[] = [];
     try {
-      setBusy("Reading the PDF…");
+      setBusy("Opening the PDF…");
       const { getDocumentProxy, extractText, renderPageAsImage } = await import("unpdf");
       const pdf = await getDocumentProxy(new Uint8Array(await file.arrayBuffer()));
       const { text } = await extractText(pdf, { mergePages: false });
       const pages = Math.min(pdf.numPages, 64);
       for (let n = 1; n <= pages; n++) {
-        setBusy(`Page ${n} of ${pages}: reading the visa…`);
+        setBusy(`Page ${n} of ${pages}: reading…`);
+        const png = (await renderPageAsImage(pdf, n, { width: 2000, format: "png" })) as Uint8Array;
         let pageText = String((text as string[])[n - 1] ?? "");
-        // Scanned page (no text inside): read it with text recognition.
         if (pageText.replace(/\s/g, "").length < 40) {
+          // Scanned page: text recognition.
           try {
-            const img = (await renderPageAsImage(pdf, n, { width: 2000, format: "png" })) as Uint8Array;
-            const [ocr] = await ocrImages([new Blob([new Uint8Array(img)], { type: "image/png" })], (m) => setBusy(`Page ${n} of ${pages}: ${m}`));
+            const [ocr] = await ocrImages([new Blob([new Uint8Array(png)], { type: "image/png" })], (m) => setBusy(`Page ${n} of ${pages}: ${m}`));
             pageText = ocr ?? "";
           } catch {
             /* keep empty */
           }
         }
         const details = pageText.replace(/\s/g, "").length >= 40 ? await readVisaPageText(profileId, pageText) : null;
-        const found = !!details && !!(details.visaNumber || details.visaType || details.issueDate || details.expiryDate || details.countryCode);
-        const country = details?.countryCode ?? (fallback || null);
-        if (details && !found && !fallback) {
-          lines.push({ page: n, ok: false, text: "No visa details on this page (skipped)." });
-          continue;
-        }
-        if (!country) {
-          lines.push({ page: n, ok: false, text: "Country not found. Choose “Country for unreadable pages” and import again." });
-          continue;
-        }
-        setBusy(`Page ${n} of ${pages}: saving…`);
-        const bytes = (await renderPageAsImage(pdf, n, { width: 1400, format: "jpeg", quality: 0.85 })) as Uint8Array;
-        const image = await prepareUpload(new File([new Uint8Array(bytes)], `visa-page-${n}.jpg`, { type: "image/jpeg" }));
-        const fd = new FormData();
-        fd.append("document", image);
-        const r = await addVisaFromPage(profileId, { ...(details ?? {}), countryCode: country }, fd).catch(() => ({ error: "No answer from the server." }) as { error: string });
-        if ("ok" in r && r.ok) {
-          const what = [countryName(country), details?.visaType, details?.visaNumber].filter(Boolean).join(" · ");
-          lines.push({ page: n, ok: true, text: `${what}${found ? "" : " (scanned page: please fill in the details)"}` });
-        } else lines.push({ page: n, ok: false, text: ("skipped" in r && r.skipped) || ("error" in r && r.error) || "Not added." });
+        const jpg = (await renderPageAsImage(pdf, n, { width: 1400, format: "jpeg", quality: 0.85 })) as Uint8Array;
+        const image = new File([new Uint8Array(jpg)], `visa-page-${n}.jpg`, { type: "image/jpeg" });
+        const looksLikeVisa = !!details && !!(details.visaNumber || details.visaType || details.issueDate || details.expiryDate || details.countryCode);
+        found.push({ page: n, image, preview: URL.createObjectURL(image), details, country: details?.countryCode ?? "", include: looksLikeVisa || !details });
       }
-      const added = lines.filter((l) => l.ok).length;
-      toast(added ? `${added} visa${added === 1 ? "" : "s"} added from the PDF` : "No visas were added from this PDF.", added ? "ok" : "error");
+      setItems(found);
+      toast(`${found.length} page${found.length === 1 ? "" : "s"} read. Check the country for each visa, then press Add visas.`, "info");
     } catch {
       toast("This PDF could not be read. Try another copy.", "error");
     } finally {
-      setReport(lines);
       setBusy(null);
     }
   }
+
+  async function save() {
+    const chosen = items.filter((i) => i.include && !i.result?.ok);
+    const missing = chosen.filter((i) => !i.country);
+    if (missing.length) return toast(`Choose the country for page ${missing.map((m) => m.page).join(", ")}.`, "error");
+    let added = 0;
+    for (const it of chosen) {
+      setBusy(`Saving page ${it.page}…`);
+      const fd = new FormData();
+      fd.append("document", await prepareUpload(it.image));
+      const r = await addVisaFromPage(profileId, { ...(it.details ?? {}), countryCode: it.country }, fd).catch(() => ({ error: "No answer from the server." }) as { error: string });
+      if ("ok" in r && r.ok) {
+        added++;
+        update(it.page, { result: { ok: true, text: `Added as a ${countryName(it.country)} visa` } });
+      } else update(it.page, { result: { ok: false, text: ("skipped" in r && r.skipped) || ("error" in r && r.error) || "Not added" } });
+    }
+    setBusy(null);
+    toast(added ? `${added} visa${added === 1 ? "" : "s"} added — see each country below` : "No visas were added.", added ? "ok" : "error");
+  }
+
+  const toAdd = items.filter((i) => i.include && !i.result?.ok).length;
 
   return (
     <div className="mb-5 rounded-2xl border-2 border-dashed border-gold/50 bg-gold/5 p-4 sm:p-5">
@@ -83,32 +104,54 @@ export function VisaPdfImport({ profileId }: { profileId: string }) {
           📑
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-navy">Import visas from a PDF (several visa pages)</p>
+          <p className="font-semibold text-navy">Import visas from a PDF (several visa pages, any countries)</p>
           <p className="text-sm text-ink-soft">
-            Upload one PDF with all your visa pages. Each page becomes its own visa: the country, type, number, dates and entries are read
-            from the page, and the page is saved as that visa&apos;s document. Visas already in the record are skipped.
+            Upload one PDF with all your visa pages. Every page is read (scans too), then shown below so you can check its country. Each page
+            becomes its own visa under its country, with the page saved as the visa&apos;s document.
           </p>
         </div>
-      </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-        <div>
-          <span className="field-label">Country for unreadable (scanned) pages (optional)</span>
-          <CountrySelect name="importFallbackCountry" defaultValue="" onChange={setFallback} />
-        </div>
         <button type="button" disabled={!!busy} onClick={() => fileRef.current?.click()} className="btn btn-gold">
-          {busy ? "Importing…" : "📑 Choose visa pages PDF"}
+          {busy ? "Working…" : "📑 Choose visa pages PDF"}
         </button>
       </div>
-      <input ref={fileRef} type="file" accept="application/pdf" className="sr-only" onChange={(e) => { run(e.target.files?.[0]); e.target.value = ""; }} />
+      <input ref={fileRef} type="file" accept="application/pdf" className="sr-only" onChange={(e) => { read(e.target.files?.[0]); e.target.value = ""; }} />
       {busy && <p className="mt-3 text-sm font-medium text-navy-2">{busy}</p>}
-      {report.length > 0 && (
-        <ul className="mt-3 space-y-1 rounded-xl bg-white p-3 text-sm">
-          {report.map((l) => (
-            <li key={l.page} className={l.ok ? "text-ok" : "text-ink-soft"}>
-              {l.ok ? "✓" : "–"} Page {l.page}: {l.text}
-            </li>
-          ))}
-        </ul>
+
+      {items.length > 0 && (
+        <div className="mt-4 space-y-3">
+          {items.map((it) => {
+            const d = it.details;
+            const facts = [d?.visaType, d?.visaNumber && `No. ${d.visaNumber}`, d?.entries && `${d.entries} entry`, shortDate(d?.issueDate ?? null) && `Issued ${shortDate(d?.issueDate ?? null)}`, shortDate(d?.expiryDate ?? null) && `Expires ${shortDate(d?.expiryDate ?? null)}`].filter(Boolean);
+            return (
+              <div key={it.page} className={`flex flex-wrap items-start gap-3 rounded-xl border bg-white p-3 ${it.include ? "border-line" : "border-dashed border-line opacity-60"}`}>
+                <a href={it.preview} target="_blank" rel="noopener" className="block h-28 w-20 shrink-0 overflow-hidden rounded-lg bg-paper shadow-[0_0_0_1px_rgba(0,0,0,0.08)]" title="Open this page">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={it.preview} alt={`Page ${it.page}`} className="size-full object-cover" />
+                </a>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-semibold text-navy">
+                    <input type="checkbox" checked={it.include} disabled={!!it.result?.ok} onChange={(e) => update(it.page, { include: e.target.checked })} className="size-4 accent-navy" />
+                    Page {it.page}: add as a visa
+                  </label>
+                  <p className="text-xs text-ink-soft">{facts.length ? facts.join(" · ") : "No details could be read — you can fill them in after adding."}</p>
+                  <div className="max-w-sm">
+                    <CountrySelect key={`${it.page}-${it.country}`} name={`importCountry${it.page}`} defaultValue={it.country} onChange={(c) => update(it.page, { country: c })} />
+                    {!it.country && it.include && <p className="mt-1 text-xs font-medium text-amber-700">Choose the country of this visa.</p>}
+                  </div>
+                  {it.result && <p className={`text-sm font-medium ${it.result.ok ? "text-ok" : "text-danger"}`}>{it.result.ok ? "✓ " : ""}{it.result.text}</p>}
+                </div>
+              </div>
+            );
+          })}
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" disabled={!!busy || toAdd === 0} onClick={save} className="btn btn-primary">
+              ✓ Add {toAdd} visa{toAdd === 1 ? "" : "s"}
+            </button>
+            <button type="button" disabled={!!busy} onClick={() => setItems([])} className="btn btn-ghost">
+              Clear
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

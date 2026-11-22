@@ -257,7 +257,7 @@ function StayForm({
           inputRef={fileRef}
           label="Booking confirmation or photo (optional)"
           saved={stay?.hasFile ? { url: `/api/stays/${stay.id}/file`, name: stay.fileName, image: isImageName(stay.fileName, stay.mime) } : null}
-          onDelete={stay && canDelete ? () => deleteAttachment("stay", stay.id) : undefined}
+          onDelete={stay ? () => deleteAttachment("stay", stay.id) : undefined}
         />
         <button type="button" onClick={readBooking} disabled={reading} className="btn btn-gold mt-3">
           {reading ? "Reading…" : "✨ Read details from booking (PDF)"}

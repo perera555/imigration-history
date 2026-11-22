@@ -148,7 +148,7 @@ export function BoardingPassForm({
           inputRef={fileRef}
           label="Boarding pass photo or PDF"
           saved={pass?.hasFile ? { url: `/api/boarding/${pass.id}/file`, name: pass.fileName, image: isImageName(pass.fileName, pass.mime) } : null}
-          onDelete={pass && canDelete ? () => deleteAttachment("boarding", pass.id) : undefined}
+          onDelete={pass ? () => deleteAttachment("boarding", pass.id) : undefined}
         />
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" onClick={readDetails} disabled={reading} className="btn btn-gold">

@@ -5,7 +5,7 @@ import { getDb } from "./db";
 import { saveRestorePoint } from "./backup";
 import { flash } from "./flash";
 import { isUuid, PASSPORT_PAGES } from "./data";
-import { requireAdmin, requireProfileAccess } from "./session";
+import { canAccessProfile, requireAdmin, requireAuth, requireProfileAccess } from "./session";
 
 const DOC_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -139,13 +139,13 @@ export async function uploadPassportPdfPart(
   return { ok: true };
 }
 
-/** Removes a passport PDF (admins only; a restore point is saved first). */
+/** Removes a passport PDF (the record's owner or an admin; a restore point is saved first). */
 export async function deletePassportPdf(documentId: string) {
-  const session = await requireAdmin();
+  const session = await requireAuth();
   if (!isUuid(documentId)) return;
   const sql = await getDb();
-  const [d] = await sql<{ passportNumber: string }[]>`select passport_number from passport_documents where id = ${documentId}`;
-  if (!d) return;
+  const [d] = await sql<{ passportNumber: string; profileId: string }[]>`select passport_number, profile_id from passport_documents where id = ${documentId}`;
+  if (!d || !canAccessProfile(session, d.profileId)) return;
   await saveRestorePoint(sql, { passportDocumentId: documentId }, `Deleted the PDF of passport ${d.passportNumber}`, session.email);
   await sql`delete from passport_documents where id = ${documentId}`;
   await flash(`Passport ${d.passportNumber} PDF deleted successfully`);

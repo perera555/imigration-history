@@ -188,7 +188,7 @@ export function VisaForm({
           inputRef={fileRef}
           label="Visa photo or document"
           saved={visa?.hasDocument ? { url: `/api/visas/${visa.id}/document`, name: visa.documentName, image: isImageName(visa.documentName) } : null}
-          onDelete={visa && canDeletePages ? () => deleteAttachment("visa", visa.id) : undefined}
+          onDelete={visa ? () => deleteAttachment("visa", visa.id) : undefined}
         />
         <button type="button" onClick={readDetails} disabled={reading} className="btn btn-gold mt-3">
           {reading ? "Reading…" : "Read details from document"}
@@ -204,7 +204,7 @@ export function VisaForm({
         {readMsg.error && <p className="mt-2 text-sm font-medium text-danger">{readMsg.error}</p>}
       </div>
 
-      <VisaPages visaId={visa?.id} pages={visa?.pages} canDelete={canDeletePages} queued={visa ? undefined : queued} onQueue={setQueued} />
+      <VisaPages visaId={visa?.id} pages={visa?.pages} canDelete queued={visa ? undefined : queued} onQueue={setQueued} />
       {pageMsg && <p className="text-sm font-medium text-navy-2">{pageMsg}</p>}
 
       {/* Countries travelled on this visa (Schengen: any number of countries) */}
