@@ -10,7 +10,8 @@ export async function fileToImages(file: File, maxPages = 10): Promise<Blob[]> {
   const pdf = await getDocumentProxy(new Uint8Array(await file.arrayBuffer()));
   const out: Blob[] = [];
   for (let n = 1; n <= Math.min(pdf.numPages, maxPages); n++) {
-    const bytes = (await renderPageAsImage(pdf, n, { width: 2000, format: "png" })) as Uint8Array;
+    // Sharp image: visa stickers are small on a scanned passport page.
+    const bytes = (await renderPageAsImage(pdf, n, { width: 3000, format: "png" })) as Uint8Array;
     out.push(new Blob([new Uint8Array(bytes)], { type: "image/png" }));
   }
   return out;

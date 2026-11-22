@@ -41,9 +41,21 @@ function parseDate(s: string): string | null {
 const DATE = String.raw`(\d{1,2}(?:st|nd|rd|th)?[\s\-/.]+[A-Za-z]{3,9}\.?[\s\-/.,]+\d{4}|[A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4}|\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{4})`;
 
 function dateAfter(text: string, labels: string): string | null {
-  const m = text.match(new RegExp(`(?:${labels})\\s*[:\\-]?\\s*${DATE}`, "i"));
+  // Value right after the label, or (sticker layout) on the line below, after other values.
+  const m =
+    text.match(new RegExp(`(?:${labels})\\s*[:\\-]?\\s*${DATE}`, "i")) ??
+    text.match(new RegExp(`(?:${labels})[^0-9]{0,60}?${DATE}`, "i"));
   return m ? parseDate(m[1]) : null;
 }
+
+/** Sticker layout: labels on one line, values on the next ("TYPE OF VISA … / Tourist …"). */
+function valueBelow(text: string, label: RegExp): string[] {
+  const lines = text.split(/\n/).map((l) => l.trim()).filter(Boolean);
+  const i = lines.findIndex((l) => label.test(l));
+  return i >= 0 && lines[i + 1] ? lines[i + 1].split(/\s+/) : [];
+}
+
+const LABEL_WORDS = /\b(category|entr(?:y|ies)|fee|issue|issued|date|passport|valid|until|remarks|place|surname|sex|birth|nationality)\b/i;
 
 function guessCountry(text: string, exclude: string | null): string | null {
   const lower = text.toLowerCase();
@@ -73,12 +85,16 @@ export async function readVisaPdf(bytes: Uint8Array, holderNationalityCode: stri
 }
 
 /**
- * The machine-readable zone at the bottom of a visa sticker (2 lines of letters, digits and "<"):
- *   V<THASURNAME<<GIVEN<NAMES<<<…
- *   AB1234567<8LKA8503183M2406049<<…   (visa no., nationality, birth date, sex, expiry date)
+ * The machine-readable zone at the bottom of a visa sticker (ICAO 9303 MRV, 2 lines):
+ *   V<THASURNAME<<GIVEN<NAMES<<<…            (V, issuing country, name)
+ *   XX000000<0LKA0001011F3001010012345<<      passport no. (9) + check, nationality (3),
+ *                                              birth date (6) + check, sex, VALID-UNTIL date (6) + check,
+ *                                              then optional data — on Thai visas the visa number's digits.
  * Also works on OCR text, where "<" may come out as "«", "‹" or "K".
  */
-function parseVisaMrz(text: string): { countryCode: string | null; visaNumber: string | null; expiryDate: string | null; passportNumber: string | null } | null {
+function parseVisaMrz(
+  text: string,
+): { countryCode: string | null; visaNumberDigits: string | null; expiryDate: string | null; passportNumber: string | null } | null {
   const lines = text
     .split(/\n/)
     .map((l) =>
@@ -97,8 +113,8 @@ function parseVisaMrz(text: string): { countryCode: string | null; visaNumber: s
   const special: Record<string, string> = { D: "DE", GBR: "GB", UTO: "" };
   const countryCode = (special[state] ?? alpha3ToAlpha2(state) ?? null) || null;
   const l2 = lines[i + 1] ?? "";
-  // Second line: visa no. (9) + check digit + nationality (3) + birth date (6) + check + sex + expiry (6).
-  const m2 = l2.match(/^([A-Z0-9<]{9})[0-9<K]?[A-Z<]{3}(\d{6})[0-9<K]?[MFX<K](\d{6})/);
+  // passport (9) · check · nationality (3) · birth date (6) · check · sex · valid until (6) · check · optional data
+  const m2 = l2.match(/([A-Z0-9<]{9})[0-9<K]([A-Z<]{3})(\d{6})[0-9<K]([MFX<K])(\d{6})[0-9<K]?([A-Z0-9<]*)/);
   const ok = !!m2 && /\d/.test(m2[1]);
   const yymmdd = (s: string, future: boolean) => {
     if (!/^\d{6}$/.test(s)) return null;
@@ -107,12 +123,25 @@ function parseVisaMrz(text: string): { countryCode: string | null; visaNumber: s
     const iso = `${year}-${s.slice(2, 4)}-${s.slice(4, 6)}`;
     return Number.isNaN(Date.parse(iso)) ? null : iso;
   };
+  const optional = ok ? (m2![6].replace(/</g, "").match(/\d{5,}/)?.[0] ?? null) : null;
   return {
     countryCode,
-    visaNumber: ok ? m2![1].replace(/</g, "") || null : null,
-    expiryDate: ok ? yymmdd(m2![3], true) : null,
-    passportNumber: null,
+    passportNumber: ok ? m2![1].replace(/</g, "") || null : null,
+    expiryDate: ok ? yymmdd(m2![5], true) : null,
+    visaNumberDigits: optional,
   };
+}
+
+/** The printed visa number (a letter and 6–8 digits, e.g. "X 0012345"), ideally matching the digits in the MRZ. */
+function printedVisaNumber(text: string, digits: string | null): string | null {
+  const candidates = [...text.toUpperCase().matchAll(/\b([A-Z])\s?(\d{6,8})\b/g)].map((m) => ({ full: `${m[1]}${m[2]}`, digits: m[2] }));
+  if (digits) {
+    const tail = digits.replace(/^0+/, "");
+    const hit = candidates.find((c) => c.digits.endsWith(tail) || tail.endsWith(c.digits.replace(/^0+/, "")));
+    if (hit) return hit.full;
+    return digits;
+  }
+  return null;
 }
 
 /** Visa details from the text of one visa page (or a whole e-visa). Null when there's almost no text. */
@@ -122,12 +151,17 @@ export function parseVisaText(text: string, holderNationalityCode: string | null
   const mrz = parseVisaMrz(String(text));
   const details = parseVisaFields(t, holderNationalityCode);
   if (!mrz) return details;
-  // The machine-readable lines are the most reliable source for country, number and expiry.
+  // The machine-readable lines are the most reliable source for country, passport, valid-until and number.
+  const visaNumber = printedVisaNumber(t, mrz.visaNumberDigits) ?? details.visaNumber;
   return {
     ...details,
     countryCode: mrz.countryCode ?? details.countryCode,
-    visaNumber: mrz.visaNumber ?? details.visaNumber,
+    visaNumber: visaNumber && visaNumber !== mrz.passportNumber ? visaNumber : details.visaNumber,
     expiryDate: mrz.expiryDate ?? details.expiryDate,
+    travelTo: mrz.expiryDate ?? details.travelTo,
+    passportNumber: mrz.passportNumber ?? details.passportNumber,
+    // No issue date printed (e.g. "Valid from" only): use the start of validity.
+    issueDate: details.issueDate ?? details.travelFrom,
   };
 }
 
@@ -143,7 +177,12 @@ function parseVisaFields(t: string, holderNationalityCode: string | null): VisaD
   const entriesRaw =
     t.match(/\b(single|double|multiple)\s*[- ]?\s*entr(?:y|ies)\b/i)?.[1] ??
     t.match(/(?:no\.?\s*of\s*entries|entries|entry)\s*[:\-]?\s*(single|double|multiple|1|2|m|s|d)\b/i)?.[1] ??
+    // Sticker: "NO OF ENTRY" label with "S" / "SINGLE" on the line below.
+    valueBelow(t, /no\.?\s*of\s*entr/i).find((w) => /^(single|double|multiple|s|d|m)$/i.test(w)) ??
+    t.match(/\b(single|multiple)\b/i)?.[1] ??
     null;
+  // Sticker: "TYPE OF VISA" label with "Tourist" below (also from category "TR").
+  const typeBelow = valueBelow(t, /type of visa/i).find((w) => /^[A-Za-z][A-Za-z\-]{3,}$/.test(w) && !LABEL_WORDS.test(w));
   const entriesMap: Record<string, string> = { s: "Single", "1": "Single", single: "Single", d: "Double", "2": "Double", double: "Double", m: "Multiple", multiple: "Multiple" };
   const stay = t.match(/(?:duration of stay|length of stay|period of stay|stay(?: of| up to| period)?|max(?:imum)? stay)\s*[:\-]?\s*(?:of\s*)?(\d{1,3})\s*days?/i)?.[1];
 
@@ -158,7 +197,9 @@ function parseVisaFields(t: string, holderNationalityCode: string | null): VisaD
     countryCode: guessCountry(t, holderNationalityCode),
     visaType: namedType
       ? namedType.trim().replace(/\s+/g, " ")
-      : visaTypeRaw && !/^\d+\)?$/.test(visaTypeRaw.trim())
+      : typeBelow
+        ? typeBelow.charAt(0).toUpperCase() + typeBelow.slice(1).toLowerCase()
+        : visaTypeRaw && !/^\d+\)?$/.test(visaTypeRaw.trim()) && !LABEL_WORDS.test(visaTypeRaw)
         ? visaTypeRaw.trim().replace(/\s+/g, " ")
       : /schengen/i.test(t) ? (/type\s*d\b|national visa/i.test(t) ? "Schengen visa (national, type D)" : "Schengen visa (short stay)") : null,
     visaFormat: /\b(e-?visa|electronic visa|evisa|grant notice|visa grant|electronic travel authori[sz]ation|eta\b)/i.test(t)
@@ -168,7 +209,7 @@ function parseVisaFields(t: string, holderNationalityCode: string | null): VisaD
     issueDate: dateAfter(t, "date of issue|issue date|issued on|date issued|grant date|date of grant|granted on"),
     expiryDate:
       dateAfter(t, "date of expiry|expiry date|expiration date|expires on|expires|visa expiry|visa valid until|stay until|length of stay|period of stay until") ??
-      dateAfter(t, "must not arrive after|last date of entry"),
+      dateAfter(t, "must not arrive after|last date of entry|enter before"),
     travelFrom: dateAfter(t, "valid from|travel from|from date|start date|first entry|enter from|period of validity from"),
     travelTo: dateAfter(t, "valid until|valid till|valid to|travel until|travel to|until|end date|must not arrive after|last date of entry|enter before"),
     purpose: t.match(/(?:purpose of (?:visit|travel|entry)|purpose)\s*[:\-]?\s*([A-Za-z &\/-]{3,40}?)(?:\s{2,}|\n|$|\s+(?:visa|date|valid|entr|passport|duration))/i)?.[1]?.trim() ?? null,
