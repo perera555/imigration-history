@@ -424,6 +424,11 @@ export function formatShortDate(value: string | null): string {
   });
 }
 
+/** Just what a visit needs to list its hotel bookings (name, document). */
+export function visitStays(stays: Stay[]): { id: string; tripId: string | null; name: string; hasFile: boolean; fileName: string | null }[] {
+  return stays.map((s) => ({ id: s.id, tripId: s.tripId, name: s.name, hasFile: s.hasFile, fileName: s.fileName }));
+}
+
 /** Trip choices for linking a boarding pass or stay, e.g. "Thailand · 10 Dec 2013 → 12 Dec 2013". */
 export function boardingTrips(
   trips: Trip[],

@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { readDocument, type ExtractState, type ImportProfile, type ImportTrip } from "@/lib/actions";
 import { RecordForm } from "./RecordForm";
+import type { VisitStay } from "./VisitBookings";
 import { SubmitButton } from "./SubmitButton";
 
 const tripKey = (t: ImportTrip) => `${t.countryCode}|${t.departureDate}|${t.returnDate ?? ""}`;
@@ -17,9 +18,11 @@ export function UpdateRecordForm({
   formKey,
   initialProfile,
   initialTrips,
+  stays,
 }: {
   updateId: string;
   formKey: string;
+  stays?: VisitStay[];
   initialProfile: ImportProfile;
   initialTrips: ImportTrip[];
 }) {
@@ -92,6 +95,7 @@ export function UpdateRecordForm({
         key={filled ? `filled-${filled.n}` : formKey}
         target={updateId}
         updateId={updateId}
+        stays={stays}
         saveLabel="Save / Update record"
         initialProfile={filled?.profile ?? initialProfile}
         initialTrips={filled?.trips ?? initialTrips}

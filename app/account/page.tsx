@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { requireAuth } from "@/lib/session";
-import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, getPassportPages, getPassportDocuments, boardingTrips, travelStats } from "@/lib/data";
+import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, getPassportPages, getPassportDocuments, boardingTrips, travelStats, visitStays } from "@/lib/data";
 import { PassportPagesSection } from "@/components/PassportPagesSection";
 import { DocumentsPanel } from "@/components/DocumentsPanel";
 import { LiveRefresh } from "@/components/LiveRefresh";
@@ -85,7 +85,7 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
             <DocumentsPanel profileId={profile.id} />
             <StatsBar stats={travelStats(trips)} />
           </section>
-          <ProfileEditor profile={profile} trips={trips} visas={visas} canDelete={false} />
+          <ProfileEditor profile={profile} trips={trips} visas={visas} stays={visitStays(stays)} canDelete={false} />
           <PassportPagesSection profileId={profile.id} current={profile.passportNumber} previous={profile.previousPassports} pages={passportPages} documents={passportDocs} canDelete={false} />
           <section className="space-y-4">
             <div>

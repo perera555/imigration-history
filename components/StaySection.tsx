@@ -295,6 +295,17 @@ export function StaySection({
 }) {
   const [editing, setEditing] = useState<string | null>(null); // stay id, "new" or "new:<tripId>"
   const [saved, setSaved] = useState("");
+  // "+ Add hotel booking" on a visit in the immigration record: open the form for that visit here.
+  useEffect(() => {
+    const open = (e: Event) => {
+      const { tripId, stayId } = (e as CustomEvent<{ tripId?: string; stayId?: string }>).detail ?? {};
+      setEditing(stayId ?? (tripId ? `new:${tripId}` : "new"));
+      setSaved("");
+      setTimeout(() => (document.getElementById(stayId ? `stay-${stayId}` : "stays") ?? document.getElementById("stays"))?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    };
+    window.addEventListener("open-stay", open);
+    return () => window.removeEventListener("open-stay", open);
+  }, []);
   const tripLabel = (id: string | null) => trips.find((t) => t.id === id)?.label;
 
   // Hotels typed in the immigration record ("Where you stayed") that have no full stay yet: listed automatically.
@@ -322,7 +333,7 @@ export function StaySection({
   const card = (s: Stay) => {
     const nights = stayNights(s);
     return (
-      <article key={s.id} className="rounded-2xl border border-line bg-white p-4">
+      <article key={s.id} id={`stay-${s.id}`} className="scroll-mt-24 rounded-2xl border border-line bg-white p-4">
         <div className="flex items-start gap-3">
           <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-navy text-xl" aria-hidden>
             {STAY_ICON[s.kind] ?? "📍"}
@@ -369,9 +380,14 @@ export function StaySection({
             </a>
           )}
           {s.hasFile && (
-            <a href={`/api/stays/${s.id}/file`} target="_blank" rel="noopener" className="btn btn-ghost !px-3 !py-1.5 text-xs">
-              📄 Confirmation
-            </a>
+            <>
+              <a href={`/api/stays/${s.id}/file`} target="_blank" rel="noopener" className="btn btn-ghost !px-3 !py-1.5 text-xs">
+                👁 View booking
+              </a>
+              <a href={`/api/stays/${s.id}/file?download=1`} className="btn btn-ghost !px-3 !py-1.5 text-xs">
+                ⬇ Download
+              </a>
+            </>
           )}
           <button type="button" onClick={() => setEditing(editing === s.id ? null : s.id)} className="btn btn-primary !px-3 !py-1.5 text-xs">
             {editing === s.id ? "Close" : "✏️ Update"}

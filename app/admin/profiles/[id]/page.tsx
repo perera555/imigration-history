@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireProfileAccess } from "@/lib/session";
-import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, getPassportPages, getPassportDocuments, boardingTrips } from "@/lib/data";
+import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, getPassportPages, getPassportDocuments, boardingTrips, visitStays } from "@/lib/data";
 import { PassportPagesSection } from "@/components/PassportPagesSection";
 import { DocumentsPanel } from "@/components/DocumentsPanel";
 import { LiveRefresh } from "@/components/LiveRefresh";
@@ -50,7 +50,7 @@ async function EditProfile({ params }: { params: PageProps<"/admin/profiles/[id]
       <h1 className="font-serif text-3xl font-bold text-navy">{profile.fullName}</h1>
       <DocumentsPanel profileId={profile.id} />
       <LiveRefresh profileId={profile.id} />
-      <ProfileEditor profile={profile} trips={trips} visas={visas} canDelete={session.role === "admin"} />
+      <ProfileEditor profile={profile} trips={trips} visas={visas} stays={visitStays(stays)} canDelete={session.role === "admin"} />
       <PassportPagesSection profileId={profile.id} current={profile.passportNumber} previous={profile.previousPassports} pages={passportPages} documents={passportDocs} canDelete={session.role === "admin"} />
       <StaySection profileId={profile.id} stays={stays} trips={boardingTrips(trips)} canDelete={session.role === "admin"} />
       <VisaList profileId={profile.id} holder={profile} visas={visas} trips={trips} canViewDocument canDelete={session.role === "admin"} />

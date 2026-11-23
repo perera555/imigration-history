@@ -10,17 +10,21 @@ import { EMPTY_PROFILE } from "@/lib/record";
 import { Flag } from "./Flag";
 import { ConfirmButton } from "./SubmitButton";
 import { CountrySearch } from "./CountrySearch";
+import { VisitBookings, type VisitStay } from "./VisitBookings";
 
 /** One page with everything for an existing record: card details, add trip, recorded trips. */
 export function ProfileEditor({
   profile,
   trips,
   visas = [],
+  stays = [],
   canDelete = true,
 }: {
   profile: Profile;
   trips: Trip[];
   visas?: Visa[];
+  /** Hotel / Airbnb stays, shown with their booking documents under each visit. */
+  stays?: VisitStay[];
   /** Users and admins can add and update; only admins can delete. */
   canDelete?: boolean;
 }) {
@@ -92,6 +96,9 @@ export function ProfileEditor({
                   {tripDuration(trip) && ` · ${tripDuration(trip)}`} · {trip.purpose || "—"}
                   {trip.passportNumber && <span className="font-mono"> · {trip.passportNumber}</span>}
                 </p>
+                <div className="mt-1.5">
+                  <VisitBookings tripId={trip.id} stays={stays} />
+                </div>
               </div>
               <Link href={`/admin/trips/${trip.id}`} className="btn btn-ghost !py-1.5">
                 Edit

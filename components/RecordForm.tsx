@@ -4,6 +4,7 @@ import { DateInput } from "./DateInput";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { CityInput } from "./CityInput";
 import { HotelInput } from "./HotelInput";
+import { VisitBookings, type VisitStay } from "./VisitBookings";
 import { useRouter } from "next/navigation";
 import { saveImport, updateRecord, type ImportProfile, type ImportTrip } from "@/lib/actions";
 import { CountrySelect } from "./CountrySelect";
@@ -185,7 +186,10 @@ export function RecordForm({
   stayOnPage = false,
   updateId,
   afterUpdateHref,
+  stays = [],
 }: {
+  /** Hotel stays with booking documents, shown under each saved visit. */
+  stays?: VisitStay[];
   /** Update mode: replace this record (card + all visits) with the form contents. */
   updateId?: string;
   afterUpdateHref?: string;
@@ -657,6 +661,14 @@ export function RecordForm({
                             <span className={lbl}>📝 Notes</span>
                             <input value={v.notes} onChange={(e) => setVisit(b.key, v.key, { notes: e.target.value })} className="field !py-2" />
                           </label>
+                        </div>
+                        {/* Hotel reservation documents of this visit (several hotels per visit) */}
+                        <div className="mt-4">
+                          {v.id || Object.values(v.ids ?? {})[0] ? (
+                            <VisitBookings tripId={(v.id || Object.values(v.ids ?? {})[0])!} stays={stays} />
+                          ) : (
+                            <p className="text-xs text-ink-soft">🧾 Save this visit first, then add its hotel booking documents here.</p>
+                          )}
                         </div>
                         </div>
                       </details>

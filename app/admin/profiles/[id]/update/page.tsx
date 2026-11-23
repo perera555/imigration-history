@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { requireProfileAccess } from "@/lib/session";
-import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, getPassportPages, getPassportDocuments, boardingTrips, groupByCountry } from "@/lib/data";
+import { getProfile, getTrips, getVisas, getBoardingPasses, getStays, getPassportPages, getPassportDocuments, boardingTrips, groupByCountry, visitStays } from "@/lib/data";
 import { PassportPagesSection } from "@/components/PassportPagesSection";
 import { StaySection } from "@/components/StaySection";
 import { VisaCountryManager } from "@/components/VisaCountryManager";
@@ -86,6 +86,7 @@ async function UpdateRecord({
         // Remount with fresh database data after every save.
         formKey={`${profile.updatedAt.toISOString()}-${trips.length}-${trips.map((t) => t.id).join(",").length}`}
         updateId={id}
+        stays={visitStays(stays)}
         initialProfile={{
           fullName: profile.fullName,
           dateOfBirth: profile.dateOfBirth,
