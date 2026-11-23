@@ -97,7 +97,15 @@ export function ProfileEditor({
                   {trip.passportNumber && <span className="font-mono"> · {trip.passportNumber}</span>}
                 </p>
                 <div className="mt-1.5">
-                  <VisitBookings tripId={trip.id} stays={stays} />
+                  <VisitBookings
+                    tripId={trip.id}
+                    stays={stays}
+                    profileId={profile.id}
+                    countryCode={trip.countryCode}
+                    city={trip.city ?? ""}
+                    checkIn={trip.departureDate ?? ""}
+                    checkOut={trip.returnDate ?? ""}
+                  />
                 </div>
               </div>
               <Link href={`/admin/trips/${trip.id}`} className="btn btn-ghost !py-1.5">

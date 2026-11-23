@@ -665,7 +665,15 @@ export function RecordForm({
                         {/* Hotel reservation documents of this visit (several hotels per visit) */}
                         <div className="mt-4">
                           {v.id || Object.values(v.ids ?? {})[0] ? (
-                            <VisitBookings tripId={(v.id || Object.values(v.ids ?? {})[0])!} stays={stays} />
+                            <VisitBookings
+                              tripId={(v.id || Object.values(v.ids ?? {})[0])!}
+                              stays={stays}
+                              profileId={recordId}
+                              countryCode={b.countryCode || (b.codes ?? [])[0]?.code || ""}
+                              city={v.city ?? ""}
+                              checkIn={v.departureDate}
+                              checkOut={v.returnDate}
+                            />
                           ) : (
                             <p className="text-xs text-ink-soft">🧾 Save this visit first, then add its hotel booking documents here.</p>
                           )}
