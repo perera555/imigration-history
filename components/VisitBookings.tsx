@@ -8,7 +8,16 @@ import { HotelInput } from "./HotelInput";
 import { useToastOn } from "./Toaster";
 
 /** A visit's hotel / Airbnb stays with their booking documents (from the "Hotels & Airbnb" section). */
-export type VisitStay = { id: string; tripId: string | null; name: string; hasFile: boolean; fileName: string | null };
+export type VisitStay = {
+  id: string;
+  tripId: string | null;
+  name: string;
+  hasFile: boolean;
+  fileName: string | null;
+  address?: string | null;
+  checkIn?: string | null;
+  checkOut?: string | null;
+};
 
 /** Opens an existing stay in the "Hotels & Airbnb" section on this page. */
 function openStay(detail: { tripId?: string; stayId?: string }) {
@@ -111,7 +120,10 @@ export function VisitBookings({
   city = "",
   checkIn = "",
   checkOut = "",
+  documentsOnly = false,
 }: {
+  /** In the visit form the hotels are typed above, so only their booking documents are listed here. */
+  documentsOnly?: boolean;
   tripId: string;
   stays: VisitStay[];
   profileId?: string | null;
@@ -125,7 +137,7 @@ export function VisitBookings({
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="font-semibold uppercase tracking-[0.12em] text-ink-soft">🧾 Hotel bookings</span>
+        <span className="font-semibold uppercase tracking-[0.12em] text-ink-soft">{documentsOnly ? "🧾 Booking documents" : "🧾 Hotel bookings"}</span>
         {mine.map((s, i) => (
           <span key={s.id} className="inline-flex items-center gap-1 rounded-full border border-line bg-white py-0.5 pl-3 pr-1">
             <button type="button" onClick={() => openStay({ stayId: s.id })} className="font-medium text-navy hover:underline" title="Open this stay">
@@ -147,7 +159,8 @@ export function VisitBookings({
             )}
           </span>
         ))}
-        {!adding && (
+        {documentsOnly && !mine.length && <span className="text-ink-soft">Save the hotels above first, then add their booking documents here.</span>}
+        {!adding && !documentsOnly && (
           <button
             type="button"
             onClick={() => (profileId ? setAdding(true) : openStay({ tripId }))}

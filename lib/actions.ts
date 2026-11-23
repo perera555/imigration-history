@@ -400,7 +400,13 @@ export type ImportTrip = {
   /** Hotel / Airbnb home stayed on this visit, e.g. "PJ Watergate". */
   stayedAt?: string | null;
   stayedAddress?: string | null;
+  /**
+   * Every hotel of this visit with its own dates (e.g. Hotel A 19–21, Hotel B 21–24). Saved as the visit's
+   * stays. Absent = leave the visit's stays as they are.
+   */
+  hotels?: VisitHotel[];
 };
+export type VisitHotel = { stayId?: string | null; name: string; address?: string | null; checkIn?: string | null; checkOut?: string | null };
 export type ImportProfile = {
   fullName: string | null;
   dateOfBirth: string | null;
@@ -492,6 +498,46 @@ function cleanTrip(t: ImportTrip): { error: string } | { values: ImportTrip } {
   };
 }
 
+/** A visit's hotel rows, cleaned (name required; dates must be real dates). */
+function cleanHotels(list: VisitHotel[] | undefined): VisitHotel[] | undefined {
+  if (!Array.isArray(list)) return undefined;
+  const s = (v: unknown, max: number) => (v ? String(v).trim().slice(0, max) || null : null);
+  const d = (v: unknown) => (typeof v === "string" && isDate(v) ? v : null);
+  return list
+    .slice(0, 30)
+    .map((h) => ({ stayId: h.stayId && isUuid(h.stayId) ? h.stayId : null, name: s(h.name, 160) ?? "", address: s(h.address, 300), checkIn: d(h.checkIn), checkOut: d(h.checkOut) }))
+    .filter((h) => h.name);
+}
+
+/**
+ * Saves a visit's hotels as its stays: updates the ones already saved, adds new ones, and removes
+ * stays taken out of the form (only those without a booking document, so no document is ever lost).
+ */
+async function syncVisitHotels(
+  tx: Awaited<ReturnType<typeof getDb>>,
+  profileId: string,
+  tripId: string,
+  trip: { countryCode: string; city: string | null },
+  hotels: VisitHotel[],
+) {
+  const saved = await tx<{ id: string; hasFile: boolean }[]>`
+    select id, data is not null as has_file from stays where profile_id = ${profileId} and trip_id = ${tripId}`;
+  const ids = new Set(saved.map((x) => x.id));
+  const kept = new Set<string>();
+  for (const h of hotels) {
+    const checkOut = h.checkIn && h.checkOut && h.checkOut < h.checkIn ? null : h.checkOut ?? null;
+    const values = { name: h.name, address: h.address ?? null, checkIn: h.checkIn ?? null, checkOut };
+    if (h.stayId && ids.has(h.stayId)) {
+      kept.add(h.stayId);
+      await tx`update stays set ${tx(values)}, updated_at = now() where id = ${h.stayId}`;
+    } else {
+      await tx`insert into stays ${tx({ ...values, profileId, tripId, kind: "Hotel", countryCode: trip.countryCode, city: trip.city })}`;
+    }
+  }
+  const drop = saved.filter((x) => !kept.has(x.id) && !x.hasFile).map((x) => x.id);
+  if (drop.length) await tx`delete from stays where id in ${tx(drop)}`;
+}
+
 function profileValuesFrom(p: ImportProfile) {
   const s = (v: unknown, max: number) => (v ? String(v).trim().slice(0, max) || null : null);
   const dob = s(p.dateOfBirth, 10);
@@ -554,7 +600,7 @@ export async function updateRecord(
       continue;
     }
     seen.add(key);
-    trips.push({ ...cleaned.values, id: trip.id && isUuid(trip.id) ? trip.id : null });
+    trips.push({ ...cleaned.values, id: trip.id && isUuid(trip.id) ? trip.id : null, hotels: cleanHotels(trip.hotels) });
   }
 
   const sql = await getDb();
@@ -587,9 +633,11 @@ export async function updateRecord(
     const keep = trips.filter((t) => t.id && existing.has(t.id)).map((t) => t.id!);
     if (keep.length) await tx`delete from trips where profile_id = ${profileId} and id not in ${tx(keep)}`;
     else await tx`delete from trips where profile_id = ${profileId}`;
-    for (const { id, ...t } of trips) {
+    for (const { id, hotels, ...t } of trips) {
+      let tripId = id;
       if (id && existing.has(id)) await tx`update trips set ${tx(t)} where id = ${id} and profile_id = ${profileId}`;
-      else await tx`insert into trips ${tx({ ...t, profileId })}`;
+      else [{ id: tripId }] = await tx<{ id: string }[]>`insert into trips ${tx({ ...t, profileId })} returning id`;
+      if (hotels && tripId) await syncVisitHotels(tx as never, profileId, tripId, t, hotels);
     }
   });
   await flash(
@@ -612,7 +660,7 @@ export async function saveImport(
   for (const trip of payload.trips.slice(0, 500)) {
     const cleaned = cleanTrip(trip);
     if ("error" in cleaned) return { error: cleaned.error };
-    trips.push(cleaned.values);
+    trips.push({ ...cleaned.values, hotels: cleanHotels(trip.hotels) });
   }
   const profileValues = profileValuesFrom(payload.profile);
 
@@ -654,7 +702,12 @@ export async function saveImport(
     return { error: "This document is already added. All these visits are already in the record, so nothing was added again." };
   }
   if (fresh.length) {
-    await sql`insert into trips ${sql(fresh.map((t) => ({ ...t, profileId })))}`;
+    await sql.begin(async (tx) => {
+      for (const { hotels, ...t } of fresh) {
+        const [{ id }] = await tx<{ id: string }[]>`insert into trips ${tx({ ...t, profileId })} returning id`;
+        if (hotels?.length) await syncVisitHotels(tx as never, profileId, id, t, hotels);
+      }
+    });
   }
   await flash(`Record saved successfully${fresh.length ? ` (${fresh.length} visit${fresh.length === 1 ? "" : "s"} added)` : ""}`);
   return { profileId, added: fresh.length, skipped };

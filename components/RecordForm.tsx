@@ -32,10 +32,14 @@ type Visit = {
   notes: string;
   /** City of this visit (each visit to the same country can be in a different city). */
   city?: string;
-  /** Hotel / Airbnb home stayed on this visit. */
+  /** Hotel / Airbnb home stayed on this visit (the first hotel). */
   stayedAt?: string;
   stayedAddress?: string;
+  /** Every hotel of this visit with its own dates, e.g. Hotel A 19–21, Hotel B 21–24. */
+  hotels?: HotelRow[];
 };
+type HotelRow = { key: number; stayId?: string | null; name: string; address: string; checkIn: string; checkOut: string };
+const emptyHotel = (): HotelRow => ({ key: nextKey(), name: "", address: "", checkIn: "", checkOut: "" });
 type CountryBlock = {
   key: number;
   countryCode: string;
@@ -50,7 +54,7 @@ type CountryBlock = {
 // Initial rows use fixed keys (see toBlocks) so server and browser HTML match.
 let seq = 1_000_000;
 const nextKey = () => seq++;
-const emptyVisit = (): Visit => ({ key: nextKey(), departureDate: "", returnDate: "", purpose: "", passportNumber: "", notes: "" });
+const emptyVisit = (): Visit => ({ key: nextKey(), departureDate: "", returnDate: "", purpose: "", passportNumber: "", notes: "", hotels: [emptyHotel()] });
 const emptyCountry = (): CountryBlock => ({ key: nextKey(), countryCode: "", city: "", visits: [emptyVisit()] });
 const emptySchengen = (): CountryBlock => ({
   key: nextKey(),
@@ -66,9 +70,19 @@ const emptySchengen = (): CountryBlock => ({
  * Schengen countries visited on the same dates, which become one Schengen block
  * (e.g. Netherlands + Belgium + France, 14–21 Feb 2018).
  */
-function toBlocks(trips: ImportTrip[]): CountryBlock[] {
+function toBlocks(trips: ImportTrip[], stays: VisitStay[] = []): CountryBlock[] {
   let k = 0;
   const key = () => ++k; // deterministic keys for the first render
+  /** A saved visit's hotels: its stays (with their dates), else the hotel typed on the visit, else one empty row. */
+  const hotelsOf = (t: ImportTrip, tripIds: string[]): HotelRow[] => {
+    const mine = stays
+      .filter((s) => s.tripId && tripIds.includes(s.tripId))
+      .sort((a, b) => (a.checkIn ?? "9999").localeCompare(b.checkIn ?? "9999"))
+      .map((s) => ({ key: key(), stayId: s.id, name: s.name, address: s.address ?? "", checkIn: s.checkIn ?? "", checkOut: s.checkOut ?? "" }));
+    if (mine.length) return mine;
+    if (t.stayedAt) return [{ key: key(), name: t.stayedAt, address: t.stayedAddress ?? "", checkIn: "", checkOut: "" }];
+    return [{ key: key(), name: "", address: "", checkIn: "", checkOut: "" }];
+  };
   const sorted = [...trips].sort((a, b) => (a.departureDate || "").localeCompare(b.departureDate || ""));
 
   // Schengen trips grouped by their dates: which countries, and each country's trip id.
@@ -109,7 +123,7 @@ function toBlocks(trips: ImportTrip[]): CountryBlock[] {
         block = { key: key(), countryCode: "", city: "", schengen: true, codes: g.codes.map((code) => ({ key: key(), code })), visits: [] };
         blocks.set(id, block);
       }
-      block.visits.push(visit({ id: null, ids: g.ids }));
+      block.visits.push(visit({ id: null, ids: g.ids, hotels: hotelsOf(t, Object.values(g.ids)) }));
       continue;
     }
     // One section per country; each visit keeps its own city.
@@ -119,11 +133,18 @@ function toBlocks(trips: ImportTrip[]): CountryBlock[] {
       block = { key: key(), countryCode: t.countryCode, city: "", visits: [] };
       blocks.set(id, block);
     }
-    block.visits.push(visit({}));
+    block.visits.push(visit({ hotels: hotelsOf(t, t.id ? [t.id] : []) }));
   }
   return blocks.size
     ? [...blocks.values()]
-    : [{ key: key(), countryCode: "", city: "", visits: [{ key: key(), departureDate: "", returnDate: "", purpose: "", passportNumber: "", notes: "" }] }];
+    : [
+        {
+          key: key(),
+          countryCode: "",
+          city: "",
+          visits: [{ key: key(), departureDate: "", returnDate: "", purpose: "", passportNumber: "", notes: "", hotels: [{ key: key(), name: "", address: "", checkIn: "", checkOut: "" }] }],
+        },
+      ];
 }
 
 /** Turns the form blocks into trips; a Schengen visit becomes one trip per Schengen country. */
@@ -132,12 +153,16 @@ function collectTrips(blocks: CountryBlock[]): { trips: ImportTrip[] } | { error
   for (const b of blocks) {
     const codes = b.schengen ? [...new Set((b.codes ?? []).map((c) => c.code).filter(Boolean))] : [b.countryCode];
     for (const v of b.visits) {
-      const empty = !v.departureDate && !v.returnDate && !v.purpose && !v.passportNumber && !v.notes && !v.city && !v.stayedAt && !v.stayedAddress;
+      const hotels = (v.hotels ?? []).filter((h) => h.name.trim());
+      const empty = !v.departureDate && !v.returnDate && !v.purpose && !v.passportNumber && !v.notes && !v.city && !hotels.length;
       if (empty) continue;
       if (b.schengen && !codes.length) return { error: "Add the Schengen countries you travelled to." };
       if (!b.schengen && !b.countryCode) return { error: "Choose a country for every section that has visits." };
       if (!v.departureDate) return { error: "Every visit needs a departure date." };
-      for (const code of codes) {
+      for (const h of hotels) {
+        if (h.checkIn && h.checkOut && h.checkOut < h.checkIn) return { error: `${h.name}: the "to" date is before the "from" date.` };
+      }
+      for (const [i, code] of codes.entries()) {
         trips.push({
           id: b.schengen ? (v.ids?.[code] ?? null) : (v.id ?? null),
           countryCode: code,
@@ -147,8 +172,14 @@ function collectTrips(blocks: CountryBlock[]): { trips: ImportTrip[] } | { error
           purpose: v.purpose,
           passportNumber: v.passportNumber || null,
           notes: v.notes || null,
-          stayedAt: v.stayedAt || null,
-          stayedAddress: v.stayedAddress || null,
+          // The first hotel also stays on the visit itself; every hotel (with its dates) is saved as a stay.
+          stayedAt: hotels[0]?.name.trim() || null,
+          stayedAddress: hotels[0]?.address.trim() || null,
+          // Schengen: the hotels are kept once (on the first country's visit), not repeated per country.
+          hotels:
+            v.hotels === undefined || (b.schengen && i > 0)
+              ? undefined
+              : hotels.map((h) => ({ stayId: h.stayId ?? null, name: h.name.trim(), address: h.address.trim() || null, checkIn: h.checkIn || null, checkOut: h.checkOut || null })),
         });
       }
     }
@@ -207,7 +238,7 @@ export function RecordForm({
   const router = useRouter();
   const [saveTo, setSaveTo] = useState(target);
   const [profile, setProfile] = useState<ImportProfile>(initialProfile ?? EMPTY_PROFILE);
-  const [blocks, setBlocks] = useState<CountryBlock[]>(() => toBlocks(initialTrips ?? []));
+  const [blocks, setBlocks] = useState<CountryBlock[]>(() => toBlocks(initialTrips ?? [], stays));
   // Hotels already saved in the record, per country (suggestions for the Hotel / Airbnb field).
   const [savedHotels, setSavedHotels] = useState<Record<string, { name: string; address: string | null }[]>>({});
   const countriesKey = [...new Set(blocks.map((b) => b.countryCode).filter(Boolean))].sort().join(",");
@@ -229,8 +260,9 @@ export function RecordForm({
     const typed = blocks
       .filter((x) => x.countryCode === b.countryCode)
       .flatMap((x) => x.visits)
-      .filter((v) => v.stayedAt?.trim())
-      .map((v) => ({ name: v.stayedAt!.trim(), address: v.stayedAddress?.trim() || null }));
+      .flatMap((v) => v.hotels ?? [])
+      .filter((h) => h.name.trim())
+      .map((h) => ({ name: h.name.trim(), address: h.address.trim() || null }));
     const seen = new Set<string>();
     return [...(savedHotels[b.countryCode] ?? []), ...typed].filter((h) => !seen.has(h.name.toLowerCase()) && !!seen.add(h.name.toLowerCase()));
   };
@@ -582,9 +614,11 @@ export function RecordForm({
                             <span className="font-semibold text-navy">
                               {v.departureDate ? `${visitDate(v.departureDate)} → ${v.returnDate ? visitDate(v.returnDate) : "…"}` : "New visit: fill in the dates"}
                             </span>
-                            {(v.city || v.purpose || v.stayedAt) && (
-                              <span className="text-ink-soft"> · {[v.city && `🏙 ${v.city}`, v.purpose, v.stayedAt && `🏨 ${v.stayedAt}`].filter(Boolean).join(" · ")}</span>
-                            )}
+                            {(() => {
+                              const names = (v.hotels ?? []).map((h) => h.name.trim()).filter(Boolean);
+                              const bits = [v.city && `🏙 ${v.city}`, v.purpose, names.length && `🏨 ${names.join(", ")}`].filter(Boolean);
+                              return bits.length ? <span className="text-ink-soft"> · {bits.join(" · ")}</span> : null;
+                            })()}
                           </span>
                           <span className="ml-auto flex items-center gap-1">
                             <span className="rounded-full bg-navy px-3 py-1 text-xs font-semibold text-gold-soft">
@@ -629,38 +663,80 @@ export function RecordForm({
                             />
                           </label>
                         </div>
-                        <div className={`mt-5 grid gap-x-4 gap-y-5 rounded-xl bg-gradient-to-r from-gold/10 via-paper/60 to-transparent p-4 sm:grid-cols-2 ${b.schengen ? "lg:grid-cols-3" : "lg:grid-cols-4"}`}>
-                          {!b.schengen && (
-                            <label>
-                              <span className={lbl}>🏙 City (optional)</span>
-                              <CityInput countryCode={b.countryCode} value={v.city ?? ""} onChange={(city) => setVisit(b.key, v.key, { city })} className="field !py-2" />
+                        <div className="mt-5 rounded-xl bg-gradient-to-r from-gold/10 via-paper/60 to-transparent p-4">
+                          <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+                            {!b.schengen && (
+                              <label>
+                                <span className={lbl}>🏙 City (optional)</span>
+                                <CityInput countryCode={b.countryCode} value={v.city ?? ""} onChange={(city) => setVisit(b.key, v.key, { city })} className="field !py-2" />
+                              </label>
+                            )}
+                            <label className={b.schengen ? "sm:col-span-2" : ""}>
+                              <span className={lbl}>📝 Notes</span>
+                              <input value={v.notes} onChange={(e) => setVisit(b.key, v.key, { notes: e.target.value })} className="field !py-2" />
                             </label>
-                          )}
-                          <label>
-                            <span className={lbl}>🏨 Hotel / Airbnb (optional)</span>
-                            <HotelInput
-                              countryCode={b.countryCode}
-                              city={v.city ?? ""}
-                              value={v.stayedAt ?? ""}
-                              saved={hotelsFor(b)}
-                              // A hotel from the list: fill its address too.
-                              onChange={(name, address) => setVisit(b.key, v.key, { stayedAt: name, ...(address ? { stayedAddress: address } : {}) })}
-                              className="field !py-2"
-                            />
-                          </label>
-                          <label>
-                            <span className={lbl}>📍 Hotel address (optional)</span>
-                            <input
-                              value={v.stayedAddress ?? ""}
-                              onChange={(e) => setVisit(b.key, v.key, { stayedAddress: e.target.value })}
-                              className="field !py-2"
-                              placeholder="Street, city"
-                            />
-                          </label>
-                          <label className={b.schengen ? "sm:col-span-2 lg:col-span-1" : ""}>
-                            <span className={lbl}>📝 Notes</span>
-                            <input value={v.notes} onChange={(e) => setVisit(b.key, v.key, { notes: e.target.value })} className="field !py-2" />
-                          </label>
+                          </div>
+
+                          {/* Hotels of this visit, each with its own dates (e.g. Hotel A 19–21, Hotel B 21–24) */}
+                          <div className="mt-5">
+                            <span className={lbl}>🏨 Hotels / Airbnb on this visit (optional)</span>
+                            <div className="space-y-3">
+                              {(v.hotels ?? []).map((h, hi) => {
+                                const list = v.hotels ?? [];
+                                const setHotel = (patch: Partial<HotelRow>) =>
+                                  setVisit(b.key, v.key, { hotels: list.map((x) => (x.key === h.key ? { ...x, ...patch } : x)) });
+                                return (
+                                  <div key={h.key} className="grid items-end gap-3 rounded-xl border border-line bg-white/70 p-3 sm:grid-cols-2 lg:grid-cols-[2fr_2fr_1fr_1fr_auto]">
+                                    <label>
+                                      <span className={lbl}>{list.length > 1 ? `Hotel ${hi + 1}` : "Hotel / Airbnb"}</span>
+                                      <HotelInput
+                                        countryCode={b.countryCode || (b.codes ?? [])[0]?.code || ""}
+                                        city={v.city ?? ""}
+                                        value={h.name}
+                                        saved={hotelsFor(b)}
+                                        // A hotel from the list: fill its address too.
+                                        onChange={(name, address) => setHotel({ name, ...(address ? { address } : {}) })}
+                                        className="field !py-2"
+                                      />
+                                    </label>
+                                    <label>
+                                      <span className={lbl}>📍 Address</span>
+                                      <input value={h.address} onChange={(e) => setHotel({ address: e.target.value })} className="field !py-2" placeholder="Street, city" />
+                                    </label>
+                                    <label>
+                                      <span className={lbl}>From</span>
+                                      <DateInput value={h.checkIn} onChange={(e) => setHotel({ checkIn: e.target.value })} className="field !py-2" />
+                                    </label>
+                                    <label>
+                                      <span className={lbl}>To</span>
+                                      <DateInput value={h.checkOut} onChange={(e) => setHotel({ checkOut: e.target.value })} className="field !py-2" />
+                                    </label>
+                                    <button
+                                      type="button"
+                                      aria-label="Remove this hotel"
+                                      title="Remove this hotel"
+                                      onClick={() => setVisit(b.key, v.key, { hotels: list.length === 1 ? [emptyHotel()] : list.filter((x) => x.key !== h.key) })}
+                                      className="mb-1 grid size-8 place-items-center justify-self-end rounded-full text-lg text-ink-soft hover:bg-red-50 hover:text-danger"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const list = v.hotels ?? [];
+                                // The next hotel starts the day the previous one ends.
+                                const prev = list[list.length - 1];
+                                setVisit(b.key, v.key, { hotels: [...list, { ...emptyHotel(), checkIn: prev?.checkOut || "", checkOut: v.returnDate || "" }] });
+                              }}
+                              className="mt-2 rounded-full border border-dashed border-gold/70 bg-gold/5 px-3 py-1 text-xs font-semibold text-navy hover:bg-gold/10"
+                            >
+                              + Add another hotel
+                            </button>
+                          </div>
                         </div>
                         {/* Hotel reservation documents of this visit (several hotels per visit) */}
                         <div className="mt-4">
@@ -673,9 +749,10 @@ export function RecordForm({
                               city={v.city ?? ""}
                               checkIn={v.departureDate}
                               checkOut={v.returnDate}
+                              documentsOnly
                             />
                           ) : (
-                            <p className="text-xs text-ink-soft">🧾 Save this visit first, then add its hotel booking documents here.</p>
+                            <p className="text-xs text-ink-soft">🧾 Save this visit first, then add each hotel&apos;s booking document here.</p>
                           )}
                         </div>
                         </div>
