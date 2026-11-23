@@ -82,6 +82,16 @@ function BulkBoardingPasses({ profileId, visitDates = [] }: { profileId: string;
   );
 }
 
+/** "Show ▾" / "Hide ▴" on a folded boarding pass row. */
+function Toggle() {
+  return (
+    <span className="ml-auto rounded-full bg-navy px-3 py-1 text-xs font-semibold text-gold-soft">
+      <span className="group-open:hidden">Show ▾</span>
+      <span className="hidden group-open:inline">Hide ▴</span>
+    </span>
+  );
+}
+
 /** Separate "Boarding passes" section: cards (previous trips and current travel) + add / update form. */
 export function BoardingPassSection({
   profileId,
@@ -141,31 +151,54 @@ export function BoardingPassSection({
       }
       const route = [ordered[0].fromAirport, ...ordered.map((p) => p.toAirport)].map((a) => a || "---").join(" → ");
       return (
-        <div key={`journey-${g[0].id}`} className="space-y-4 rounded-3xl border-2 border-gold/50 bg-gold/5 p-3 lg:col-span-2">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
-            <span className="rounded-full bg-navy px-3 py-1 text-xs font-bold text-gold-soft">✈ One boarding pass · {g.length} flights</span>
+        // Small by default: one line with the whole route; click to see every flight.
+        <details key={`journey-${g[0].id}`} className="group rounded-2xl border-2 border-gold/50 bg-gold/5 open:p-3 open:lg:col-span-2">
+          <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 p-3 group-open:p-1 [&::-webkit-details-marker]:hidden">
+            <span className="rounded-full bg-navy px-3 py-1 text-xs font-bold text-gold-soft">✈ {g.length} flights</span>
             <span className="font-serif text-lg font-bold text-navy">{route}</span>
             <span className="text-xs text-ink-soft">
               {fmt(ordered[0].flightDate)}
               {ordered[0].bookingRef && <span className="font-mono"> · PNR {ordered[0].bookingRef}</span>}
             </span>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
+            <Toggle />
+          </summary>
+          <div className="mt-3 grid gap-4 lg:grid-cols-2">
             {ordered.map((p, i) => (
               <div key={p.id} className="space-y-1">
                 <p className="px-1 text-xs font-semibold uppercase tracking-[0.15em] text-ink-soft">
                   Flight {i + 1} of {g.length}
                 </p>
-                {card(p)}
+                {fullCard(p)}
               </div>
             ))}
           </div>
-        </div>
+        </details>
       );
     });
   };
 
+  /** One boarding pass, small by default (route, flight, date, seat); click to see it in full. */
   const card = (p: BoardingPass) => (
+    <details key={p.id} className="group rounded-2xl border border-line bg-white open:border-transparent open:bg-transparent open:lg:col-span-2" open={editing === p.id || undefined}>
+      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl p-3 group-open:mb-3 group-open:bg-white group-open:shadow-sm [&::-webkit-details-marker]:hidden">
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-navy text-gold-soft" aria-hidden>
+          ✈
+        </span>
+        <span className="font-serif text-lg font-bold text-navy">
+          {p.fromAirport || "---"} → {p.toAirport || "---"}
+        </span>
+        <span className="text-xs text-ink-soft">
+          <span className="font-mono">{p.flightNumber || "—"}</span> · {fmt(p.flightDate)}
+          {p.seat && ` · seat ${p.seat}`}
+          {p.hasFile && " · 📎"}
+        </span>
+        <Toggle />
+      </summary>
+      {fullCard(p)}
+    </details>
+  );
+
+  const fullCard = (p: BoardingPass) => (
     <article key={p.id} className="space-y-3">
       {/* Real boarding pass proportions (203 x 83 mm), 3D */}
       <div className="bp-scene">
