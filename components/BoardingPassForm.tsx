@@ -3,10 +3,9 @@
 import { safeAction } from "@/lib/safe-action";
 import { DateInput } from "./DateInput";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { readBoardingPass, readBoardingText, saveBoardingPass, type BoardingSaveState } from "@/lib/boarding-actions";
+import { saveBoardingPass, type BoardingSaveState } from "@/lib/boarding-actions";
 import type { BoardingDetails } from "@/lib/boarding-reader";
-import { readBarcodeTexts } from "@/lib/barcode";
-import { fileToImages, ocrImages } from "@/lib/ocr";
+import { dateFromVisits, readBoardingFile } from "@/lib/boarding-read";
 import type { BoardingPass } from "@/lib/data";
 import { SubmitButton } from "./SubmitButton";
 import { parseBcbp } from "@/lib/bcbp";
@@ -74,14 +73,7 @@ export function BoardingPassForm({
   /** Puts read flight details into the form and links the visit whose dates match the flight. */
   function apply(d: Partial<BoardingDetails>, how: string) {
     // A barcode gives the day of the year only: use the year of the visit on that day and month.
-    let date = d.flightDate ?? null;
-    if (date && !trips.some((t) => t.date.split("|").includes(date!))) {
-      // Same day of the year (leap years included), e.g. day 86 = 26 Mar 2024 or 27 Mar 2023.
-      const dayOfYear = (s: string) => Math.round((Date.parse(s) - Date.UTC(Number(s.slice(0, 4)), 0, 0)) / 86_400_000);
-      const want = dayOfYear(date);
-      const sameDay = trips.flatMap((t) => t.date.split("|")).find((x) => /^\d{4}-\d{2}-\d{2}$/.test(x) && dayOfYear(x) === want);
-      if (sameDay) date = sameDay;
-    }
+    const date = dateFromVisits(d.flightDate, trips.flatMap((t) => t.date.split("|")).filter(Boolean));
     const match = date ? trips.find((t) => t.date.split("|").includes(date!)) : undefined;
     setF((x) => ({
       ...x,
@@ -109,25 +101,8 @@ export function BoardingPassForm({
     setReadMsg({});
     startReading(async () => {
       try {
-        if (file.type === "application/pdf") {
-          const fd = new FormData();
-          fd.append("file", file);
-          const r = await readBoardingPass(profileId, fd).catch(() => null);
-          if (r && "ok" in r) return apply(r.details, "from the PDF");
-        }
-        setReadMsg({ ok: "Looking for the boarding pass barcode…" });
-        const images = file.type === "application/pdf" ? await fileToImages(file, 3) : [file];
-        const codes = await readBarcodeTexts(images).catch(() => [] as string[]);
-        const b = codes.map((c) => parseBcbp(c)).find(Boolean);
-        if (b) {
-          return apply(
-            { airline: b.airlineCode, flightNumber: b.flightNumber, fromAirport: b.fromAirport, toAirport: b.toAirport, flightDate: b.flightDate, seat: b.seat, bookingRef: b.bookingRef },
-            "from the barcode",
-          );
-        }
-        const texts = await ocrImages(images, (m) => setReadMsg({ ok: m }));
-        const d = await readBoardingText(profileId, texts.join("\n")).catch(() => null);
-        if (d) return apply(d, "from the scan");
+        const r = await readBoardingFile(profileId, file, (m) => setReadMsg({ ok: m }));
+        if (r) return apply(r.details, r.how);
         setReadMsg({ error: "Couldn't find flight details in this boarding pass. It is attached, so fill in the details and save." });
       } catch {
         setReadMsg({ error: "Couldn't read this boarding pass. It is attached, so fill in the details and save." });

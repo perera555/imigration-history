@@ -3,7 +3,8 @@
 //   on this device and shown when there is no internet (network first, cache fallback).
 // - App files and flag images are cached for speed.
 // - Admin/account pages, sign-in and form submissions are never cached.
-const VERSION = "v2";
+// v3: clears saved app files from v2, which could keep showing an old version of the app.
+const VERSION = "v3";
 const PAGES = `ih-pages-${VERSION}`;
 const ASSETS = `ih-assets-${VERSION}`;
 
@@ -68,7 +69,8 @@ self.addEventListener("fetch", (event) => {
   }
   if (url.origin !== self.location.origin) return;
 
-  if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/")) {
+  // Only files whose names change with every new version (so a saved copy can never be out of date).
+  if (url.pathname.startsWith("/_next/static/immutable/") || url.pathname.startsWith("/icons/")) {
     event.respondWith(cacheFirst(request));
     return;
   }

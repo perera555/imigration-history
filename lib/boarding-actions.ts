@@ -36,7 +36,11 @@ export async function readBoardingPass(profileId: string, form: FormData): Promi
   } catch (error) {
     console.error("Boarding pass reading failed:", error);
   }
-  return { error: "Couldn't find flight details in this PDF. It is attached, so fill in the details and save." };
+  // The current page reads scans and barcodes itself after this; only an old, not-refreshed page shows this message.
+  return {
+    error:
+      "This is a scanned PDF. Please refresh the page (press Ctrl + Shift + R) and choose the file again: the new version cuts the scan to the boarding pass size, reads the barcode and fills the form.",
+  };
 }
 
 /** Flight details from text read off a scanned PDF or photo in the browser (OCR). */

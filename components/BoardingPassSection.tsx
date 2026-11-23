@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { deleteBoardingPass, readBoardingPass, saveBoardingPass } from "@/lib/boarding-actions";
-import { parseBcbp } from "@/lib/bcbp";
+import { deleteBoardingPass, saveBoardingPass } from "@/lib/boarding-actions";
+import { dateFromVisits, readBoardingFile } from "@/lib/boarding-read";
+import { cropScan } from "@/lib/crop-scan";
 import { prepareUpload } from "@/lib/upload-prep";
 import { CountrySearch } from "./CountrySearch";
 import { useToastOn } from "./Toaster";
@@ -14,26 +15,15 @@ import { downloadBoardingPassImage } from "@/lib/bp-image";
 const fmt = (d: string | null) =>
   d ? new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }) : "—";
 
-/** Reads flight details from a file: PDF text (server) or barcode in a photo (browser). */
-async function detailsFrom(profileId: string, file: File): Promise<Record<string, string>> {
+/** Reads flight details from a file: PDF text, then the barcode, then the printed text (OCR). */
+async function detailsFrom(profileId: string, file: File, visitDates: string[], onProgress: (m: string) => void): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
   try {
-    if (file.type === "application/pdf") {
-      const fd = new FormData();
-      fd.append("file", file);
-      const r = await readBoardingPass(profileId, fd);
-      if (r && "ok" in r) for (const [k, v] of Object.entries(r.details)) if (v) out[k] = String(v);
-    } else {
-      type Detector = { detect: (src: ImageBitmap) => Promise<{ rawValue: string }[]> };
-      const BD = (window as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => Detector }).BarcodeDetector;
-      if (BD) {
-        const codes = await new BD({ formats: ["pdf417", "aztec", "qr_code", "data_matrix"] }).detect(await createImageBitmap(file));
-        const d = codes.map((c) => parseBcbp(c.rawValue)).find(Boolean);
-        if (d) {
-          for (const k of ["flightNumber", "fromAirport", "toAirport", "flightDate", "seat", "bookingRef"] as const) if (d[k]) out[k] = String(d[k]);
-          if (d.airlineCode) out.airline = d.airlineCode;
-        }
-      }
+    const r = await readBoardingFile(profileId, file, onProgress);
+    if (r) {
+      for (const [k, v] of Object.entries(r.details)) if (v) out[k] = String(v);
+      const date = dateFromVisits(r.details.flightDate, visitDates);
+      if (date) out.flightDate = date;
     }
   } catch {
     /* details stay empty; the file is still saved */
@@ -42,7 +32,7 @@ async function detailsFrom(profileId: string, file: File): Promise<Record<string
 }
 
 /** "📷 Add several boarding passes": one boarding pass per chosen file, details read when possible, linked to trips by date. */
-function BulkBoardingPasses({ profileId }: { profileId: string }) {
+function BulkBoardingPasses({ profileId, visitDates = [] }: { profileId: string; visitDates?: string[] }) {
   const ref = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState<{ busy?: string; ok?: string; error?: string }>({});
   useToastOn(msg.ok, msg.error);
@@ -53,10 +43,12 @@ function BulkBoardingPasses({ profileId }: { profileId: string }) {
     const problems: string[] = [];
     for (let i = 0; i < files.length; i++) {
       setMsg({ busy: `Adding boarding pass ${i + 1} of ${files.length}…` });
-      const file = await prepareUpload(files[i]);
+      // A full-page printer scan is cut to the boarding pass size first.
+      const file = await prepareUpload((await cropScan(files[i])) ?? files[i]);
       const fd = new FormData();
       fd.append("file", file);
-      for (const [k, v] of Object.entries(await detailsFrom(profileId, file))) fd.append(k, v);
+      const details = await detailsFrom(profileId, file, visitDates, (m) => setMsg({ busy: `Boarding pass ${i + 1} of ${files.length}: ${m}` }));
+      for (const [k, v] of Object.entries(details)) fd.append(k, v);
       try {
         const r = await saveBoardingPass(profileId, null, undefined, fd);
         if (r?.error) problems.push(`${files[i].name}: ${r.error}`);
@@ -243,7 +235,7 @@ export function BoardingPassSection({
         </div>
         {editing !== "new" && (
           <div className="ml-auto flex flex-wrap justify-end gap-2">
-            <BulkBoardingPasses profileId={profileId} />
+            <BulkBoardingPasses profileId={profileId} visitDates={trips.flatMap((t) => t.date.split("|")).filter(Boolean)} />
             <button type="button" onClick={() => setEditing("new")} className="btn btn-gold">
               + Upload boarding pass
             </button>

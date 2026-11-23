@@ -15,7 +15,22 @@ export function InstallButton() {
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" }).catch(() => {});
+      if (process.env.NODE_ENV === "production") {
+        navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" }).catch(() => {});
+      } else {
+        // Local development: no offline helper, and remove one left from before, with its saved
+        // files, so the newest code always runs. Reload once if it was in charge of this page.
+        const wasInCharge = !!navigator.serviceWorker.controller;
+        navigator.serviceWorker
+          .getRegistrations()
+          .then((regs) => Promise.all(regs.map((r) => r.unregister())))
+          .then(() => caches?.keys())
+          .then((keys) => Promise.all((keys ?? []).filter((k) => k.startsWith("ih-")).map((k) => caches.delete(k))))
+          .then(() => {
+            if (wasInCharge) window.location.reload();
+          })
+          .catch(() => {});
+      }
     }
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
