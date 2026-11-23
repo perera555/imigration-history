@@ -3,7 +3,10 @@
 import { safeAction } from "@/lib/safe-action";
 import { DateInput } from "./DateInput";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { readBoardingPass, saveBoardingPass, type BoardingSaveState } from "@/lib/boarding-actions";
+import { readBoardingPass, readBoardingText, saveBoardingPass, type BoardingSaveState } from "@/lib/boarding-actions";
+import type { BoardingDetails } from "@/lib/boarding-reader";
+import { readBarcodeTexts } from "@/lib/barcode";
+import { fileToImages, ocrImages } from "@/lib/ocr";
 import type { BoardingPass } from "@/lib/data";
 import { SubmitButton } from "./SubmitButton";
 import { parseBcbp } from "@/lib/bcbp";
@@ -68,76 +71,67 @@ export function BoardingPassForm({
   }, [state, onDone]);
   useToastOn(readMsg.ok, readMsg.error ?? state?.error);
 
-  const scanRef = useRef<HTMLInputElement>(null);
-
-  /** 📷 Scan: camera photo (or picked image) -> attached as the document; barcode read when possible. */
-  async function onScan(file: File | undefined) {
-    if (!file) return;
-    // Attach the photo as the boarding pass document.
-    if (fileRef.current) {
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      fileRef.current.files = dt.files;
-      fileRef.current.dispatchEvent(new Event("change", { bubbles: true })); // show the preview
+  /** Puts read flight details into the form and links the visit whose dates match the flight. */
+  function apply(d: Partial<BoardingDetails>, how: string) {
+    // A barcode gives the day of the year only: use the year of the visit on that day and month.
+    let date = d.flightDate ?? null;
+    if (date && !trips.some((t) => t.date.split("|").includes(date!))) {
+      // Same day of the year (leap years included), e.g. day 86 = 26 Mar 2024 or 27 Mar 2023.
+      const dayOfYear = (s: string) => Math.round((Date.parse(s) - Date.UTC(Number(s.slice(0, 4)), 0, 0)) / 86_400_000);
+      const want = dayOfYear(date);
+      const sameDay = trips.flatMap((t) => t.date.split("|")).find((x) => /^\d{4}-\d{2}-\d{2}$/.test(x) && dayOfYear(x) === want);
+      if (sameDay) date = sameDay;
     }
-    setReadMsg({});
-    type Detector = { detect: (src: ImageBitmap) => Promise<{ rawValue: string }[]> };
-    const BD = (window as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => Detector }).BarcodeDetector;
-    if (!BD) {
-      setReadMsg({ ok: "📷 Photo attached. This browser can't read barcodes, so please fill in the flight details." });
-      return;
-    }
-    try {
-      const codes = await new BD({ formats: ["pdf417", "aztec", "qr_code", "data_matrix"] }).detect(await createImageBitmap(file));
-      const d = codes.map((c) => parseBcbp(c.rawValue)).find(Boolean);
-      if (!d) {
-        setReadMsg({ ok: "📷 Photo attached. No boarding pass barcode found, so please fill in the flight details." });
-        return;
-      }
-      const match = d.flightDate ? trips.find((t) => t.date.split("|").includes(d.flightDate!)) : undefined;
-      setF((x) => ({
-        ...x,
-        flightNumber: d.flightNumber ?? x.flightNumber,
-        fromAirport: d.fromAirport ?? x.fromAirport,
-        toAirport: d.toAirport ?? x.toAirport,
-        flightDate: d.flightDate ?? x.flightDate,
-        seat: d.seat ?? x.seat,
-        bookingRef: d.bookingRef ?? x.bookingRef,
-        airline: x.airline || (d.airlineCode ?? ""),
-        tripId: x.tripId || match?.id || "",
-      }));
-      setReadMsg({ ok: `✓ Barcode scanned: ${d.flightNumber ?? ""} ${d.fromAirport ?? ""}→${d.toAirport ?? ""} for ${d.passenger}. Check the details, then save.` });
-    } catch {
-      setReadMsg({ ok: "📷 Photo attached. The barcode couldn't be read, so please fill in the flight details." });
-    }
+    const match = date ? trips.find((t) => t.date.split("|").includes(date!)) : undefined;
+    setF((x) => ({
+      ...x,
+      airline: d.airline ?? x.airline,
+      flightNumber: d.flightNumber ?? x.flightNumber,
+      fromAirport: d.fromAirport ?? x.fromAirport,
+      toAirport: d.toAirport ?? x.toAirport,
+      flightDate: date ?? x.flightDate,
+      seat: d.seat ?? x.seat,
+      bookingRef: d.bookingRef ?? x.bookingRef,
+      tripId: x.tripId || match?.id || "",
+      direction: x.direction || (match && date === match.date.split("|")[0] ? "Departure" : match ? "Return" : ""),
+    }));
+    const n = Object.values(d).filter((v) => v !== null && v !== undefined).length;
+    setReadMsg({ ok: `✓ ${n} detail${n === 1 ? "" : "s"} read ${how}. Please check them, then save.` });
   }
 
-  function readDetails() {
-    const file = fileRef.current?.files?.[0];
+  /**
+   * Reads the boarding pass: 1) the PDF's text, 2) the barcode on the page (all flight details are in it),
+   * 3) the printed text of a scan or photo (OCR). Runs by itself when a file is chosen.
+   */
+  function readDetails(picked?: File) {
+    const file = picked ?? fileRef.current?.files?.[0];
     if (!file) return setReadMsg({ error: "Choose the boarding pass first." });
     setReadMsg({});
     startReading(async () => {
-      const fd = new FormData();
-      fd.append("file", file);
-      const r = await readBoardingPass(profileId, fd);
-      if (!r || "error" in r) return setReadMsg({ error: r?.error ?? "Could not read the boarding pass." });
-      const d = r.details;
-      // Link to the trip whose departure or return matches the flight date.
-      const match = d.flightDate ? trips.find((t) => t.date.split("|").includes(d.flightDate!)) : undefined;
-      setF((x) => ({
-        ...x,
-        airline: d.airline ?? x.airline,
-        flightNumber: d.flightNumber ?? x.flightNumber,
-        fromAirport: d.fromAirport ?? x.fromAirport,
-        toAirport: d.toAirport ?? x.toAirport,
-        flightDate: d.flightDate ?? x.flightDate,
-        seat: d.seat ?? x.seat,
-        bookingRef: d.bookingRef ?? x.bookingRef,
-        tripId: x.tripId || match?.id || "",
-        direction: x.direction || (match && d.flightDate === match.date.split("|")[0] ? "Departure" : match ? "Return" : ""),
-      }));
-      const n = Object.values(d).filter((v) => v !== null).length;
-      setReadMsg({ ok: `✓ ${n} detail${n === 1 ? "" : "s"} read. Please check them, then save.` });
+      try {
+        if (file.type === "application/pdf") {
+          const fd = new FormData();
+          fd.append("file", file);
+          const r = await readBoardingPass(profileId, fd).catch(() => null);
+          if (r && "ok" in r) return apply(r.details, "from the PDF");
+        }
+        setReadMsg({ ok: "Looking for the boarding pass barcode…" });
+        const images = file.type === "application/pdf" ? await fileToImages(file, 3) : [file];
+        const codes = await readBarcodeTexts(images).catch(() => [] as string[]);
+        const b = codes.map((c) => parseBcbp(c)).find(Boolean);
+        if (b) {
+          return apply(
+            { airline: b.airlineCode, flightNumber: b.flightNumber, fromAirport: b.fromAirport, toAirport: b.toAirport, flightDate: b.flightDate, seat: b.seat, bookingRef: b.bookingRef },
+            "from the barcode",
+          );
+        }
+        const texts = await ocrImages(images, (m) => setReadMsg({ ok: m }));
+        const d = await readBoardingText(profileId, texts.join("\n")).catch(() => null);
+        if (d) return apply(d, "from the scan");
+        setReadMsg({ error: "Couldn't find flight details in this boarding pass. It is attached, so fill in the details and save." });
+      } catch {
+        setReadMsg({ error: "Couldn't read this boarding pass. It is attached, so fill in the details and save." });
+      }
     });
   }
 
@@ -147,25 +141,19 @@ export function BoardingPassForm({
         <DocumentPicker
           name="file"
           inputRef={fileRef}
-          label="Boarding pass photo or PDF"
+          onPicked={(file) => readDetails(file)}
+          cropScans
+          label="Boarding pass photo, scan or PDF (PDF, PNG or JPEG)"
           saved={pass?.hasFile ? { url: `/api/boarding/${pass.id}/file`, name: pass.fileName, image: isImageName(pass.fileName, pass.mime) } : null}
           onDelete={pass ? () => deleteAttachment("boarding", pass.id) : undefined}
         />
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button type="button" onClick={readDetails} disabled={reading} className="btn btn-gold">
-            {reading ? "Reading…" : "Read details from boarding pass"}
+          <button type="button" onClick={() => readDetails()} disabled={reading} className="btn btn-gold">
+            {reading ? "Reading…" : "↻ Read details again"}
           </button>
-          <button type="button" onClick={() => scanRef.current?.click()} className="btn btn-ghost">
-            🔎 Scan barcode
-          </button>
-          <input
-            ref={scanRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="sr-only"
-            onChange={(e) => onScan(e.target.files?.[0])}
-          />
+          <span className="text-xs text-ink-soft">
+            Scanned on a printer? Choose the scan (PDF, PNG or JPEG): it is cut to the boarding pass size, the barcode is read and the form is filled.
+          </span>
         </div>
         {readMsg.ok && <p className="mt-2 text-sm font-medium text-ok">{readMsg.ok}</p>}
         {readMsg.error && <p className="mt-2 text-sm font-medium text-danger">{readMsg.error}</p>}

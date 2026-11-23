@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { prepareUpload } from "@/lib/upload-prep";
+import { cropScan } from "@/lib/crop-scan";
 
 export const isImageName = (name?: string | null, mime?: string | null) =>
   !!(mime?.startsWith("image/") || (name && /\.(png|jpe?g|webp)$/i.test(name)));
@@ -18,7 +19,10 @@ export function DocumentPicker({
   saved,
   onPicked,
   onDelete,
+  cropScans = false,
 }: {
+  /** A full-page scan is cut down to the printed document on it (e.g. a boarding pass). */
+  cropScans?: boolean;
   name: string;
   inputRef: React.RefObject<HTMLInputElement | null>;
   label: string;
@@ -38,9 +42,11 @@ export function DocumentPicker({
 
   async function use(original: File | undefined, fromCamera = false) {
     if (!original) return;
-    const file = await prepareUpload(original);
+    // A full-page scan: keep just the printed document (e.g. the boarding pass), not the empty paper.
+    const cropped = cropScans ? await cropScan(original) : null;
+    const file = await prepareUpload(cropped ?? original);
     // A camera photo (or a photo made smaller) goes into the real (named) input so it is saved with the form.
-    if ((fromCamera || file !== original) && inputRef.current) {
+    if ((fromCamera || cropped || file !== original) && inputRef.current) {
       const dt = new DataTransfer();
       dt.items.add(file);
       inputRef.current.files = dt.files;

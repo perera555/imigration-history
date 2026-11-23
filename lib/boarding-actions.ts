@@ -39,6 +39,15 @@ export async function readBoardingPass(profileId: string, form: FormData): Promi
   return { error: "Couldn't find flight details in this PDF. It is attached, so fill in the details and save." };
 }
 
+/** Flight details from text read off a scanned PDF or photo in the browser (OCR). */
+export async function readBoardingText(profileId: string, text: string): Promise<BoardingDetails | null> {
+  if (!isUuid(profileId)) return null;
+  await requireProfileAccess(profileId);
+  const { parseBoardingText } = await import("./boarding-reader");
+  const d = parseBoardingText(String(text ?? "").slice(0, 20_000));
+  return d && Object.values(d).some((v) => v !== null) ? d : null;
+}
+
 export type BoardingSaveState = { error?: string; ok?: string } | undefined;
 
 /** Adds (passId = null) or updates a boarding pass, with optional file. Users: own record only. */

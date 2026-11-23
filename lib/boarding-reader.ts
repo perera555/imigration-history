@@ -39,7 +39,12 @@ const AIRLINES: Record<string, string> = {
 export async function readBoardingPdf(bytes: Uint8Array): Promise<BoardingDetails | null> {
   const pdf = await getDocumentProxy(bytes);
   const { text } = await extractText(pdf, { mergePages: true });
-  const t = String(text).replace(/[ \t]+/g, " ");
+  return parseBoardingText(String(text));
+}
+
+/** Flight details from boarding pass text (from the PDF, or read from a scan / photo). */
+export function parseBoardingText(raw: string): BoardingDetails | null {
+  const t = raw.replace(/[ \t]+/g, " ");
   if (t.replace(/\s/g, "").length < 20) return null;
 
   const flight = t.match(/(?:flight|flt)\s*(?:no\.?|number)?\s*[:\-]?\s*([A-Z0-9]{2})\s?(\d{2,4})\b/i) ?? t.match(/\b([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?(\d{3,4})\b/);
