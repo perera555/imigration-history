@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { PdfButtons } from "./PdfButtons";
 import { UpdateButton } from "./UpdateButton";
-import { travelStats, type Profile, type Stay, type Trip, type Visa } from "@/lib/data";
+import { boardingTrips, travelStats, type Profile, type Stay, type Trip, type Visa } from "@/lib/data";
+import { StaySection } from "./StaySection";
 import { VisaList } from "./VisaList";
 import { TravelCard } from "./TravelCard";
 import { DocumentsPanel } from "./DocumentsPanel";
@@ -52,6 +53,9 @@ export function ProfileDetail({
         </div>
         <HistoryTable trips={trips} stays={stays} />
       </section>
+
+      {/* Hotels & Airbnb: every hotel per visit with its booking document (owner and admins) */}
+      {showDocuments && <StaySection profileId={profile.id} stays={stays} trips={boardingTrips(trips)} canDelete={false} />}
 
       {/* Visas: shown below the immigration record */}
       <VisaList profileId={profile.id} holder={profile} visas={visas} trips={trips} canViewDocument={showDocuments} canDelete={showDocuments} />
