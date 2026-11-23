@@ -6,6 +6,7 @@ import type { Stay } from "@/lib/data";
 import { STAY_ICON, STAY_KINDS, findLinks, stayNights } from "@/lib/stay-kinds";
 import { countryName } from "@/lib/countries";
 import { CountrySelect } from "./CountrySelect";
+import { CityInput } from "./CityInput";
 import { CountrySearch } from "./CountrySearch";
 import { DateInput } from "./DateInput";
 import { DocumentPicker, isImageName } from "./DocumentPicker";
@@ -180,7 +181,8 @@ function StayForm({
         </div>
         <label>
           <span className="field-label">City</span>
-          <input name="city" value={f.city} onChange={set("city")} className="field" placeholder="e.g. Bangkok" />
+          <CityInput countryCode={f.countryCode} value={f.city} onChange={(city) => setF((x) => ({ ...x, city }))} />
+          <input type="hidden" name="city" value={f.city} />
         </label>
         <label className="sm:col-span-2">
           <span className="field-label">Address</span>
