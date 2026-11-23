@@ -103,7 +103,10 @@ export async function GET(req: Request) {
       const key = `${country}|${cityKey}`;
       let job = inFlight.get(key);
       if (!job) {
-        job = fetchCity(country, city).finally(() => inFlight.delete(key));
+        // Map look-ups run one after another, so they never crowd out the rest of the app.
+        const run: Promise<Hotel[]> = queue.catch(() => {}).then(() => fetchCity(country, city));
+        queue = run;
+        job = run.finally(() => inFlight.delete(key));
         inFlight.set(key, job);
       }
       hotels = await job;
@@ -125,3 +128,4 @@ export async function GET(req: Request) {
 }
 
 const inFlight = new Map<string, Promise<Hotel[]>>();
+let queue: Promise<unknown> = Promise.resolve();

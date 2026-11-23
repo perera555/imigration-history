@@ -2,6 +2,7 @@
 // `npm run dev` starts it automatically; `npm run db` starts it on its own.
 import EmbeddedPostgres from "embedded-postgres";
 import { existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -22,8 +23,50 @@ export function portInUse(port = LOCAL_DB_PORT) {
   });
 }
 
+/**
+ * The database really answers (not just a port that is held open by a leftover process):
+ * sends PostgreSQL's SSL request and expects its one-letter reply ("S" or "N").
+ */
+export function dbAnswers(port = LOCAL_DB_PORT, timeoutMs = 4000) {
+  return new Promise((resolve) => {
+    const socket = net.connect({ port, host: "127.0.0.1" });
+    const done = (ok) => {
+      socket.destroy();
+      resolve(ok);
+    };
+    socket.setTimeout(timeoutMs, () => done(false));
+    socket.once("error", () => done(false));
+    socket.once("connect", () => socket.write(Buffer.from([0, 0, 0, 8, 4, 210, 22, 47])));
+    socket.once("data", (d) => done(d.length > 0 && (d[0] === 0x53 || d[0] === 0x4e)));
+  });
+}
+
+/** Stops this project's own database processes that were left behind after a crash (Windows). */
+export function killLeftoverDb() {
+  if (process.platform !== "win32") return;
+  const bin = path.join(root, "node_modules", "@embedded-postgres").replace(/'/g, "''");
+  spawnSync(
+    "powershell",
+    [
+      "-NoProfile",
+      "-Command",
+      // Only postgres.exe started from this project's node_modules (never another PostgreSQL on the PC).
+      `$bin = '${bin}'; Get-CimInstance Win32_Process -Filter "Name='postgres.exe'" | Where-Object { $_.CommandLine -and $_.CommandLine.Replace('/', '\\').Contains($bin) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`,
+    ],
+    { stdio: "ignore", timeout: 20_000 },
+  );
+}
+
 /** Starts the local database unless it is already running. Returns a stop function (or null). */
 export async function startLocalDb({ quiet = false } = {}) {
+  if (await portInUse()) {
+    if (!(await dbAnswers())) {
+      // Port held, but the database doesn't answer: a crashed copy left processes behind.
+      console.log("Local database is not answering — clearing the stuck copy and starting it again…");
+      killLeftoverDb();
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
   if (await portInUse()) {
     if (!quiet) console.log(`✓ Local database already running on 127.0.0.1:${LOCAL_DB_PORT}`);
     return null;

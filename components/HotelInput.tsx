@@ -28,11 +28,13 @@ export function HotelInput({
   const listId = useId();
   const [all, setAll] = useState<Hotel[]>([]);
   const [status, setStatus] = useState("");
+  // Only load a city's hotels when this box is used (not for every visit when the page opens).
+  const [active, setActive] = useState(false);
 
   // The city's whole list is loaded once (the first time can take ~30 s), then searched here.
   useEffect(() => {
     const c = city.trim();
-    if (!/^[A-Z]{2}$/i.test(countryCode) || c.length < 2) {
+    if (!active || !/^[A-Z]{2}$/i.test(countryCode) || c.length < 2) {
       setAll([]);
       setStatus("");
       return;
@@ -61,7 +63,7 @@ export function HotelInput({
       clearTimeout(timer);
       ctrl.abort();
     };
-  }, [countryCode, city]);
+  }, [countryCode, city, active]);
 
   const q = value.trim().toLowerCase();
   const found = (q ? [...all.filter((h) => h.name.toLowerCase().startsWith(q)), ...all.filter((h) => !h.name.toLowerCase().startsWith(q) && h.name.toLowerCase().includes(q))] : all).slice(0, 40);
@@ -73,6 +75,7 @@ export function HotelInput({
       <input
         value={value}
         list={listId}
+        onFocus={() => setActive(true)}
         onChange={(e) => {
           const name = e.target.value;
           const known = options.find((h) => h.name.toLowerCase() === name.trim().toLowerCase());

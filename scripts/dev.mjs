@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { startLocalDb, portInUse, LOCAL_DB_PORT } from "./local-db.mjs";
+import { startLocalDb, portInUse, dbAnswers, LOCAL_DB_PORT } from "./local-db.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -30,11 +30,21 @@ async function ensureDb(quiet = false) {
 }
 if (local) {
   await ensureDb();
-  // Watchdog: if the database ever stops (e.g. another copy that was running closes), start it again.
+  // Watchdog: if the database ever stops or stops answering (e.g. it crashed and left a process
+  // holding its port), clear it and start it again. Checks that it really answers, not just the port.
+  let checking = false;
   setInterval(async () => {
-    if (!stopDb && !(await portInUse())) {
-      console.log("Local database stopped — starting it again…");
+    if (checking) return;
+    checking = true;
+    try {
+      if (await dbAnswers()) return;
+      await new Promise((r) => setTimeout(r, 3000));
+      if (await dbAnswers()) return; // just busy
+      console.log((await portInUse()) ? "Local database stopped answering — restarting it…" : "Local database stopped — starting it again…");
+      stopDb = null;
       await ensureDb(true);
+    } finally {
+      checking = false;
     }
   }, 10_000).unref();
 }
