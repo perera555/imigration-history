@@ -1,7 +1,8 @@
 "use client";
 
 import { DateInput } from "./DateInput";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { CityInput } from "./CityInput";
 import { useRouter } from "next/navigation";
 import { saveImport, updateRecord, type ImportProfile, type ImportTrip } from "@/lib/actions";
 import { CountrySelect } from "./CountrySelect";
@@ -198,6 +199,30 @@ export function RecordForm({
   const [saveTo, setSaveTo] = useState(target);
   const [profile, setProfile] = useState<ImportProfile>(initialProfile ?? EMPTY_PROFILE);
   const [blocks, setBlocks] = useState<CountryBlock[]>(() => toBlocks(initialTrips ?? []));
+  // Hotels already saved in the record, per country (suggestions for the Hotel / Airbnb field).
+  const [savedHotels, setSavedHotels] = useState<Record<string, { name: string; address: string | null }[]>>({});
+  const countriesKey = [...new Set(blocks.map((b) => b.countryCode).filter(Boolean))].sort().join(",");
+  useEffect(() => {
+    if (!updateId) return;
+    for (const code of countriesKey.split(",").filter(Boolean)) {
+      if (savedHotels[code]) continue;
+      fetch(`/api/profiles/${updateId}/hotels?country=${code}`)
+        .then((r) => (r.ok ? r.json() : { hotels: [] }))
+        .then((d: { hotels?: { name: string; address: string | null }[] }) => setSavedHotels((m) => ({ ...m, [code]: d.hotels ?? [] })))
+        .catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countriesKey, updateId]);
+  /** Hotel suggestions for a country block: saved ones plus ones typed on visits to the same country. */
+  const hotelsFor = (b: CountryBlock) => {
+    const typed = blocks
+      .filter((x) => x.countryCode === b.countryCode)
+      .flatMap((x) => x.visits)
+      .filter((v) => v.stayedAt?.trim())
+      .map((v) => ({ name: v.stayedAt!.trim(), address: v.stayedAddress?.trim() || null }));
+    const seen = new Set<string>();
+    return [...(savedHotels[b.countryCode] ?? []), ...typed].filter((h) => !seen.has(h.name.toLowerCase()) && !!seen.add(h.name.toLowerCase()));
+  };
   // Visit cards: a filled visit starts as a short row (open it with "Update"); a new, empty one starts open.
   // Decided once per visit, so typing a date doesn't fold the card while it is being filled.
   const visitOpen = useRef(new Map<string | number, boolean>());
@@ -452,7 +477,7 @@ export function RecordForm({
                       </div>
                       <label className="w-48">
                         <span className="field-label">City (optional)</span>
-                        <input value={b.city} onChange={(e) => setBlock(b.key, { city: e.target.value })} className="field" placeholder="e.g. Dubai" />
+                        <CityInput countryCode={b.countryCode} value={b.city} onChange={(city) => setBlock(b.key, { city })} />
                       </label>
                     </>
                   )}
@@ -602,10 +627,16 @@ export function RecordForm({
                             <span className={lbl}>🏨 Hotel / Airbnb (optional)</span>
                             <input
                               value={v.stayedAt ?? ""}
-                              list="stayed-options"
-                              onChange={(e) => setVisit(b.key, v.key, { stayedAt: e.target.value })}
+                              list={`stayed-${b.key}`}
+                              onChange={(e) => {
+                                const name = e.target.value;
+                                // A hotel from the list: fill its address too (when empty).
+                                const known = hotelsFor(b).find((h) => h.name.toLowerCase() === name.trim().toLowerCase());
+                                setVisit(b.key, v.key, { stayedAt: name, ...(known?.address && !v.stayedAddress ? { stayedAddress: known.address } : {}) });
+                              }}
                               className="field !py-2"
-                              placeholder="e.g. PJ Watergate"
+                              placeholder={b.countryCode ? "Pick a saved one, or type it in" : "e.g. PJ Watergate"}
+                              autoComplete="off"
                             />
                           </label>
                           <label>
@@ -670,12 +701,16 @@ export function RecordForm({
           <option key={p} value={p} />
         ))}
       </datalist>
-      {/* Places already typed on other visits: pick again with one click */}
-      <datalist id="stayed-options">
-        {[...new Set(blocks.flatMap((b) => b.visits.map((v) => v.stayedAt?.trim())).filter(Boolean))].map((p) => (
-          <option key={p} value={p} />
-        ))}
-      </datalist>
+      {/* Hotels per country: saved ones and ones typed on other visits to that country */}
+      {blocks.map((b) => (
+        <datalist key={b.key} id={`stayed-${b.key}`}>
+          {hotelsFor(b).map((h) => (
+            <option key={h.name} value={h.name}>
+              {h.address ?? ""}
+            </option>
+          ))}
+        </datalist>
+      ))}
 
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-card p-4 shadow-sm">
         <button type="button" onClick={save} disabled={saving} className="btn btn-primary !px-6 !py-3">

@@ -6,6 +6,7 @@ import type { FormState } from "@/lib/actions";
 import type { Trip } from "@/lib/data";
 import { CountrySelect } from "./CountrySelect";
 import { SubmitButton } from "./SubmitButton";
+import { CityInput } from "./CityInput";
 
 const PURPOSES = ["Tour", "Business", "Business & Tour", "Visit", "Family Visit", "Student", "Work", "Transit", "Medical", "Conference"];
 
@@ -23,11 +24,15 @@ export function TripForm({
   const [state, formAction] = useActionState(action, undefined);
   const formRef = useRef<HTMLFormElement>(null);
   const [formKey, setFormKey] = useState(0);
+  const [country, setCountry] = useState(trip?.countryCode ?? "");
+  const [city, setCity] = useState(trip?.city ?? "");
 
   // After a successful "add", clear the form for the next entry.
   useEffect(() => {
     if (state?.ok && !trip) {
       formRef.current?.reset();
+      setCity("");
+      setCountry("");
       setFormKey((k) => k + 1);
     }
   }, [state, trip]);
@@ -37,11 +42,12 @@ export function TripForm({
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <span className="field-label">Country *</span>
-          <CountrySelect name="countryCode" defaultValue={trip?.countryCode} />
+          <CountrySelect name="countryCode" defaultValue={trip?.countryCode} onChange={setCountry} />
         </div>
         <label>
           <span className="field-label">City (optional)</span>
-          <input name="city" defaultValue={trip?.city ?? ""} className="field" placeholder="e.g. Dubai, London" />
+          <CityInput countryCode={country} value={city} onChange={setCity} />
+          <input type="hidden" name="city" value={city} />
         </label>
         <label>
           <span className="field-label">Purpose</span>
