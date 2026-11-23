@@ -15,20 +15,24 @@ import { downloadBoardingPassImage } from "@/lib/bp-image";
 const fmt = (d: string | null) =>
   d ? new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }) : "—";
 
-/** Reads flight details from a file: PDF text, then the barcode, then the printed text (OCR). */
-async function detailsFrom(profileId: string, file: File, visitDates: string[], onProgress: (m: string) => void): Promise<Record<string, string>> {
-  const out: Record<string, string> = {};
+/**
+ * Flight details from a file (barcode, then PDF text, then OCR): one entry per flight, so a
+ * connecting journey on one boarding pass (e.g. CMB → AUH → DUB) gives one boarding pass per flight.
+ */
+async function flightsFrom(profileId: string, file: File, visitDates: string[], onProgress: (m: string) => void): Promise<Record<string, string>[]> {
   try {
     const r = await readBoardingFile(profileId, file, onProgress);
-    if (r) {
-      for (const [k, v] of Object.entries(r.details)) if (v) out[k] = String(v);
-      const date = dateFromVisits(r.details.flightDate, visitDates);
+    if (!r) return [{}];
+    return r.legs.map((leg) => {
+      const out: Record<string, string> = {};
+      for (const [k, v] of Object.entries(leg)) if (v) out[k] = String(v);
+      const date = dateFromVisits(leg.flightDate, visitDates);
       if (date) out.flightDate = date;
-    }
+      return out;
+    });
   } catch {
-    /* details stay empty; the file is still saved */
+    return [{}]; // details stay empty; the file is still saved
   }
-  return out;
 }
 
 /** "📷 Add several boarding passes": one boarding pass per chosen file, details read when possible, linked to trips by date. */
@@ -45,16 +49,18 @@ function BulkBoardingPasses({ profileId, visitDates = [] }: { profileId: string;
       setMsg({ busy: `Adding boarding pass ${i + 1} of ${files.length}…` });
       // A full-page printer scan is cut to the boarding pass size first.
       const file = await prepareUpload((await cropScan(files[i])) ?? files[i]);
-      const fd = new FormData();
-      fd.append("file", file);
-      const details = await detailsFrom(profileId, file, visitDates, (m) => setMsg({ busy: `Boarding pass ${i + 1} of ${files.length}: ${m}` }));
-      for (const [k, v] of Object.entries(details)) fd.append(k, v);
-      try {
-        const r = await saveBoardingPass(profileId, null, undefined, fd);
-        if (r?.error) problems.push(`${files[i].name}: ${r.error}`);
-        else added++;
-      } catch {
-        problems.push(`${files[i].name}: no answer from the server`);
+      const flights = await flightsFrom(profileId, file, visitDates, (m) => setMsg({ busy: `Boarding pass ${i + 1} of ${files.length}: ${m}` }));
+      for (const details of flights) {
+        const fd = new FormData();
+        fd.append("file", file);
+        for (const [k, v] of Object.entries(details)) fd.append(k, v);
+        try {
+          const r = await saveBoardingPass(profileId, null, undefined, fd);
+          if (r?.error) problems.push(`${files[i].name}: ${r.error}`);
+          else added++;
+        } catch {
+          problems.push(`${files[i].name}: no answer from the server`);
+        }
       }
     }
     setMsg(

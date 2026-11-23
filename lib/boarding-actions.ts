@@ -99,10 +99,11 @@ export async function saveBoardingPass(
     if (!ok.length) values.tripId = null;
   }
   // Not linked yet: put it under the trip whose departure or return date is the flight date.
+  // A flight on a day one visit ends and the next begins (e.g. Dublin to London on the 29th) starts the next visit.
   if (!values.tripId && values.flightDate) {
     const [match] = await sql<{ id: string; departureDate: string }[]>`select id, departure_date from trips
       where profile_id = ${profileId} and (departure_date = ${values.flightDate} or return_date = ${values.flightDate})
-      order by departure_date limit 1`;
+      order by (departure_date = ${values.flightDate}) desc, departure_date limit 1`;
     if (match) {
       values.tripId = match.id;
       if (!values.direction) values.direction = match.departureDate === values.flightDate ? "Departure" : "Return";

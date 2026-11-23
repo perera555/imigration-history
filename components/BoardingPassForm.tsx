@@ -5,10 +5,9 @@ import { DateInput } from "./DateInput";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { saveBoardingPass, type BoardingSaveState } from "@/lib/boarding-actions";
 import type { BoardingDetails } from "@/lib/boarding-reader";
-import { dateFromVisits, readBoardingFile } from "@/lib/boarding-read";
+import { dateFromVisits, readBoardingFile, visitForFlight } from "@/lib/boarding-read";
 import type { BoardingPass } from "@/lib/data";
 import { SubmitButton } from "./SubmitButton";
-import { parseBcbp } from "@/lib/bcbp";
 import { DocumentPicker, isImageName } from "./DocumentPicker";
 import { useToastOn } from "./Toaster";
 import { deleteAttachment } from "@/lib/attachment-actions";
@@ -63,6 +62,46 @@ export function BoardingPassForm({
   const [readMsg, setReadMsg] = useState<{ ok?: string; error?: string }>({});
   const [reading, startReading] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  /** Every flight on the boarding pass when there are several (connecting journey, e.g. CMB → AUH → DUB). */
+  const [legs, setLegs] = useState<Partial<BoardingDetails>[]>([]);
+  const [savingAll, setSavingAll] = useState(false);
+
+  /** Saves each flight of a connecting journey as its own boarding pass, with the same document. */
+  async function saveAllFlights() {
+    if (!formRef.current) return;
+    setSavingAll(true);
+    const visitDates = trips.flatMap((t) => t.date.split("|")).filter(Boolean);
+    let saved = 0;
+    const problems: string[] = [];
+    for (const leg of legs) {
+      const fd = new FormData(formRef.current); // the document, passenger and other fields as in the form
+      const date = dateFromVisits(leg.flightDate, visitDates);
+      const visit = visitForFlight(trips, date);
+      const values: Record<string, string | null | undefined> = {
+        airline: leg.airline,
+        flightNumber: leg.flightNumber,
+        fromAirport: leg.fromAirport,
+        toAirport: leg.toAirport,
+        flightDate: date,
+        seat: leg.seat,
+        bookingRef: leg.bookingRef,
+        tripId: visit?.trip.id ?? fd.get("tripId")?.toString(),
+        direction: visit?.direction ?? fd.get("direction")?.toString(),
+      };
+      for (const [k, v] of Object.entries(values)) fd.set(k, v ?? "");
+      try {
+        const r = await saveBoardingPass(profileId, null, undefined, fd);
+        if (r?.error) problems.push(`${leg.fromAirport}→${leg.toAirport}: ${r.error}`);
+        else saved++;
+      } catch {
+        problems.push(`${leg.fromAirport}→${leg.toAirport}: the server didn't answer`);
+      }
+    }
+    setSavingAll(false);
+    if (problems.length) setReadMsg({ error: `${saved} saved. Not saved: ${problems.join("; ")}` });
+    else onDone?.();
+  }
   const set = (k: keyof Fields) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF((x) => ({ ...x, [k]: e.target.value }));
 
   useEffect(() => {
@@ -74,7 +113,7 @@ export function BoardingPassForm({
   function apply(d: Partial<BoardingDetails>, how: string) {
     // A barcode gives the day of the year only: use the year of the visit on that day and month.
     const date = dateFromVisits(d.flightDate, trips.flatMap((t) => t.date.split("|")).filter(Boolean));
-    const match = date ? trips.find((t) => t.date.split("|").includes(date!)) : undefined;
+    const visit = visitForFlight(trips, date);
     setF((x) => ({
       ...x,
       airline: d.airline ?? x.airline,
@@ -84,8 +123,8 @@ export function BoardingPassForm({
       flightDate: date ?? x.flightDate,
       seat: d.seat ?? x.seat,
       bookingRef: d.bookingRef ?? x.bookingRef,
-      tripId: x.tripId || match?.id || "",
-      direction: x.direction || (match && date === match.date.split("|")[0] ? "Departure" : match ? "Return" : ""),
+      tripId: x.tripId || visit?.trip.id || "",
+      direction: x.direction || visit?.direction || "",
     }));
     const n = Object.values(d).filter((v) => v !== null && v !== undefined).length;
     setReadMsg({ ok: `✓ ${n} detail${n === 1 ? "" : "s"} read ${how}. Please check them, then save.` });
@@ -102,6 +141,7 @@ export function BoardingPassForm({
     startReading(async () => {
       try {
         const r = await readBoardingFile(profileId, file, (m) => setReadMsg({ ok: m }));
+        setLegs(r && r.legs.length > 1 ? r.legs : []);
         if (r) return apply(r.details, r.how);
         setReadMsg({ error: "Couldn't find flight details in this boarding pass. It is attached, so fill in the details and save." });
       } catch {
@@ -111,7 +151,7 @@ export function BoardingPassForm({
   }
 
   return (
-    <form action={action} className="space-y-5">
+    <form ref={formRef} action={action} className="space-y-5">
       <div className="rounded-2xl border border-dashed border-line bg-paper/50 p-4">
         <DocumentPicker
           name="file"
@@ -132,6 +172,24 @@ export function BoardingPassForm({
         </div>
         {readMsg.ok && <p className="mt-2 text-sm font-medium text-ok">{readMsg.ok}</p>}
         {readMsg.error && <p className="mt-2 text-sm font-medium text-danger">{readMsg.error}</p>}
+        {!pass && legs.length > 1 && (
+          // Connecting journey on one boarding pass: every flight can be saved at once.
+          <div className="mt-3 rounded-xl border border-gold/60 bg-gold/10 p-3">
+            <p className="text-sm font-semibold text-navy">✈ This boarding pass has {legs.length} flights:</p>
+            <ol className="mt-1 list-decimal pl-5 text-sm">
+              {legs.map((l, i) => (
+                <li key={i} className="font-mono">
+                  {l.flightNumber ?? "—"} · {l.fromAirport ?? "?"} → {l.toAirport ?? "?"}
+                  {l.seat ? ` · seat ${l.seat}` : ""}
+                </li>
+              ))}
+            </ol>
+            <button type="button" onClick={saveAllFlights} disabled={savingAll} className="btn btn-primary mt-2 !py-1.5 text-sm">
+              {savingAll ? "Saving…" : `Save all ${legs.length} flights (same boarding pass)`}
+            </button>
+            <p className="mt-1 text-xs text-ink-soft">The form below shows flight 1; press Save to keep only that one.</p>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

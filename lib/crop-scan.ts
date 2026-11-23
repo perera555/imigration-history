@@ -37,25 +37,28 @@ export async function cropToContent(image: Blob, name = "boarding-pass"): Promis
       const i = (y * w + x) * 4;
       return 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2] < 200; // not paper-white
     };
-    // Rows / columns with some printing on them (ignores dust and scanner edge shadows).
+    // Scanners leave dark lines and shadows along the page edges: look only inside a thin border.
+    const mx = Math.round(w * 0.03);
+    const my = Math.round(h * 0.025);
+    // Rows / columns with real printing on them (not dust specks, not a full-width scanner line).
     const rowHas = (y: number) => {
       let n = 0;
-      for (let x = 0; x < w; x++) if (ink(x, y)) n++;
-      return n > w * 0.004 && n < w * 0.98;
+      for (let x = mx; x < w - mx; x++) if (ink(x, y)) n++;
+      return n > (w - 2 * mx) * 0.01 && n < (w - 2 * mx) * 0.9;
     };
     const colHas = (x: number, top: number, bottom: number) => {
       let n = 0;
       for (let y = top; y <= bottom; y++) if (ink(x, y)) n++;
-      return n > (bottom - top + 1) * 0.004 && n < (bottom - top + 1) * 0.98;
+      return n > (bottom - top + 1) * 0.01 && n < (bottom - top + 1) * 0.9;
     };
-    let top = 0;
-    while (top < h && !rowHas(top)) top++;
-    let bottom = h - 1;
+    let top = my;
+    while (top < h - my && !rowHas(top)) top++;
+    let bottom = h - 1 - my;
     while (bottom > top && !rowHas(bottom)) bottom--;
     if (bottom - top < h * 0.05) return null; // nothing printed found
-    let left = 0;
-    while (left < w && !colHas(left, top, bottom)) left++;
-    let right = w - 1;
+    let left = mx;
+    while (left < w - mx && !colHas(left, top, bottom)) left++;
+    let right = w - 1 - mx;
     while (right > left && !colHas(right, top, bottom)) right--;
     // Already just the boarding pass (no big empty paper around it): keep it as it is.
     if ((bottom - top) * (right - left) > w * h * 0.8) return null;
