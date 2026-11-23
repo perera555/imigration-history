@@ -114,7 +114,7 @@ export function VisaForm({
   const [f, setF] = useState<Fields>(() => {
     const x = fromVisa(visa, defaultPassport, defaultCountry, defaultType);
     // Saved earlier with the visa number in the passport box: move it to Visa number.
-    if (visa && !x.visaNumber && x.passportNumber && passports.length && !passports.some((p) => samePassport(p, x.passportNumber))) {
+    if (visa && !x.visaNumber && x.passportNumber && !passports.some((p) => samePassport(p, x.passportNumber))) {
       return { ...x, visaNumber: x.passportNumber, passportNumber: "" };
     }
     return x;
@@ -204,7 +204,12 @@ export function VisaForm({
       const fd = new FormData();
       fd.append("document", file);
       const result = await readVisaDocument(profileId, fd);
-      let d: VisaDetails | null = result && "ok" in result ? result.details : null;
+      // A read "passport" that isn't one of yours is the visa number (some stickers print it in that place).
+      const fixNumbers = (x: VisaDetails | null): VisaDetails | null =>
+        x?.passportNumber && !x.visaNumber && !passportList.some((p) => samePassport(p, x.passportNumber))
+          ? { ...x, visaNumber: x.passportNumber.toUpperCase(), passportNumber: null }
+          : x;
+      let d: VisaDetails | null = fixNumbers(result && "ok" in result ? result.details : null);
       let note = result && "ok" in result ? (result.note ?? "") : "";
       // Same visa if the digits match (printed with a letter in front, machine-read without it).
       const digitsOf = (n: string) => n.replace(/[^0-9]/g, "").replace(/^0+/, "");
@@ -217,7 +222,7 @@ export function VisaForm({
           const texts = await ocrImages(await fileToImages(file, 6), (m) => setReadMsg({ ok: m }));
           const pages: VisaDetails[] = [];
           for (const t of texts) {
-            const p = await readVisaPageText(profileId, t);
+            const p = fixNumbers(await readVisaPageText(profileId, t));
             if (p && Object.values(p).some((v) => v !== null)) pages.push(p);
           }
           const next = pages.find((p) => !isKnown(p));
@@ -238,7 +243,7 @@ export function VisaForm({
       // A number that isn't one of your passports is the visa number (when none was read), not a passport.
       let readPassport = d.passportNumber && !isVisaNumber(d.passportNumber, d.visaNumber ?? f.visaNumber) ? d.passportNumber : null;
       const mine = readPassport ? passportList.find((p) => samePassport(p, readPassport)) : undefined;
-      if (readPassport && !mine && passportList.length) {
+      if (readPassport && !mine) {
         if (!d.visaNumber && !f.visaNumber) d = { ...d, visaNumber: readPassport.toUpperCase() };
         readPassport = null;
       }

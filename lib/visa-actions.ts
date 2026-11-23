@@ -165,7 +165,7 @@ export async function addVisaFromPage(
   const key = (p: string | null | undefined) => (p ?? "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
   const own = [holder?.passportNumber, ...(holder?.previousPassports ?? [])].filter((p): p is string => !!key(p));
   const readPp = s(details.passportNumber, 30);
-  if (readPp && own.length && !own.some((p) => key(p) === key(readPp))) {
+  if (readPp && !own.some((p) => key(p) === key(readPp))) {
     details = { ...details, visaNumber: details.visaNumber || readPp, passportNumber: null };
   }
   const values = {

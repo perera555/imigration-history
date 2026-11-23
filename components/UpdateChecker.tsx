@@ -60,31 +60,39 @@ export function showUpdateToast(onLater?: () => void) {
   );
 }
 
+/** Someone is typing or choosing a file: don't reload under them. */
+function busyTyping() {
+  const el = document.activeElement;
+  return !!el && el !== document.body && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+}
+
 /**
- * "New version available — Update now": checks the live version every few minutes and whenever the
- * app comes back to the screen (e.g. the installed app reopened on a phone).
+ * Always on the newest version: checks the live version every minute and whenever the app comes back to
+ * the screen (e.g. the installed app reopened on a phone), then reloads by itself — but never while
+ * someone is typing in a field (it tries again on the next check).
  */
 export function UpdateChecker() {
-  const shown = useRef(false);
+  const updating = useRef(false);
 
   useEffect(() => {
     if (CURRENT === "dev" || process.env.NODE_ENV !== "production") return;
     const check = async () => {
-      if (shown.current || document.visibilityState !== "visible" || !navigator.onLine) return;
+      if (updating.current || document.visibilityState !== "visible" || !navigator.onLine) return;
       try {
         const version = await liveVersion();
-        if (!version || version === CURRENT) return;
-        shown.current = true;
-        showUpdateToast(() => setTimeout(() => (shown.current = false), 30 * 60 * 1000)); // ask again in 30 minutes
+        if (!version || version === CURRENT || busyTyping()) return;
+        updating.current = true;
+        hotToast.loading("Updating to the newest version…", { id: "app-update" });
+        setTimeout(updateNow, 1200);
       } catch {
         /* offline or server busy: try again later */
       }
     };
-    const timer = setInterval(check, 3 * 60 * 1000);
+    const timer = setInterval(check, 60 * 1000);
     const onVisible = () => document.visibilityState === "visible" && check();
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("online", check);
-    const first = setTimeout(check, 15_000);
+    const first = setTimeout(check, 3_000);
     return () => {
       clearInterval(timer);
       clearTimeout(first);

@@ -69,7 +69,7 @@ export function VisaCard({
   // Saved earlier with the visa number in the passport box (not one of the holder's passports): show it as the visa number.
   const ppKey = (p: string | null | undefined) => (p ?? "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
   const own = holder ? [holder.passportNumber, ...holder.previousPassports].filter((p) => ppKey(p)) : [];
-  const misplaced = !visa.visaNumber && !!ppKey(visa.passportNumber) && own.length > 0 && !own.some((p) => ppKey(p) === ppKey(visa.passportNumber));
+  const misplaced = !visa.visaNumber && !!ppKey(visa.passportNumber) && !!holder && !own.some((p) => ppKey(p) === ppKey(visa.passportNumber));
   const visaNo = visa.visaNumber ?? (misplaced ? visa.passportNumber : null);
   const passportNo = (misplaced || isVisaNumber(visa.passportNumber, visa.visaNumber) ? null : visa.passportNumber) ?? holder?.passportNumber;
   const mrz = `V<${visa.countryCode}${(visa.visaType || "VISA").toUpperCase().replace(/[^A-Z0-9]/g, "<")}<<${(visaNo ?? "").replace(/[^A-Z0-9]/gi, "")}`
