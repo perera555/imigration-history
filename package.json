@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "db": "node scripts/local-db.mjs",
+    "db:autostart": "node scripts/db-autostart.mjs",
+    "db:autostart:off": "node scripts/db-autostart.mjs off",
     "build": "next build",
     "start": "next start",
     "seed": "node --env-file-if-exists=.env.local scripts/seed.mjs",

@@ -1,10 +1,11 @@
-// `npm run dev`: starts the local database (when .env.local uses it), then the Next.js dev server.
-// Stopping the dev server (Ctrl+C) also stops the database cleanly.
+// `npm run dev`: makes sure the local database is running (when .env.local uses it), then starts the
+// Next.js dev server. The database runs in its own background keeper (scripts/local-db.mjs), which
+// restarts it if it ever stops — so closing the dev server or a terminal never takes it down.
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { startLocalDb, portInUse, dbAnswers, LOCAL_DB_PORT } from "./local-db.mjs";
+import { launchKeeper, LOCAL_DB_PORT } from "./local-db.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -18,46 +19,18 @@ function usesLocalDb() {
   }
 }
 
-let stopDb = null;
-const local = usesLocalDb();
-async function ensureDb(quiet = false) {
-  if (stopDb) return; // ours is running
-  try {
-    stopDb = await startLocalDb({ quiet });
-  } catch (error) {
-    console.error("Could not start the local database:", error?.message ?? error);
-  }
-}
-if (local) {
-  await ensureDb();
-  // Watchdog: if the database ever stops or stops answering (e.g. it crashed and left a process
-  // holding its port), clear it and start it again. Checks that it really answers, not just the port.
-  let checking = false;
-  setInterval(async () => {
-    if (checking) return;
-    checking = true;
-    try {
-      if (await dbAnswers()) return;
-      await new Promise((r) => setTimeout(r, 3000));
-      if (await dbAnswers()) return; // just busy
-      console.log((await portInUse()) ? "Local database stopped answering — restarting it…" : "Local database stopped — starting it again…");
-      stopDb = null;
-      await ensureDb(true);
-    } finally {
-      checking = false;
-    }
-  }, 10_000).unref();
+if (usesLocalDb()) {
+  console.log((await launchKeeper()) ? `✓ Local database ready on 127.0.0.1:${LOCAL_DB_PORT} (kept running in the background)` : "⚠ The local database did not start — see .localdb/db.log");
 }
 
 const nextBin = path.join(root, "node_modules", "next", "dist", "bin", "next");
 const child = spawn(process.execPath, [nextBin, "dev", ...process.argv.slice(2)], { cwd: root, stdio: "inherit" });
 
 let stopping = false;
-const shutdown = async (code = 0) => {
+const shutdown = (code = 0) => {
   if (stopping) return;
   stopping = true;
   if (!child.killed) child.kill("SIGINT");
-  if (stopDb) await stopDb();
   process.exit(code);
 };
 process.on("SIGINT", () => shutdown(0));
