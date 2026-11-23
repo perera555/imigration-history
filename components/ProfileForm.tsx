@@ -1,5 +1,6 @@
 "use client";
 
+import { safeAction } from "@/lib/safe-action";
 import { DateInput } from "./DateInput";
 import { useActionState } from "react";
 import type { FormState } from "@/lib/actions";
@@ -21,7 +22,7 @@ export function ProfileForm({
   /** Users: fields that already have a value are read-only (only admins can change saved data). */
   lockFilled?: boolean;
 }) {
-  const [state, formAction] = useActionState(action, undefined);
+  const [state, formAction] = useActionState(safeAction(action), undefined);
   const locked = (value: unknown) => lockFilled && value != null && value !== "";
   const lockClass = "bg-paper-2/70 text-ink-soft cursor-not-allowed";
 

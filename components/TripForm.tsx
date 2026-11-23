@@ -1,5 +1,6 @@
 "use client";
 
+import { safeAction } from "@/lib/safe-action";
 import { DateInput } from "./DateInput";
 import { useActionState, useEffect, useRef, useState } from "react";
 import type { FormState } from "@/lib/actions";
@@ -21,7 +22,7 @@ export function TripForm({
   passports: string[];
   submitLabel: string;
 }) {
-  const [state, formAction] = useActionState(action, undefined);
+  const [state, formAction] = useActionState(safeAction(action), undefined);
   const formRef = useRef<HTMLFormElement>(null);
   const [formKey, setFormKey] = useState(0);
   const [country, setCountry] = useState(trip?.countryCode ?? "");

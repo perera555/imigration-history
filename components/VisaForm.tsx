@@ -110,7 +110,14 @@ export function VisaForm({
   defaultPassport?: string | null;
   onDone?: () => void;
 }) {
-  const [state, action] = useActionState<VisaSaveState, FormData>(saveVisa.bind(null, profileId, visa?.id ?? null), undefined);
+  const [state, action] = useActionState<VisaSaveState, FormData>(async (prev, fd) => {
+    try {
+      return await saveVisa(profileId, visa?.id ?? null, prev, fd);
+    } catch {
+      // The server didn't answer properly (restarting, asleep, network): keep the form and say so.
+      return { error: "The server didn't answer. Nothing was lost — please press Save again." };
+    }
+  }, undefined);
   const [f, setF] = useState<Fields>(() => {
     const x = fromVisa(visa, defaultPassport, defaultCountry, defaultType);
     // Saved earlier with the visa number in the passport box: move it to Visa number.
@@ -203,7 +210,13 @@ export function VisaForm({
     startReading(async () => {
       const fd = new FormData();
       fd.append("document", file);
-      const result = await readVisaDocument(profileId, fd);
+      let result: Awaited<ReturnType<typeof readVisaDocument>>;
+      try {
+        result = await readVisaDocument(profileId, fd);
+      } catch {
+        // The server didn't answer properly: say so instead of breaking the page.
+        return setReadMsg({ error: "The server didn't answer while reading the document. Please press “↻ Read details again”." });
+      }
       // A read "passport" that isn't one of yours is the visa number (some stickers print it in that place).
       const fixNumbers = (x: VisaDetails | null): VisaDetails | null =>
         x?.passportNumber && !x.visaNumber && !looksLikePassport(x.passportNumber) && !passportList.some((p) => samePassport(p, x.passportNumber))

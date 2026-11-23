@@ -1,5 +1,6 @@
 "use client";
 
+import { safeAction } from "@/lib/safe-action";
 import { useActionState } from "react";
 import { readDocument, type ExtractState } from "@/lib/actions";
 import { SubmitButton } from "./SubmitButton";
@@ -18,7 +19,7 @@ export function DocumentImport({
   defaultTarget: string;
   allowNew?: boolean;
 }) {
-  const [state, action] = useActionState<ExtractState, FormData>(readDocument, undefined);
+  const [state, action] = useActionState<ExtractState, FormData>(safeAction(readDocument), undefined);
   const extracted = state && "ok" in state ? state : null;
 
   const targets = [

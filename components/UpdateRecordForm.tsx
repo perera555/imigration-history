@@ -1,5 +1,6 @@
 "use client";
 
+import { safeAction } from "@/lib/safe-action";
 import { useActionState, useEffect, useState } from "react";
 import { readDocument, type ExtractState, type ImportProfile, type ImportTrip } from "@/lib/actions";
 import { RecordForm } from "./RecordForm";
@@ -26,7 +27,7 @@ export function UpdateRecordForm({
   initialProfile: ImportProfile;
   initialTrips: ImportTrip[];
 }) {
-  const [state, action] = useActionState<ExtractState, FormData>(readDocument, undefined);
+  const [state, action] = useActionState<ExtractState, FormData>(safeAction(readDocument), undefined);
   const [filled, setFilled] = useState<{ n: number; profile: ImportProfile; trips: ImportTrip[]; addedTrips: number; addedFields: number } | null>(null);
 
   useEffect(() => {

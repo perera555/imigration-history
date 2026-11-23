@@ -1,5 +1,6 @@
 "use client";
 
+import { safeAction } from "@/lib/safe-action";
 import { useActionState, useEffect, useState } from "react";
 import { saveStay, type StaySaveState } from "@/lib/stay-actions";
 import { STAY_KINDS } from "@/lib/stay-kinds";
@@ -42,7 +43,7 @@ function AddHotel({
   checkOut: string;
   onDone: () => void;
 }) {
-  const [state, action, saving] = useActionState<StaySaveState, FormData>(saveStay.bind(null, profileId, null), undefined);
+  const [state, action, saving] = useActionState<StaySaveState, FormData>(safeAction(saveStay.bind(null, profileId, null)), undefined);
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   useToastOn(null, state?.error ?? null);

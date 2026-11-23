@@ -1,5 +1,6 @@
 "use client";
 
+import { safeAction } from "@/lib/safe-action";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { deleteStay, readStayDocument, saveStay, type StaySaveState } from "@/lib/stay-actions";
 import type { Stay } from "@/lib/data";
@@ -67,7 +68,7 @@ function StayForm({
   onDone: () => void;
   canDelete?: boolean;
 }) {
-  const [state, action] = useActionState<StaySaveState, FormData>(saveStay.bind(null, profileId, stay?.id ?? null), undefined);
+  const [state, action] = useActionState<StaySaveState, FormData>(safeAction(saveStay.bind(null, profileId, stay?.id ?? null)), undefined);
   const [f, setF] = useState<Fields>(() => {
     const base = fromStay(stay, startTrip);
     const t = trips.find((x) => x.id === base.tripId);

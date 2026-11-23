@@ -1,5 +1,6 @@
 "use client";
 
+import { safeAction } from "@/lib/safe-action";
 import { DateInput } from "./DateInput";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { readBoardingPass, saveBoardingPass, type BoardingSaveState } from "@/lib/boarding-actions";
@@ -55,7 +56,7 @@ export function BoardingPassForm({
   /** Admins: "🗑 Delete photo" for the saved file. */
   canDelete?: boolean;
 }) {
-  const [state, action] = useActionState<BoardingSaveState, FormData>(saveBoardingPass.bind(null, profileId, pass?.id ?? null), undefined);
+  const [state, action] = useActionState<BoardingSaveState, FormData>(safeAction(saveBoardingPass.bind(null, profileId, pass?.id ?? null)), undefined);
   const [f, setF] = useState<Fields>(() => fromPass(pass));
   const [readMsg, setReadMsg] = useState<{ ok?: string; error?: string }>({});
   const [reading, startReading] = useTransition();
