@@ -45,7 +45,12 @@ export function isVisaNumber(passport: string | null | undefined, visaNumber: st
   return digits(passport).length >= 5 && digits(passport) === digits(visaNumber);
 }
 
-const norm =(s: string) => s.trim().toUpperCase().replace(/\s+/g, "").replace(/–|—/g, "-");
+/** Shaped like a passport number: 1–2 letters then 6–8 digits (e.g. "N1234567"), or 8–9 digits. */
+export function looksLikePassport(p: string | null | undefined): boolean {
+  return /^(?:[A-Z]{1,2}\d{6,8}|\d{8,9})$/.test((p ?? "").replace(/\s+/g, "").toUpperCase());
+}
+
+const norm = (s: string) => s.trim().toUpperCase().replace(/\s+/g, "").replace(/–|—/g, "-");
 
 /** What a visa category code means, e.g. ("TH", "T") → "Tourist"; null when it isn't a known code. */
 export function visaTypeMeaning(countryCode: string | null | undefined, type: string | null | undefined): string | null {

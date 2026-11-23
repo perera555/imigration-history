@@ -169,6 +169,16 @@ function printedVisaNumber(text: string, digits: string | null): string | null {
 }
 
 /** Visa details from the text of one visa page (or a whole e-visa). Null when there's almost no text. */
+/** Purpose wording on visas → the purposes in the visa form ("Recreation/Sight-Seeing" → "Tourism"). */
+function purposeName(raw: string | null): string | null {
+  if (!raw) return null;
+  if (/recreation|sight[\s-]*seeing|touris|holiday|leisure/i.test(raw)) return "Tourism";
+  if (/business|meeting/i.test(raw)) return "Business";
+  if (/medical|treatment/i.test(raw)) return "Medical";
+  if (/stud|education/i.test(raw)) return "Study";
+  return raw;
+}
+
 export function parseVisaText(text: string, holderNationalityCode: string | null): VisaDetails | null {
   const t = String(text).replace(/[ \t]+/g, " ");
   if (t.replace(/\s/g, "").length < 40) return null;
@@ -194,6 +204,8 @@ export function parseVisaText(text: string, holderNationalityCode: string | null
 function parseVisaFields(t: string, holderNationalityCode: string | null): VisaDetails {
 
   const visaNumber =
+    // Indian e-Visa: the visa number is the "ETA Number" (the Application ID is only the application).
+    t.match(/\bETA\s*(?:no\.?|number)\s*[:\-]?\s*((?=[A-Z0-9]*\d)[A-Z0-9]{6,20})\b/i)?.[1] ??
     // e.g. "Visa No: …", "Grant reference number: …", "Application ref: …"; a visa number always has a digit.
     t.match(
       /(?:visa|e-?visa|grant|application|reference|transaction|control)(?:\s+reference)?\s*(?:no\.?|number|#|ref(?:erence)?\.?)(?:\s*(?:no\.?|number))?\s*[:\-]?\s*((?=[A-Z0-9\-/]*\d)[A-Z0-9][A-Z0-9\-/]{4,24})\b/i,
@@ -218,6 +230,8 @@ function parseVisaFields(t: string, holderNationalityCode: string | null): VisaD
 
   // Full visa names first: "Student (subclass 500)", "granted you a Visitor (subclass 600) visa".
   const namedType =
+    // Indian e-Visa: "ETA for e-Tourist Visa 1 year" → "e-Tourist"
+    t.match(/\b(e-(?:tourist|business|medical|conference|student|ayush))\s+visa\b/i)?.[1]?.replace(/^e-(\w)/i, (_, c: string) => `e-${c.toUpperCase()}`) ??
     // The visa title only (1–4 capitalised words), e.g. "Temporary Skill Shortage (subclass 482)".
     t.match(/\b((?:[A-Z][a-z'&\-]+\s+){0,3}[A-Z][a-z'&\-]+\s*\(subclass\s*\d{3}\))/)?.[1] ??
     t.match(/granted you an?\s+([A-Za-z0-9'()&\- ]{3,60}?)\s+visa\b/i)?.[1] ??
@@ -247,9 +261,14 @@ function parseVisaFields(t: string, holderNationalityCode: string | null): VisaD
       dateAfter(t, "must not arrive after|last date of entry|enter before"),
     travelFrom: dateAfter(t, "valid from|travel from|from date|start date|first entry|enter from|period of validity from"),
     travelTo: dateAfter(t, "valid until|valid till|valid to|travel until|travel to|until|end date|must not arrive after|last date of entry|enter before"),
-    purpose: t.match(/(?:purpose of (?:visit|travel|entry)|purpose)\s*[:\-]?\s*([A-Za-z &\/-]{3,40}?)(?:\s{2,}|\n|$|\s+(?:visa|date|valid|entr|passport|duration))/i)?.[1]?.trim() ?? null,
+    purpose: purposeName(
+      t.match(/(?:purpose of (?:visit|travel|entry)|purpose|activities permitted)\s*[:\-]?\s*([A-Za-z &\/-]{3,40}?)(?:\s{2,}|\n|$|\s+(?:visa|date|valid|entr|passport|duration|guidelines))/i)?.[1]?.trim() ?? null,
+    ),
     entries: entriesRaw ? entriesMap[entriesRaw.toLowerCase()] ?? null : null,
-    stayDays: stay ? Number(stay) : null,
+    stayDays: stay
+      ? Number(stay)
+      : // e.g. Indian e-Visa: "Continuous stay in India on each entry should not exceed 90 days"
+        Number(t.match(/(?:stay|each entry)[^.\n]{0,60}?(?:not exceed|maximum of|up to)\s*(\d{1,3})\s*days/i)?.[1]) || null,
     issuedAt: t.match(/(?:place of issue|issued at|issuing (?:post|office|authority)|issued by)\s*[:\-]?\s*([A-Za-z ,.'-]{3,50}?)(?:\s{2,}|\n|$|\s+(?:date|visa|valid|passport))/i)?.[1]?.trim() ?? null,
     passportNumber:
       t.match(/passport\s*(?:\((?:or )?other travel\s+document\)\s*)?(?:no\.?|number|#)\s*[:\-]?\s*([A-Z]{1,2}\d{6,9})/i)?.[1]?.toUpperCase() ?? null,

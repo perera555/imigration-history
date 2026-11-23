@@ -8,6 +8,7 @@ import { isUuid } from "./data";
 import { isCountryCode, NATIONALITIES } from "./countries";
 import { canAccessProfile, requireAdmin, requireAuth, requireProfileAccess } from "./session";
 import type { VisaDetails } from "./visa-reader";
+import { looksLikePassport } from "./visa-types";
 
 const DOC_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
 const MAX_DOC_BYTES = 8 * 1024 * 1024;
@@ -165,7 +166,7 @@ export async function addVisaFromPage(
   const key = (p: string | null | undefined) => (p ?? "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
   const own = [holder?.passportNumber, ...(holder?.previousPassports ?? [])].filter((p): p is string => !!key(p));
   const readPp = s(details.passportNumber, 30);
-  if (readPp && !own.some((p) => key(p) === key(readPp))) {
+  if (readPp && !looksLikePassport(readPp) && !own.some((p) => key(p) === key(readPp))) {
     details = { ...details, visaNumber: details.visaNumber || readPp, passportNumber: null };
   }
   const values = {

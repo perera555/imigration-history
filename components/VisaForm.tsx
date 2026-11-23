@@ -8,7 +8,7 @@ import type { VisaDetails } from "@/lib/visa-reader";
 import type { Visa } from "@/lib/data";
 import { CountrySelect } from "./CountrySelect";
 import { isSchengen } from "@/lib/countries";
-import { isVisaNumber, visaTypeMeaning } from "@/lib/visa-types";
+import { isVisaNumber, looksLikePassport, visaTypeMeaning } from "@/lib/visa-types";
 import { SubmitButton } from "./SubmitButton";
 import { DocumentPicker, isImageName } from "./DocumentPicker";
 import { VisaPages, uploadVisaPages } from "./VisaPages";
@@ -114,7 +114,7 @@ export function VisaForm({
   const [f, setF] = useState<Fields>(() => {
     const x = fromVisa(visa, defaultPassport, defaultCountry, defaultType);
     // Saved earlier with the visa number in the passport box: move it to Visa number.
-    if (visa && !x.visaNumber && x.passportNumber && !passports.some((p) => samePassport(p, x.passportNumber))) {
+    if (visa && !x.visaNumber && x.passportNumber && !looksLikePassport(x.passportNumber) && !passports.some((p) => samePassport(p, x.passportNumber))) {
       return { ...x, visaNumber: x.passportNumber, passportNumber: "" };
     }
     return x;
@@ -206,7 +206,7 @@ export function VisaForm({
       const result = await readVisaDocument(profileId, fd);
       // A read "passport" that isn't one of yours is the visa number (some stickers print it in that place).
       const fixNumbers = (x: VisaDetails | null): VisaDetails | null =>
-        x?.passportNumber && !x.visaNumber && !passportList.some((p) => samePassport(p, x.passportNumber))
+        x?.passportNumber && !x.visaNumber && !looksLikePassport(x.passportNumber) && !passportList.some((p) => samePassport(p, x.passportNumber))
           ? { ...x, visaNumber: x.passportNumber.toUpperCase(), passportNumber: null }
           : x;
       let d: VisaDetails | null = fixNumbers(result && "ok" in result ? result.details : null);
@@ -243,7 +243,7 @@ export function VisaForm({
       // A number that isn't one of your passports is the visa number (when none was read), not a passport.
       let readPassport = d.passportNumber && !isVisaNumber(d.passportNumber, d.visaNumber ?? f.visaNumber) ? d.passportNumber : null;
       const mine = readPassport ? passportList.find((p) => samePassport(p, readPassport)) : undefined;
-      if (readPassport && !mine) {
+      if (readPassport && !mine && !looksLikePassport(readPassport)) {
         if (!d.visaNumber && !f.visaNumber) d = { ...d, visaNumber: readPassport.toUpperCase() };
         readPassport = null;
       }
