@@ -8,6 +8,7 @@ import type { VisaDetails } from "@/lib/visa-reader";
 import type { Visa } from "@/lib/data";
 import { CountrySelect } from "./CountrySelect";
 import { isSchengen } from "@/lib/countries";
+import { visaTypeMeaning } from "@/lib/visa-types";
 import { SubmitButton } from "./SubmitButton";
 import { DocumentPicker, isImageName } from "./DocumentPicker";
 import { VisaPages, uploadVisaPages } from "./VisaPages";
@@ -333,6 +334,11 @@ export function VisaForm({
         <label>
           <span className="field-label">Visa type</span>
           <input name="visaType" list="visa-types" value={f.visaType} onChange={set("visaType")} className="field" placeholder="Tourist, Student…" />
+          {visaTypeMeaning(f.countryCode, f.visaType) && (
+            <span className="mt-1 block text-xs text-emerald-700">
+              “{f.visaType.trim()}” = {visaTypeMeaning(f.countryCode, f.visaType)} visa
+            </span>
+          )}
           <datalist id="visa-types">
             {TYPES.map((t) => (
               <option key={t} value={t} />

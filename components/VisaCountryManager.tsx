@@ -5,6 +5,7 @@ import { addVisaFromPhoto, deleteVisa, removeDuplicateVisas } from "@/lib/visa-a
 import { prepareUpload } from "@/lib/upload-prep";
 import { countryName, flagSvg, isSchengen } from "@/lib/countries";
 import type { Visa } from "@/lib/data";
+import { visaTypeName } from "@/lib/visa-types";
 import { VisaForm } from "./VisaForm";
 import { ConfirmButton } from "./SubmitButton";
 import { CountrySearch } from "./CountrySearch";
@@ -243,7 +244,7 @@ export function VisaCountryManager({
                   <span className="grid size-7 shrink-0 place-items-center rounded-full bg-navy text-xs font-bold text-gold-soft">{n + 1}</span>
                   <span className="min-w-0">
                     <span className="block text-sm font-semibold text-navy">
-                      {g.key === "schengen" ? `Schengen visa (issued by ${countryName(v.countryCode)})` : `${v.visaType || "Visa"}`}
+                      {g.key === "schengen" ? `Schengen visa (issued by ${countryName(v.countryCode)})` : visaTypeName(v.countryCode, v.visaType)}
                       {v.visaNumber && <span className="font-mono font-normal text-ink-soft"> · {v.visaNumber}</span>}
                     </span>
                     <span className="block text-xs text-ink-soft">

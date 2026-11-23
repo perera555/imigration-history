@@ -19,6 +19,7 @@ import {
 } from "@/lib/data";
 import { stayNights } from "@/lib/stay-kinds";
 import { countryName, isSchengen } from "@/lib/countries";
+import { visaTypeName } from "@/lib/visa-types";
 import { BoardingPassView } from "./BoardingPassPdf";
 
 const NAVY = "#0b1f3a";
@@ -173,7 +174,7 @@ export function ImmigrationPdf({
                     ) : null}
                   </View>
                   <View style={[s.cell, { width: "17%" }]}>
-                    <Text>{v.visaType || "Visa"}</Text>
+                    <Text>{visaTypeName(v.countryCode, v.visaType)}</Text>
                     {v.visaFormat ? <Text style={s.note}>{v.visaFormat}</Text> : null}
                     {v.visaNumber ? <Text style={[s.note, { fontFamily: "Courier" }]}>{v.visaNumber}</Text> : null}
                     {v.purpose ? <Text style={s.note}>{v.purpose}</Text> : null}

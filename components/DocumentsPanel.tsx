@@ -1,5 +1,6 @@
 import { getBoardingPasses, getPassportDocuments, getStays, getVisas, formatShortDate } from "@/lib/data";
 import { countryName } from "@/lib/countries";
+import { visaTypeName } from "@/lib/visa-types";
 import { STAY_ICON } from "@/lib/stay-kinds";
 
 type Doc = { key: string; icon: string; title: string; detail: string; view: string; download?: string };
@@ -52,7 +53,7 @@ export async function DocumentsPanel({ profileId }: { profileId: string }) {
                 key: v.id,
                 icon: "🛂",
                 title: `${countryName(v.countryCode)} visa${v.visaNumber ? ` · ${v.visaNumber}` : ""}`,
-                detail: [v.visaType, v.issueDate && `issued ${formatShortDate(v.issueDate)}`, v.documentName].filter(Boolean).join(" · "),
+                detail: [v.visaType && visaTypeName(v.countryCode, v.visaType),v.issueDate && `issued ${formatShortDate(v.issueDate)}`, v.documentName].filter(Boolean).join(" · "),
                 view: `/api/visas/${v.id}/document`,
                 download: `/api/visas/${v.id}/document?download=1`,
               },

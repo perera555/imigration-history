@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { countryName, isSchengen } from "@/lib/countries";
+import { visaTypeName } from "@/lib/visa-types";
 import { formatDate, formatShortDate, visaState, type Profile, type Trip, type Visa } from "@/lib/data";
 import { Flag } from "./Flag";
 import { DeleteAttachmentButton } from "./DeleteAttachmentButton";
@@ -81,7 +82,7 @@ export function VisaCard({
             {schengen ? `🇪🇺 Schengen visa · issued by ${name}` : `Visa · ${name}`}
           </p>
           {schengen && <p className="text-[11px] text-sky-800">Valid in all 29 Schengen countries</p>}
-          <h3 className="truncate font-serif text-xl font-bold text-navy">{visa.visaType || "Visa"}</h3>
+          <h3 className="truncate font-serif text-xl font-bold text-navy">{visaTypeName(visa.countryCode, visa.visaType)}</h3>
           {visa.visaFormat && (
             <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${visa.visaFormat === "Paper visa" ? "bg-amber-100 text-amber-900" : "bg-sky-100 text-sky-900"}`}>
               {visa.visaFormat === "Paper visa" ? "📄 Paper visa" : `💻 ${visa.visaFormat}`}

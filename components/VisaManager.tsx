@@ -4,6 +4,7 @@ import { useState } from "react";
 import { deleteVisa } from "@/lib/visa-actions";
 import { countryName, flagSvg } from "@/lib/countries";
 import type { Visa } from "@/lib/data";
+import { visaTypeName } from "@/lib/visa-types";
 import { VisaForm } from "./VisaForm";
 import { ConfirmButton } from "./SubmitButton";
 
@@ -37,7 +38,7 @@ export function VisaManager({
       <img src={flagSvg(v.countryCode)} alt="" className="h-6 w-9 rounded-[3px] object-cover" />
       <div className="min-w-0 flex-1">
         <p className="font-semibold">
-          {countryName(v.countryCode)} · {v.visaType || "Visa"}
+          {countryName(v.countryCode)} · {visaTypeName(v.countryCode, v.visaType)}
           {v.hasDocument && <span className="ml-2 rounded-full bg-paper-2 px-2 py-0.5 text-[10px] text-ink-soft">📎 document</span>}
         </p>
         <p className="text-sm text-ink-soft">
