@@ -39,7 +39,13 @@ const GENERIC: Record<string, string> = {
   ED: "Education", VOA: "Visa on arrival", ETA: "Electronic travel authorization", TRANSIT: "Transit",
 };
 
-const norm = (s: string) => s.trim().toUpperCase().replace(/\s+/g, "").replace(/–|—/g, "-");
+/** A "passport number" that is really the visa number (same digits, e.g. "A0012345" and "12345"). */
+export function isVisaNumber(passport: string | null | undefined, visaNumber: string | null | undefined): boolean {
+  const digits = (s: string | null | undefined) => (s ?? "").replace(/[^0-9]/g, "").replace(/^0+/, "");
+  return digits(passport).length >= 5 && digits(passport) === digits(visaNumber);
+}
+
+const norm =(s: string) => s.trim().toUpperCase().replace(/\s+/g, "").replace(/–|—/g, "-");
 
 /** What a visa category code means, e.g. ("TH", "T") → "Tourist"; null when it isn't a known code. */
 export function visaTypeMeaning(countryCode: string | null | undefined, type: string | null | undefined): string | null {

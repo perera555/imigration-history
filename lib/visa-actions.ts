@@ -175,7 +175,7 @@ export async function addVisaFromPage(
         ? Math.round(details.stayDays)
         : stayFromDates(d(details.travelFrom), d(details.travelTo)),
     issuedAt: s(details.issuedAt, 120),
-    passportNumber: s(details.passportNumber, 30)?.toUpperCase() ?? null,
+    passportNumber: passportOrNull(s(details.passportNumber, 30), details.visaNumber),
     notes: "Imported from a visa pages PDF. Please check the details.",
   };
   const sql = await getDb();
@@ -278,7 +278,7 @@ export async function saveVisa(profileId: string, visaId: string | null, _: Visa
     entries: text(form, "entries", 20),
     stayDays,
     issuedAt: text(form, "issuedAt", 120),
-    passportNumber: text(form, "passportNumber", 30)?.toUpperCase() ?? null,
+    passportNumber: passportOrNull(text(form, "passportNumber", 30), text(form, "visaNumber", 40)),
     status: text(form, "status", 30),
     notes: text(form, "notes", 1000),    countriesTravelled: [
       ...new Set(
@@ -336,6 +336,13 @@ export async function saveVisa(profileId: string, visaId: string | null, _: Visa
 }
 
 /** A visa with this number (same digits, with or without a letter in front) is already in the record. */
+/** The passport number, unless it is really the visa number (same digits), which the reader can mix up. */
+function passportOrNull(passport: string | null | undefined, visaNumber: string | null | undefined) {
+  const p = passport?.toUpperCase().replace(/\s+/g, "") || null;
+  const digits = (s: string | null | undefined) => (s ?? "").replace(/[^0-9]/g, "").replace(/^0+/, "");
+  return p && digits(p).length >= 5 && digits(p) === digits(visaNumber) ? null : p;
+}
+
 async function sameNumberExists(sql: Awaited<ReturnType<typeof getDb>>, profileId: string, number: string) {
   const digits = number.replace(/[^0-9]/g, "").replace(/^0+/, "");
   const rows =

@@ -8,7 +8,7 @@ import type { VisaDetails } from "@/lib/visa-reader";
 import type { Visa } from "@/lib/data";
 import { CountrySelect } from "./CountrySelect";
 import { isSchengen } from "@/lib/countries";
-import { visaTypeMeaning } from "@/lib/visa-types";
+import { isVisaNumber, visaTypeMeaning } from "@/lib/visa-types";
 import { SubmitButton } from "./SubmitButton";
 import { DocumentPicker, isImageName } from "./DocumentPicker";
 import { VisaPages, uploadVisaPages } from "./VisaPages";
@@ -58,6 +58,10 @@ function stayBetween(from: string, to: string): number | null {
   return days >= 1 && days <= 3650 ? days : null;
 }
 
+const OTHER = "__other__";
+const ppKey = (p: string | null | undefined) => (p ?? "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
+const samePassport = (a: string | null | undefined, b: string | null | undefined) => !!ppKey(a) && ppKey(a) === ppKey(b);
+
 const fromVisa = (v?: Visa, defaultPassport?: string | null, defaultCountry?: string, defaultType?: string): Fields => ({
   countryCode: v?.countryCode ?? defaultCountry ?? "",
   visaType: v?.visaType ?? defaultType ?? "",
@@ -72,7 +76,8 @@ const fromVisa = (v?: Visa, defaultPassport?: string | null, defaultCountry?: st
   // Saved without a stay: work it out from the travel dates.
   stayDays: v?.stayDays != null ? String(v.stayDays) : String(stayBetween(v?.travelFrom ?? "", v?.travelTo ?? "") ?? ""),
   issuedAt: v?.issuedAt ?? "",
-  passportNumber: v ? (v.passportNumber ?? "") : (defaultPassport ?? ""),
+  // A visa number saved here by mistake (read from the sticker) isn't a passport: leave it empty to choose.
+  passportNumber: v ? (isVisaNumber(v.passportNumber, v.visaNumber) ? "" : (v.passportNumber ?? "")) : (defaultPassport ?? ""),
   status: v?.status ?? "",
   notes: v?.notes ?? "",
 });
@@ -108,6 +113,9 @@ export function VisaForm({
   const [state, action] = useActionState<VisaSaveState, FormData>(saveVisa.bind(null, profileId, visa?.id ?? null), undefined);
   const [f, setF] = useState<Fields>(() => fromVisa(visa, defaultPassport, defaultCountry, defaultType));
   const [countryKey, setCountryKey] = useState(0);
+  // Current passport first, then previous ones (no repeats).
+  const passportList = passports.filter((p, i) => ppKey(p) && passports.findIndex((q) => samePassport(q, p)) === i);
+  const [otherPassport, setOtherPassport] = useState(() => !!f.passportNumber && !passportList.some((p) => samePassport(p, f.passportNumber)));
   // Countries travelled on this visa: saved list, or (new Schengen visa) the Schengen countries from the record.
   const [travelled, setTravelled] = useState<{ key: number; code: string }[]>(() =>
     (visa?.countriesTravelled.length ? visa.countriesTravelled : (schengenCountries ?? []).map((c) => c.code)).map((code, i) => ({
@@ -219,8 +227,13 @@ export function VisaForm({
       if (!d || !Object.values(d).some((v) => v !== null)) {
         return setReadMsg({ error: "Couldn't find visa details in this document, even by reading the scan. It is attached, so type the details below and save." });
       }
+      // Passport read from the document: never the visa number; use the matching passport from your list.
+      const readPassport = d.passportNumber && !isVisaNumber(d.passportNumber, d.visaNumber ?? f.visaNumber) ? d.passportNumber : null;
+      const passport = readPassport ? (passportList.find((p) => samePassport(p, readPassport)) ?? readPassport) : null;
+      if (passport) setOtherPassport(!passportList.some((p) => samePassport(p, passport)));
       setF((x) => ({
         ...x,
+        passportNumber: passport ?? (isVisaNumber(x.passportNumber, d.visaNumber) ? "" : x.passportNumber),
         countryCode: d.countryCode ?? x.countryCode,
         visaType: d.visaType ?? x.visaType,
         visaFormat: d.visaFormat ?? x.visaFormat,
@@ -236,7 +249,6 @@ export function VisaForm({
             ? String(d.stayDays)
             : String(stayBetween(d.travelFrom ?? x.travelFrom, d.travelTo ?? x.travelTo) ?? x.stayDays),
         issuedAt: d.issuedAt ?? x.issuedAt,
-        passportNumber: d.passportNumber ?? x.passportNumber,
       }));
       if (d.countryCode) setCountryKey((k) => k + 1);
       const found = Object.values(d).filter((v) => v !== null).length;
@@ -401,12 +413,34 @@ export function VisaForm({
         </label>
         <label>
           <span className="field-label">Passport used</span>
-          <input name="passportNumber" list="visa-passports" value={f.passportNumber} onChange={set("passportNumber")} className="field font-mono uppercase" />
-          <datalist id="visa-passports">
-            {passports.map((p) => (
-              <option key={p} value={p} />
+          {/* Your passports (current and previous); "Other" for one that isn't on your travel card. */}
+          <select
+            value={otherPassport ? OTHER : passportList.find((p) => samePassport(p, f.passportNumber)) ?? ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              setOtherPassport(v === OTHER);
+              setF((x) => ({ ...x, passportNumber: v === OTHER ? "" : v }));
+            }}
+            className="field font-mono"
+          >
+            <option value="">Choose passport…</option>
+            {passportList.map((p, i) => (
+              <option key={p} value={p}>
+                {p} {i === 0 ? "(current passport)" : "(previous passport)"}
+              </option>
             ))}
-          </datalist>
+            <option value={OTHER}>Other passport…</option>
+          </select>
+          {otherPassport && (
+            <input
+              value={f.passportNumber}
+              onChange={(e) => setF((x) => ({ ...x, passportNumber: e.target.value.toUpperCase() }))}
+              className="field mt-2 font-mono uppercase"
+              placeholder="Passport number"
+            />
+          )}
+          <input type="hidden" name="passportNumber" value={f.passportNumber} />
+          {!passportList.length && <span className="mt-1 block text-xs text-ink-soft">Add your passport numbers on the travel card to pick them here.</span>}
         </label>
         <label>
           <span className="field-label">Issued at</span>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { countryName, isSchengen } from "@/lib/countries";
-import { visaTypeName } from "@/lib/visa-types";
+import { isVisaNumber, visaTypeName } from "@/lib/visa-types";
 import { formatDate, formatShortDate, visaState, type Profile, type Trip, type Visa } from "@/lib/data";
 import { Flag } from "./Flag";
 import { DeleteAttachmentButton } from "./DeleteAttachmentButton";
@@ -139,7 +139,7 @@ export function VisaCard({
         <Item label="Visa no." value={visa.visaNumber} mono />
         <Item label="Entries" value={visa.entries} />
         <Item label="Stay" value={stayText(visa)} />
-        <Item label="Passport" value={visa.passportNumber ?? holder?.passportNumber} mono />
+        <Item label="Passport" value={(isVisaNumber(visa.passportNumber, visa.visaNumber) ? null : visa.passportNumber) ?? holder?.passportNumber} mono />
         <Item label="Issue date" value={visa.issueDate ? formatDate(visa.issueDate) : null} />
         <Item label="Expiry date" value={visa.expiryDate ? formatDate(visa.expiryDate) : null} />
         <Item
