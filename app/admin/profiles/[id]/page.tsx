@@ -48,13 +48,13 @@ async function EditProfile({ params }: { params: PageProps<"/admin/profiles/[id]
         <PdfButtons profileId={profile.id} />
       </div>
       <h1 className="font-serif text-3xl font-bold text-navy">{profile.fullName}</h1>
-      <DocumentsPanel profileId={profile.id} />
       <LiveRefresh profileId={profile.id} />
       <ProfileEditor profile={profile} trips={trips} visas={visas} stays={visitStays(stays)} canDelete={session.role === "admin"} />
       <PassportPagesSection profileId={profile.id} current={profile.passportNumber} previous={profile.previousPassports} pages={passportPages} documents={passportDocs} canDelete={session.role === "admin"} />
       <StaySection profileId={profile.id} stays={stays} trips={boardingTrips(trips)} canDelete={session.role === "admin"} />
       <VisaList profileId={profile.id} holder={profile} visas={visas} trips={trips} canViewDocument canDelete={session.role === "admin"} />
       <BoardingPassSection profileId={profile.id} holder={profile.fullName} passes={passes} trips={boardingTrips(trips)} canDelete={session.role === "admin"} />
+      <DocumentsPanel profileId={profile.id} />
     </div>
   );
 }

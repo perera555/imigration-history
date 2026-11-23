@@ -82,7 +82,6 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
           <section className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">My record</p>
             <TravelCard profile={profile} />
-            <DocumentsPanel profileId={profile.id} />
             <StatsBar stats={travelStats(trips)} />
           </section>
           <ProfileEditor profile={profile} trips={trips} visas={visas} stays={visitStays(stays)} canDelete={false} />
@@ -97,6 +96,8 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
           <StaySection profileId={profile.id} stays={stays} trips={boardingTrips(trips)} canDelete={false} />
           <VisaList profileId={profile.id} holder={profile} visas={visas} trips={trips} canViewDocument canDelete emptyHint="No visas yet. Add one in Step 3 above." />
           <BoardingPassSection profileId={profile.id} holder={profile.fullName} passes={passes} trips={boardingTrips(trips)} canDelete={false} />
+          {/* All my PDFs & documents: at the bottom of the page */}
+          <DocumentsPanel profileId={profile.id} />
         </>
       ) : (
         <div className="panel p-10 text-center text-ink-soft">

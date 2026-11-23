@@ -38,10 +38,9 @@ export function ProfileDetail({
         </div>
       </div>
 
-      {/* Card, documents and stats close together: no big gaps below the travel card */}
+      {/* Card and stats close together: no big gaps below the travel card */}
       <div className="space-y-3">
         <TravelCard profile={profile} />
-        {showDocuments && <DocumentsPanel profileId={profile.id} />}
         {showDocuments && <LiveRefresh profileId={profile.id} />}
         <StatsBar stats={travelStats(trips)} />
       </div>
@@ -56,6 +55,9 @@ export function ProfileDetail({
 
       {/* Visas: shown below the immigration record */}
       <VisaList profileId={profile.id} holder={profile} visas={visas} trips={trips} canViewDocument={showDocuments} canDelete={showDocuments} />
+
+      {/* All PDFs & documents: at the bottom of the page */}
+      {showDocuments && <DocumentsPanel profileId={profile.id} />}
     </div>
   );
 }
