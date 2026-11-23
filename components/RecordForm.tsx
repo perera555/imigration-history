@@ -3,6 +3,7 @@
 import { DateInput } from "./DateInput";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { CityInput } from "./CityInput";
+import { HotelInput } from "./HotelInput";
 import { useRouter } from "next/navigation";
 import { saveImport, updateRecord, type ImportProfile, type ImportTrip } from "@/lib/actions";
 import { CountrySelect } from "./CountrySelect";
@@ -633,18 +634,14 @@ export function RecordForm({
                           )}
                           <label>
                             <span className={lbl}>🏨 Hotel / Airbnb (optional)</span>
-                            <input
+                            <HotelInput
+                              countryCode={b.countryCode}
+                              city={v.city ?? ""}
                               value={v.stayedAt ?? ""}
-                              list={`stayed-${b.key}`}
-                              onChange={(e) => {
-                                const name = e.target.value;
-                                // A hotel from the list: fill its address too (when empty).
-                                const known = hotelsFor(b).find((h) => h.name.toLowerCase() === name.trim().toLowerCase());
-                                setVisit(b.key, v.key, { stayedAt: name, ...(known?.address && !v.stayedAddress ? { stayedAddress: known.address } : {}) });
-                              }}
+                              saved={hotelsFor(b)}
+                              // A hotel from the list: fill its address too.
+                              onChange={(name, address) => setVisit(b.key, v.key, { stayedAt: name, ...(address ? { stayedAddress: address } : {}) })}
                               className="field !py-2"
-                              placeholder={b.countryCode ? "Pick a saved one, or type it in" : "e.g. PJ Watergate"}
-                              autoComplete="off"
                             />
                           </label>
                           <label>
@@ -709,16 +706,6 @@ export function RecordForm({
           <option key={p} value={p} />
         ))}
       </datalist>
-      {/* Hotels per country: saved ones and ones typed on other visits to that country */}
-      {blocks.map((b) => (
-        <datalist key={b.key} id={`stayed-${b.key}`}>
-          {hotelsFor(b).map((h) => (
-            <option key={h.name} value={h.name}>
-              {h.address ?? ""}
-            </option>
-          ))}
-        </datalist>
-      ))}
 
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-card p-4 shadow-sm">
         <button type="button" onClick={save} disabled={saving} className="btn btn-primary !px-6 !py-3">
