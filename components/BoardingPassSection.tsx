@@ -112,6 +112,59 @@ export function BoardingPassSection({
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   };
 
+  /**
+   * Flights from the same boarding pass (same booking reference and document, within 2 days — e.g.
+   * CMB → AUH and AUH → DUB) are shown together as one journey: the whole route, then each flight.
+   */
+  const journeys = (list: BoardingPass[]) => {
+    const groups: BoardingPass[][] = [];
+    const sorted = [...list].sort((a, b) => (a.flightDate ?? "").localeCompare(b.flightDate ?? ""));
+    for (const p of sorted) {
+      const g = p.bookingRef
+        ? groups.find(
+            (x) =>
+              x[0].bookingRef === p.bookingRef &&
+              (x[0].fileName ?? "") === (p.fileName ?? "") &&
+              Math.abs(Date.parse(x[x.length - 1].flightDate ?? "") - Date.parse(p.flightDate ?? "")) <= 2 * 86_400_000,
+          )
+        : undefined;
+      if (g) g.push(p);
+      else groups.push([p]);
+    }
+    return groups.map((g) => {
+      if (g.length === 1) return card(g[0]);
+      // Flights in travel order: each one starts where the previous one landed.
+      const ordered = [g.find((p) => !g.some((q) => q.toAirport && q.toAirport === p.fromAirport)) ?? g[0]];
+      while (ordered.length < g.length) {
+        const next = g.find((p) => !ordered.includes(p) && p.fromAirport === ordered[ordered.length - 1].toAirport) ?? g.find((p) => !ordered.includes(p))!;
+        ordered.push(next);
+      }
+      const route = [ordered[0].fromAirport, ...ordered.map((p) => p.toAirport)].map((a) => a || "---").join(" → ");
+      return (
+        <div key={`journey-${g[0].id}`} className="space-y-4 rounded-3xl border-2 border-gold/50 bg-gold/5 p-3 lg:col-span-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
+            <span className="rounded-full bg-navy px-3 py-1 text-xs font-bold text-gold-soft">✈ One boarding pass · {g.length} flights</span>
+            <span className="font-serif text-lg font-bold text-navy">{route}</span>
+            <span className="text-xs text-ink-soft">
+              {fmt(ordered[0].flightDate)}
+              {ordered[0].bookingRef && <span className="font-mono"> · PNR {ordered[0].bookingRef}</span>}
+            </span>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {ordered.map((p, i) => (
+              <div key={p.id} className="space-y-1">
+                <p className="px-1 text-xs font-semibold uppercase tracking-[0.15em] text-ink-soft">
+                  Flight {i + 1} of {g.length}
+                </p>
+                {card(p)}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    });
+  };
+
   const card = (p: BoardingPass) => (
     <article key={p.id} className="space-y-3">
       {/* Real boarding pass proportions (203 x 83 mm), 3D */}
@@ -267,7 +320,7 @@ export function BoardingPassSection({
       <div className="mt-6 space-y-6">
         <div>
           <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-ink-soft">🕒 Current / upcoming ({current.length})</h3>
-          {current.length ? <div className="grid gap-4 lg:grid-cols-2">{current.map(card)}</div> : <p className="text-sm text-ink-soft">None yet.</p>}
+          {current.length ? <div className="grid gap-4 lg:grid-cols-2">{journeys(current)}</div> : <p className="text-sm text-ink-soft">None yet.</p>}
         </div>
         <div>
           <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-ink-soft">🧾 Previous trips ({previous.length})</h3>
@@ -279,7 +332,7 @@ export function BoardingPassSection({
                   <h4 className="font-serif text-lg font-bold text-navy">
                     {country} <span className="text-sm font-normal text-ink-soft">· {list.length} boarding pass{list.length === 1 ? "" : "es"}</span>
                   </h4>
-                  <div className="grid gap-4 lg:grid-cols-2">{list.map(card)}</div>
+                  <div className="grid gap-4 lg:grid-cols-2">{journeys(list)}</div>
                 </div>
               ))}
             </CountrySearch>
