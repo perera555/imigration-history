@@ -20,7 +20,7 @@ import {
 import { stayNights } from "@/lib/stay-kinds";
 import { countryName, isSchengen } from "@/lib/countries";
 import { visaTypeName } from "@/lib/visa-types";
-import { BoardingPassView } from "./BoardingPassPdf";
+import { BP_WIDTH, BoardingPassView } from "./BoardingPassPdf";
 
 const NAVY = "#0b1f3a";
 const NAVY_2 = "#13315c";
@@ -103,7 +103,31 @@ function mrz(profile: Profile) {
   return [top.padEnd(44, "<").slice(0, 44), bottom.padEnd(44, "<").slice(0, 44)];
 }
 
-export type PdfParts = { card: boolean; record: boolean; visas: boolean; boarding?: boolean; stays?: boolean };
+/**
+ * Boarding passes by date; flights of one journey on the same day (same booking) in travel order —
+ * each starts where the previous one landed (CMB > AUH, then AUH > DUB).
+ */
+function travelOrder<T extends { flightDate: string | null; bookingRef: string | null; fromAirport: string | null; toAirport: string | null }>(list: T[]): T[] {
+  const byDate = [...list].sort((a, b) => (a.flightDate ?? "9999").localeCompare(b.flightDate ?? "9999"));
+  const out: T[] = [];
+  for (const p of byDate) {
+    if (out.includes(p)) continue;
+    const same = byDate.filter((q) => !out.includes(q) && q.flightDate === p.flightDate && q.bookingRef && q.bookingRef === p.bookingRef);
+    if (same.length < 2) {
+      out.push(p);
+      continue;
+    }
+    let cur = same.find((q) => !same.some((r) => r.toAirport && r.toAirport === q.fromAirport)) ?? same[0];
+    while (cur) {
+      out.push(cur);
+      const next: T | undefined = same.find((q) => !out.includes(q) && q.fromAirport === cur!.toAirport) ?? same.find((q) => !out.includes(q));
+      cur = next as T;
+    }
+  }
+  return out;
+}
+
+export type PdfParts ={ card: boolean; record: boolean; visas: boolean; boarding?: boolean; stays?: boolean };
 export type PdfBoardingPass = BoardingPass & { image: string | null; tripLabel: string | null };
 
 export function ImmigrationPdf({
@@ -113,7 +137,7 @@ export function ImmigrationPdf({
   generatedOn,
   visas = [],
   parts = { card: true, record: true, visas: true },
-  boarding = [],
+  boarding: boardingIn = [],
   stays = [],
 }: {
   /** Hotels / Airbnb homes stayed. */
@@ -128,6 +152,7 @@ export function ImmigrationPdf({
   flags: Record<string, string | null>;
   generatedOn: string;
 }) {
+  const boarding = travelOrder(boardingIn);
   const age = ageFrom(profile.dateOfBirth);
   const stats = travelStats(trips);
   const groups = groupForDisplay(trips);
@@ -306,6 +331,55 @@ export function ImmigrationPdf({
     </View>
   );
 
+  // Boarding passes in the record PDF: the list, then each pass small (two per row) with its uploaded
+  // scan below it — straight on, no new page and no empty space. Real size is in the boarding passes PDF.
+  const SMALL = 0.44;
+  const pairs: (typeof boarding)[] = [];
+  for (let i = 0; i < boarding.length; i += 2) pairs.push(boarding.slice(i, i + 2));
+  // A boarding pass with several flights (e.g. CMB > AUH > DUB) is one paper: show its scan once.
+  const scanShown = new Set<string>();
+  const showScan = (b: (typeof boarding)[number]) => {
+    if (!b.image) return false;
+    const key = b.bookingRef && b.fileName ? `${b.bookingRef}|${b.fileName}` : b.id;
+    if (scanShown.has(key)) return false;
+    scanShown.add(key);
+    return true;
+  };
+  const boardingListSection =
+    boarding.length > 0 ? (
+      <View style={{ marginTop: 18 }}>
+        <Text style={s.sectionTitle} minPresenceAhead={60}>
+          Boarding Passes
+        </Text>
+        {boardingTable}
+        {pairs.map((pair) => {
+          const scans = pair.filter(showScan);
+          return (
+            <View key={`pair-${pair[0].id}`}>
+              {/* The passes in one row, their scans in the next: each row moves on only by itself. */}
+              <View style={{ flexDirection: "row", marginBottom: 8 }} wrap={false}>
+                {pair.map((b, i) => (
+                  <View key={b.id} style={{ marginRight: i === 0 ? 10 : 0 }}>
+                    <BoardingPassView pass={b} passenger={profile.fullName} tripLabel={b.tripLabel} size={SMALL} />
+                  </View>
+                ))}
+              </View>
+              {scans.length > 0 && (
+                <View style={{ flexDirection: "row", marginBottom: 10 }} wrap={false}>
+                  {scans.map((b, i) => (
+                    // eslint-disable-next-line jsx-a11y/alt-text
+                    <Image key={`scan-${b.id}`} src={b.image!} style={{ width: BP_WIDTH * SMALL, maxHeight: 150, objectFit: "contain", marginRight: i === 0 ? 10 : 0 }} />
+                  ))}
+                </View>
+              )}
+            </View>
+          );
+        })}
+      </View>
+    ) : null;
+  /** The boarding passes PDF on its own: real-size passes for printing. */
+  const boardingOnly = !parts.card && !parts.record && !parts.visas && !parts.stays;
+
   const footer = (
     <View style={s.footer} fixed>
       <Text>{profile.fullName} · Private &amp; confidential</Text>
@@ -349,7 +423,9 @@ export function ImmigrationPdf({
           </View>
         )}
         {groups.map((group, gi) => (
-          <View key={group.countryCode} style={[s.group, gi % 2 ? { backgroundColor: PAPER } : {}]} wrap={false}>
+          // Continues on the next page when it doesn't fit (no empty space left at the bottom of a page);
+          // a country with one or two visits stays in one piece, and each visit line is never split.
+          <View key={group.countryCode} style={[s.group, gi % 2 ? { backgroundColor: PAPER } : {}]} wrap={group.visits.length > 2} minPresenceAhead={40}>
             <View style={[s.countryCell, { width: W.country }]}>
               {flags[group.countryCode] && (
                 // eslint-disable-next-line jsx-a11y/alt-text
@@ -363,7 +439,7 @@ export function ImmigrationPdf({
             </Text>
             <View style={{ width: `${VISIT_COLS}%`, paddingVertical: 2 }}>
               {group.visits.map((trip) => (
-                <View key={trip.id} style={s.visitRow}>
+                <View key={trip.id} style={s.visitRow} wrap={false}>
                   <Text style={[s.cell, { width: pct(W.dep) }]}>{formatDate(trip.departureDate)}</Text>
                   <Text style={[s.cell, { width: pct(W.ret) }]}>{formatDate(trip.returnDate)}</Text>
                   <Text style={[s.cell, { width: pct(W.days) }]}>{tripDuration(trip) ?? "—"}</Text>
@@ -449,6 +525,7 @@ export function ImmigrationPdf({
         {parts.record && <View style={{ marginTop: 14 }}>{recordBody(false)}</View>}
         {parts.visas && visasSection}
         {parts.stays && <View style={{ marginTop: 18 }}>{staysSection}</View>}
+        {parts.boarding && boardingListSection}
         {footer}
       </Page>
       )}
@@ -459,14 +536,15 @@ export function ImmigrationPdf({
           {parts.record && recordBody(!parts.visas && !parts.stays)}
           {parts.visas && visasSection}
           {parts.stays && <View style={{ marginTop: parts.record || parts.visas ? 18 : 0 }}>{staysSection}</View>}
+          {parts.boarding && boardingListSection}
           {footer}
         </Page>
       )}
-      {parts.boarding && (
-        // Boarding passes at real size: 203 x 83 mm (575 x 235 pt), landscape A4, two per page.
+      {parts.boarding && boardingOnly && (
+        // Boarding passes PDF: real size 203 x 83 mm (575 x 235 pt), landscape A4, two per page.
         <Page size="A4" orientation="landscape" style={[s.page, { paddingHorizontal: 40 }]}>
-          {!parts.card && !parts.record && !parts.visas && titleRow}
-          <Text style={s.sectionTitle}>Boarding Passes</Text>
+          {titleRow}
+          <Text style={s.sectionTitle}>Boarding Passes (actual size)</Text>
           <Text style={[s.note, { marginBottom: 10 }]}>Actual size 203 x 83 mm. Print at 100% (no "fit to page").</Text>
           {boarding.length === 0 && <Text style={{ color: MUTED }}>No boarding passes uploaded yet.</Text>}
           {boarding.length > 0 && boardingTable}
@@ -478,11 +556,11 @@ export function ImmigrationPdf({
           {footer}
         </Page>
       )}
-      {parts.boarding && boarding.some((b) => b.image) && (
+      {parts.boarding && boardingOnly && boarding.some((b) => b.image) && (
         // Uploaded boarding pass photos, shown at boarding pass width (203 mm).
         <Page size="A4" orientation="landscape" style={[s.page, { paddingHorizontal: 40 }]}>
           <Text style={s.sectionTitle}>Uploaded boarding passes</Text>
-          {boarding.filter((b) => b.image).map((b) => (
+          {boarding.filter((b) => showScan(b)).map((b) => (
             <View key={`img-${b.id}`} wrap={false} style={{ marginBottom: 14 }}>
               <Text style={s.note}>{`${b.flightNumber ?? "Boarding pass"}${b.flightDate ? ` · ${formatDate(b.flightDate)}` : ""}`}</Text>
               {/* eslint-disable-next-line jsx-a11y/alt-text */}

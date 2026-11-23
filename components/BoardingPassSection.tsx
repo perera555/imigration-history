@@ -168,10 +168,21 @@ export function BoardingPassSection({
                 <p className="px-1 text-xs font-semibold uppercase tracking-[0.15em] text-ink-soft">
                   Flight {i + 1} of {g.length}
                 </p>
-                {fullCard(p)}
+                {fullCard(p, false)}
               </div>
             ))}
           </div>
+          {/* One paper for all the flights: its scan is shown once. */}
+          {(() => {
+            const withScan = ordered.find((p) => p.hasFile && (p.mime?.startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(p.fileName ?? "")));
+            return withScan ? (
+              <a href={`/api/boarding/${withScan.id}/file`} target="_blank" rel="noopener" title="Open the boarding pass full size" className="mt-4 block">
+                <p className="mb-1 px-1 text-xs font-semibold uppercase tracking-[0.15em] text-ink-soft">Original boarding pass</p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`/api/boarding/${withScan.id}/file`} alt="Boarding pass" loading="lazy" className="max-h-72 w-full rounded-xl bg-paper object-contain shadow-[0_0_0_1px_rgba(0,0,0,0.08)]" />
+              </a>
+            ) : null;
+          })()}
         </details>
       );
     });
@@ -198,7 +209,8 @@ export function BoardingPassSection({
     </details>
   );
 
-  const fullCard = (p: BoardingPass) => (
+  /** The full boarding pass; `withScan` false when the scan is shown once for a whole journey. */
+  const fullCard = (p: BoardingPass, withScan = true) => (
     <article key={p.id} className="space-y-3">
       {/* Real boarding pass proportions (203 x 83 mm), 3D */}
       <div className="bp-scene">
@@ -258,7 +270,7 @@ export function BoardingPassSection({
           </div>
         </div>
       </div>
-      {p.hasFile && (p.mime?.startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(p.fileName ?? "")) && (
+      {withScan && p.hasFile && (p.mime?.startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(p.fileName ?? "")) && (
         <a href={`/api/boarding/${p.id}/file`} target="_blank" rel="noopener" title="Open the uploaded photo full size" className="block">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={`/api/boarding/${p.id}/file`} alt="Boarding pass photo" loading="lazy" className="max-h-48 w-full rounded-xl bg-paper object-contain shadow-[0_0_0_1px_rgba(0,0,0,0.08)]" />
