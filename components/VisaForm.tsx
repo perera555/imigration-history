@@ -111,7 +111,14 @@ export function VisaForm({
   onDone?: () => void;
 }) {
   const [state, action] = useActionState<VisaSaveState, FormData>(saveVisa.bind(null, profileId, visa?.id ?? null), undefined);
-  const [f, setF] = useState<Fields>(() => fromVisa(visa, defaultPassport, defaultCountry, defaultType));
+  const [f, setF] = useState<Fields>(() => {
+    const x = fromVisa(visa, defaultPassport, defaultCountry, defaultType);
+    // Saved earlier with the visa number in the passport box: move it to Visa number.
+    if (visa && !x.visaNumber && x.passportNumber && passports.length && !passports.some((p) => samePassport(p, x.passportNumber))) {
+      return { ...x, visaNumber: x.passportNumber, passportNumber: "" };
+    }
+    return x;
+  });
   const [countryKey, setCountryKey] = useState(0);
   // Current passport first, then previous ones (no repeats).
   const passportList = passports.filter((p, i) => ppKey(p) && passports.findIndex((q) => samePassport(q, p)) === i);
@@ -228,9 +235,15 @@ export function VisaForm({
         return setReadMsg({ error: "Couldn't find visa details in this document, even by reading the scan. It is attached, so type the details below and save." });
       }
       // Passport read from the document: never the visa number; use the matching passport from your list.
-      const readPassport = d.passportNumber && !isVisaNumber(d.passportNumber, d.visaNumber ?? f.visaNumber) ? d.passportNumber : null;
-      const passport = readPassport ? (passportList.find((p) => samePassport(p, readPassport)) ?? readPassport) : null;
-      if (passport) setOtherPassport(!passportList.some((p) => samePassport(p, passport)));
+      // A number that isn't one of your passports is the visa number (when none was read), not a passport.
+      let readPassport = d.passportNumber && !isVisaNumber(d.passportNumber, d.visaNumber ?? f.visaNumber) ? d.passportNumber : null;
+      const mine = readPassport ? passportList.find((p) => samePassport(p, readPassport)) : undefined;
+      if (readPassport && !mine && passportList.length) {
+        if (!d.visaNumber && !f.visaNumber) d = { ...d, visaNumber: readPassport.toUpperCase() };
+        readPassport = null;
+      }
+      const passport = mine ?? readPassport;
+      if (passport) setOtherPassport(!mine);
       setF((x) => ({
         ...x,
         passportNumber: passport ?? (isVisaNumber(x.passportNumber, d.visaNumber) ? "" : x.passportNumber),

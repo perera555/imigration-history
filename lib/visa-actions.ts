@@ -158,6 +158,16 @@ export async function addVisaFromPage(
   if (!checkFile(file)) return { error: fileError(file) };
   const d = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
   const s = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
+  // A read "passport" that isn't one of the holder's passports is the visa number (when none was read).
+  const db = await getDb();
+  const [holder] = await db<{ passportNumber: string | null; previousPassports: string[] | null }[]>`
+    select passport_number, previous_passports from profiles where id = ${profileId}`;
+  const key = (p: string | null | undefined) => (p ?? "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
+  const own = [holder?.passportNumber, ...(holder?.previousPassports ?? [])].filter((p): p is string => !!key(p));
+  const readPp = s(details.passportNumber, 30);
+  if (readPp && own.length && !own.some((p) => key(p) === key(readPp))) {
+    details = { ...details, visaNumber: details.visaNumber || readPp, passportNumber: null };
+  }
   const values = {
     profileId,
     countryCode: code,

@@ -66,7 +66,13 @@ export function VisaCard({
   const linked = tripsOnVisa(visa, trips);
   const name = countryName(visa.countryCode);
   const schengen = isSchengen(visa.countryCode);
-  const mrz = `V<${visa.countryCode}${(visa.visaType || "VISA").toUpperCase().replace(/[^A-Z0-9]/g, "<")}<<${(visa.visaNumber ?? "").replace(/[^A-Z0-9]/gi, "")}`
+  // Saved earlier with the visa number in the passport box (not one of the holder's passports): show it as the visa number.
+  const ppKey = (p: string | null | undefined) => (p ?? "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
+  const own = holder ? [holder.passportNumber, ...holder.previousPassports].filter((p) => ppKey(p)) : [];
+  const misplaced = !visa.visaNumber && !!ppKey(visa.passportNumber) && own.length > 0 && !own.some((p) => ppKey(p) === ppKey(visa.passportNumber));
+  const visaNo = visa.visaNumber ?? (misplaced ? visa.passportNumber : null);
+  const passportNo = (misplaced || isVisaNumber(visa.passportNumber, visa.visaNumber) ? null : visa.passportNumber) ?? holder?.passportNumber;
+  const mrz = `V<${visa.countryCode}${(visa.visaType || "VISA").toUpperCase().replace(/[^A-Z0-9]/g, "<")}<<${(visaNo ?? "").replace(/[^A-Z0-9]/gi, "")}`
     .padEnd(44, "<")
     .slice(0, 44);
 
@@ -100,7 +106,7 @@ export function VisaCard({
         </div>
       </header>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[#e3d6b4] bg-white/40 px-5 py-2.5 text-sm">
-        {visa.visaNumber && <span className="font-mono font-semibold text-navy">No. {visa.visaNumber}</span>}
+        {visaNo && <span className="font-mono font-semibold text-navy">No. {visaNo}</span>}
         <span className="text-ink-soft tabular-nums">
           {visa.issueDate || visa.expiryDate ? `${visa.issueDate ? formatShortDate(visa.issueDate) : "…"} → ${visa.expiryDate ? formatShortDate(visa.expiryDate) : "…"}` : "No dates yet"}
         </span>
@@ -136,10 +142,10 @@ export function VisaCard({
       )}
 
       <dl className="grid grid-cols-2 gap-x-5 gap-y-3 p-5 sm:grid-cols-4">
-        <Item label="Visa no." value={visa.visaNumber} mono />
+        <Item label="Visa no." value={visaNo} mono />
         <Item label="Entries" value={visa.entries} />
         <Item label="Stay" value={stayText(visa)} />
-        <Item label="Passport" value={(isVisaNumber(visa.passportNumber, visa.visaNumber) ? null : visa.passportNumber) ?? holder?.passportNumber} mono />
+        <Item label="Passport" value={passportNo} mono />
         <Item label="Issue date" value={visa.issueDate ? formatDate(visa.issueDate) : null} />
         <Item label="Expiry date" value={visa.expiryDate ? formatDate(visa.expiryDate) : null} />
         <Item
