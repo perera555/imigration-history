@@ -8,6 +8,7 @@
 import { readBoardingPass, readBoardingText } from "./boarding-actions";
 import type { BoardingDetails } from "./boarding-reader";
 import { parseBcbpLegs } from "./bcbp";
+import { airlineName } from "./airlines";
 import { readBarcodeTexts } from "./barcode";
 import { fileToImages, ocrImages } from "./ocr";
 
@@ -31,7 +32,7 @@ export async function readBoardingFile(profileId: string, file: File, onProgress
       const key = `${b.flightNumber}|${b.fromAirport}|${b.toAirport}|${b.flightDate}`;
       return !seen.has(key) && !!seen.add(key);
     })
-    .map((b) => ({ airline: b.airlineCode, flightNumber: b.flightNumber, fromAirport: b.fromAirport, toAirport: b.toAirport, flightDate: b.flightDate, seat: b.seat, bookingRef: b.bookingRef }));
+    .map((b) => ({ airline: airlineName(b.airlineCode), flightNumber: b.flightNumber, fromAirport: b.fromAirport, toAirport: b.toAirport, flightDate: b.flightDate, seat: b.seat, bookingRef: b.bookingRef }));
   if (legs.length) return { details: legs[0], legs, how: "from the barcode" };
 
   if (file.type === "application/pdf") {

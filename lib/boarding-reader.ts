@@ -1,5 +1,6 @@
 import "server-only";
 import { extractText, getDocumentProxy } from "unpdf";
+import { AIRLINES } from "./airlines";
 
 export type BoardingDetails = {
   airline: string | null;
@@ -27,13 +28,21 @@ function findDate(t: string): string | null {
   return null;
 }
 
-const AIRLINES: Record<string, string> = {
-  UL: "SriLankan Airlines", EK: "Emirates", QR: "Qatar Airways", EY: "Etihad Airways", SQ: "Singapore Airlines",
-  TG: "Thai Airways", MH: "Malaysia Airlines", AK: "AirAsia", FD: "Thai AirAsia", "6E": "IndiGo", AI: "Air India",
-  QF: "Qantas", NZ: "Air New Zealand", BA: "British Airways", KL: "KLM", AF: "Air France", LH: "Lufthansa",
-  TK: "Turkish Airlines", CX: "Cathay Pacific", CA: "Air China", MU: "China Eastern", CZ: "China Southern",
-  FZ: "flydubai", WY: "Oman Air", GF: "Gulf Air", KU: "Kuwait Airways", SV: "Saudia", VN: "Vietnam Airlines",
-};
+/**
+ * A date printed without a year ("29OCT", or "290CT" when the scan reads O as 0): the most recent
+ * such day, up to two months ahead. The form then takes the year of the visit on that day.
+ */
+function dateWithoutYear(t: string, today = new Date()): string | null {
+  const m = t.match(/\b(\d{1,2})\s?([A-Z0][A-Z]{2})\b/);
+  if (!m) return null;
+  const month = MONTHS[m[2].replace(/^0/, "O").toLowerCase()];
+  const day = Number(m[1]);
+  if (!month || day < 1 || day > 31) return null;
+  const limit = today.getTime() + 60 * 86_400_000;
+  let year = today.getUTCFullYear();
+  if (Date.UTC(year, month - 1, day) > limit) year--;
+  return `${year}-${pad(month)}-${pad(day)}`;
+}
 
 /** Reads an e-boarding pass PDF that contains text. Returns null when there's no readable text. */
 export async function readBoardingPdf(bytes: Uint8Array): Promise<BoardingDetails | null> {
@@ -47,9 +56,14 @@ export function parseBoardingText(raw: string): BoardingDetails | null {
   const t = raw.replace(/[ \t]+/g, " ");
   if (t.replace(/\s/g, "").length < 20) return null;
 
-  const flight = t.match(/(?:flight|flt)\s*(?:no\.?|number)?\s*[:\-]?\s*([A-Z0-9]{2})\s?(\d{2,4})\b/i) ?? t.match(/\b([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?(\d{3,4})\b/);
+  const flight =
+    t.match(/(?:flight|flt)\s*(?:no\.?|number)?\s*[:\-]?\s*([A-Z0-9]{2})\s?(\d{2,4})\b/i) ??
+    // A known airline's code followed by the number (e.g. "BA 829", "EY393").
+    [...t.matchAll(/\b([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?(\d{2,4})\b/g)].find((m) => AIRLINES[m[1]]) ??
+    t.match(/\b([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?(\d{3,4})\b/);
   const route =
-    t.match(/\b([A-Z]{3})\s*(?:→|->|–|-|to|\/)\s*([A-Z]{3})\b/) ??
+    // "DUB > LHR", "CMB → AUH", "CMB-AUH", "CMB to AUH"
+    t.match(/\b([A-Z]{3})\s*(?:→|->|>|›|»|–|-|to|\/)\s*([A-Z]{3})\b/) ??
     (() => {
       const from = t.match(/(?:from|origin|departure)\s*[:\-]?\s*.*?\(?\b([A-Z]{3})\b\)?/i);
       const to = t.match(/(?:to|destination|arrival)\s*[:\-]?\s*.*?\(?\b([A-Z]{3})\b\)?/i);
@@ -57,13 +71,21 @@ export function parseBoardingText(raw: string): BoardingDetails | null {
     })();
   const code = flight?.[1]?.toUpperCase() ?? null;
 
-  return {
+  const details: BoardingDetails = {
     airline: (code && AIRLINES[code]) ?? t.match(/\b([A-Z][a-z]+ (?:Airlines|Airways|Air))\b/)?.[1] ?? null,
     flightNumber: flight ? `${flight[1].toUpperCase()}${flight[2]}` : null,
     fromAirport: route?.[1] ?? null,
     toAirport: route?.[2] ?? null,
-    flightDate: findDate(t),
-    seat: t.match(/seat\s*(?:no\.?)?\s*[:\-]?\s*(\d{1,2}[A-K])\b/i)?.[1]?.toUpperCase() ?? null,
-    bookingRef: t.match(/(?:pnr|booking\s*(?:ref(?:erence)?|code)|confirmation|record locator)\s*[:\-#]?\s*([A-Z0-9]{5,8})\b/i)?.[1]?.toUpperCase() ?? null,
+    flightDate: findDate(t) ?? dateWithoutYear(t),
+    // "SEAT 27D", or the seat printed under the "SEAT" label (first value like 27D after it).
+    seat: (t.match(/seat\s*(?:no\.?)?\s*[:\-]?\s*(\d{1,2}[A-K])\b/i) ?? t.match(/seat[^]{0,80}?\b(\d{1,2}[A-K])\b/i))?.[1]?.toUpperCase() ?? null,
+    bookingRef:
+      (t.match(/(?:pnr|booking\s*(?:ref(?:erence)?|code)|confirmation|record locator)\s*[:\-#]?\s*([A-Z0-9]{5,8})\b/i) ??
+        // Airport boarding passes: the 6-character booking code printed just before "SEQ".
+        t.match(/\b((?=[A-Z0-9]*\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{6})\s+SEQ\b/))?.[1]?.toUpperCase() ?? null,
   };
+  // Just one stray "flight number" and nothing else (e.g. the back of a boarding pass with a bag tag): nothing read.
+  const found = [details.fromAirport, details.flightDate, details.seat, details.bookingRef].filter(Boolean).length;
+  if (found === 0 && !(code && AIRLINES[code])) return null;
+  return details;
 }
