@@ -26,7 +26,10 @@ export function VisaList({
   editPage = "update",
   emptyHint = "No visas recorded yet.",
   canDelete = false,
+  stays = [],
 }: {
+  /** Hotels / Airbnb homes: each visa shows how many were stayed in on its visits (🏨 2). */
+  stays?: { tripId: string | null; name: string }[];
   /** Admins: "Delete PDF / photo" on each visa card. */
   canDelete?: boolean;
   /** Shows "View / Download visas PDF" when given. */
@@ -99,7 +102,7 @@ export function VisaList({
                 </header>
                 <div className="grid items-start gap-5 p-4 sm:p-5 lg:grid-cols-2">
                   {g.visas.map((v) => (
-                    <VisaCard key={v.id} visa={v} holder={holder} trips={trips} canViewDocument={canViewDocument} canDelete={canDelete} editPage={editPage} />
+                    <VisaCard key={v.id} visa={v} holder={holder} trips={trips} stays={stays} canViewDocument={canViewDocument} canDelete={canDelete} editPage={editPage} />
                   ))}
                 </div>
               </section>

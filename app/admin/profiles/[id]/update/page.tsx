@@ -141,7 +141,7 @@ async function UpdateRecord({
         />
       </section>
 
-      <VisaList profileId={id} holder={profile} visas={visas} trips={trips} canViewDocument canDelete={session.role === "admin"} />
+      <VisaList profileId={id} holder={profile} visas={visas} trips={trips} stays={stays} canViewDocument canDelete={session.role === "admin"} />
       <BoardingPassSection profileId={id} holder={profile.fullName} passes={passes} trips={boardingTrips(trips)} canDelete={session.role === "admin"} />
       <HashScroll />
     </div>

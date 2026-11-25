@@ -53,7 +53,10 @@ export function VisaCard({
   canViewDocument,
   editPage = "update",
   canDelete = false,
+  stays = [],
 }: {
+  /** Hotels / Airbnb homes (counted per visa as "🏨 2"). */
+  stays?: { tripId: string | null; name: string }[];
   /** Admins: "Delete PDF / photo" for the visa's document. */
   canDelete?: boolean;
   visa: Visa;
@@ -64,6 +67,16 @@ export function VisaCard({
 }) {
   const state = visaState(visa);
   const linked = tripsOnVisa(visa, trips);
+  // Hotels stayed on the visits made with this visa (saved stays, or the hotel typed on the visit), once each.
+  const linkedIds = new Set(linked.map((t) => t.id));
+  const hotels = [
+    ...new Map(
+      [...stays.filter((s) => s.tripId && linkedIds.has(s.tripId)).map((s) => s.name), ...linked.map((t) => t.stayedAt ?? "")]
+        .map((n) => n.trim())
+        .filter(Boolean)
+        .map((n) => [n.toLowerCase(), n] as const),
+    ).values(),
+  ];
   const name = countryName(visa.countryCode);
   const schengen = isSchengen(visa.countryCode);
   // Saved earlier with the visa number in the passport box (not one of the holder's passports): show it as the visa number.
@@ -112,6 +125,11 @@ export function VisaCard({
         </span>
         {visa.entries && <span className="text-ink-soft">{visa.entries} entry</span>}
         {visa.hasDocument && <span className="text-ink-soft">📎 document</span>}
+        {hotels.length > 0 && (
+          <span className="text-ink-soft" title={`Hotels on the visits made with this visa: ${hotels.join(", ")}`}>
+            🏨 {hotels.length}
+          </span>
+        )}
         <span className="ml-auto rounded-full bg-navy px-3 py-1 text-xs font-semibold text-gold-soft">
           <span className="group-open:hidden">▾ Show details</span>
           <span className="hidden group-open:inline">▴ Hide details</span>

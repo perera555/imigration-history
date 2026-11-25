@@ -58,7 +58,7 @@ export function ProfileDetail({
       {showDocuments && <StaySection profileId={profile.id} stays={stays} trips={boardingTrips(trips)} canDelete={false} />}
 
       {/* Visas: shown below the immigration record */}
-      <VisaList profileId={profile.id} holder={profile} visas={visas} trips={trips} canViewDocument={showDocuments} canDelete={showDocuments} />
+      <VisaList profileId={profile.id} holder={profile} visas={visas} trips={trips} stays={stays} canViewDocument={showDocuments} canDelete={showDocuments} />
 
       {/* All PDFs & documents: at the bottom of the page */}
       {showDocuments && <DocumentsPanel profileId={profile.id} />}
