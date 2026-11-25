@@ -24,7 +24,14 @@ if (usesLocalDb()) {
 }
 
 const nextBin = path.join(root, "node_modules", "next", "dist", "bin", "next");
-const child = spawn(process.execPath, [nextBin, "dev", ...process.argv.slice(2)], { cwd: root, stdio: "inherit" });
+// After the PC sleeps or the database restarts, the database library reconnects with a wait that has
+// already passed; Node then prints a harmless "TimeoutNegativeWarning" (shown as a red issue). Hide just that one.
+const child = spawn(process.execPath, ["--disable-warning=TimeoutNegativeWarning", nextBin, "dev", ...process.argv.slice(2)], {
+  cwd: root,
+  stdio: "inherit",
+  // Also for the worker processes Next.js starts.
+  env: { ...process.env, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --disable-warning=TimeoutNegativeWarning`.trim() },
+});
 
 let stopping = false;
 const shutdown = (code = 0) => {
