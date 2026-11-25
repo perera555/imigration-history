@@ -56,7 +56,7 @@ export function VisaCard({
   stays = [],
 }: {
   /** Hotels / Airbnb homes (counted per visa as "🏨 2"). */
-  stays?: { tripId: string | null; name: string }[];
+  stays?: { tripId: string | null; name: string; id?: string; checkIn?: string | null }[];
   /** Admins: "Delete PDF / photo" for the visa's document. */
   canDelete?: boolean;
   visa: Visa;
@@ -77,6 +77,10 @@ export function VisaCard({
         .map((n) => [n.toLowerCase(), n] as const),
     ).values(),
   ];
+  // The first saved hotel on this visa (its card in the "Hotels & Airbnb" section), by check-in date.
+  const firstStayId = stays
+    .filter((s) => s.id && s.tripId && linkedIds.has(s.tripId))
+    .sort((a, b) => (a.checkIn ?? "9999").localeCompare(b.checkIn ?? "9999"))[0]?.id;
   const name = countryName(visa.countryCode);
   const schengen = isSchengen(visa.countryCode);
   // Saved earlier with the visa number in the passport box (not one of the holder's passports): show it as the visa number.
@@ -126,9 +130,14 @@ export function VisaCard({
         {visa.entries && <span className="text-ink-soft">{visa.entries} entry</span>}
         {visa.hasDocument && <span className="text-ink-soft">📎 document</span>}
         {hotels.length > 0 && (
-          <span className="text-ink-soft" title={`Hotels on the visits made with this visa: ${hotels.join(", ")}`}>
+          // Jumps to the hotel in the "Hotels & Airbnb" section (the first one when there are several).
+          <a
+            href={firstStayId ? `#stay-${firstStayId}` : "#stays"}
+            className="rounded-full px-1.5 text-ink-soft hover:bg-navy/5 hover:text-navy"
+            title={`Hotels on this visa: ${hotels.join(", ")} — click to see ${hotels.length === 1 ? "it" : "them"}`}
+          >
             🏨 {hotels.length}
-          </span>
+          </a>
         )}
         <span className="ml-auto rounded-full bg-navy px-3 py-1 text-xs font-semibold text-gold-soft">
           <span className="group-open:hidden">▾ Show details</span>

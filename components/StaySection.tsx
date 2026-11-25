@@ -334,7 +334,7 @@ export function StaySection({
   const card = (s: Stay) => {
     const nights = stayNights(s);
     return (
-      <article key={s.id} id={`stay-${s.id}`} className="scroll-mt-24 rounded-2xl border border-line bg-white p-4">
+      <article key={s.id} id={`stay-${s.id}`} className="scroll-mt-24 rounded-2xl border border-line bg-white p-4 transition-shadow target:ring-4 target:ring-gold">
         <div className="flex items-start gap-3">
           <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-navy text-xl" aria-hidden>
             {STAY_ICON[s.kind] ?? "📍"}

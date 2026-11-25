@@ -29,7 +29,7 @@ export function VisaList({
   stays = [],
 }: {
   /** Hotels / Airbnb homes: each visa shows how many were stayed in on its visits (🏨 2). */
-  stays?: { tripId: string | null; name: string }[];
+  stays?: { tripId: string | null; name: string; id?: string; checkIn?: string | null }[];
   /** Admins: "Delete PDF / photo" on each visa card. */
   canDelete?: boolean;
   /** Shows "View / Download visas PDF" when given. */
