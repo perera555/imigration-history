@@ -21,6 +21,7 @@ import { stayNights } from "@/lib/stay-kinds";
 import { countryName, isSchengen } from "@/lib/countries";
 import { visaTypeName } from "@/lib/visa-types";
 import { BP_WIDTH, BoardingPassView } from "./BoardingPassPdf";
+import { groupTravels } from "@/lib/travels";
 
 const NAVY = "#0b1f3a";
 const NAVY_2 = "#13315c";
@@ -304,8 +305,10 @@ export function ImmigrationPdf({
   );
 
   // Boarding passes as a table (all flights at a glance), before the real-size passes.
-  const boardingTable = (
-    <View style={{ marginBottom: 14 }}>
+  const boardingTable = flightTable(boarding);
+  function flightTable(list: typeof boarding) {
+    return (
+    <View style={{ marginBottom: 10 }}>
       <View style={s.thead}>
         <Text style={[s.th, { width: "14%" }]}>DATE</Text>
         <Text style={[s.th, { width: "9%" }]}>FLIGHT</Text>
@@ -316,7 +319,7 @@ export function ImmigrationPdf({
         <Text style={[s.th, { width: "10%" }]}>FLIGHT TYPE</Text>
         <Text style={[s.th, { width: "18%" }]}>TRIP</Text>
       </View>
-      {boarding.map((b, i) => (
+      {list.map((b, i) => (
         <View key={`row-${b.id}`} style={[s.group, i % 2 ? { backgroundColor: PAPER } : {}]} wrap={false}>
           <Text style={[s.cell, { width: "14%" }]}>{b.flightDate ? formatDate(b.flightDate) : "—"}</Text>
           <Text style={[s.cell, { width: "9%", fontFamily: "Courier-Bold" }]}>{b.flightNumber || "—"}</Text>
@@ -330,13 +333,20 @@ export function ImmigrationPdf({
         </View>
       ))}
     </View>
-  );
+    );
+  }
 
-  // Boarding passes in the record PDF: the list, then each pass small (two per row) with its uploaded
-  // scan below it — straight on, no new page and no empty space. Real size is in the boarding passes PDF.
+  // Boarding passes in the record PDF, travel by travel (leaving home → back home), each travel in its
+  // parts (e.g. Colombo > Abu Dhabi > Dublin, then Dublin > London, then London > Abu Dhabi > Colombo):
+  // the flights, then each pass small (two per row) with its scan — straight on, no empty space.
   const SMALL = 0.44;
-  const pairs: (typeof boarding)[] = [];
-  for (let i = 0; i < boarding.length; i += 2) pairs.push(boarding.slice(i, i + 2));
+  const pairsOf = (list: typeof boarding) => {
+    const out: (typeof boarding)[] = [];
+    for (let i = 0; i < list.length; i += 2) out.push(list.slice(i, i + 2));
+    return out;
+  };
+  const { travels, undated } = groupTravels(boarding);
+  const arrow = (t: string) => t.replace(/→/g, ">"); // the PDF font has no arrow character
   // A boarding pass with several flights (e.g. CMB > AUH > DUB) is one paper: show its scan once.
   const scanShown = new Set<string>();
   const showScan = (b: (typeof boarding)[number]) => {
@@ -346,14 +356,8 @@ export function ImmigrationPdf({
     scanShown.add(key);
     return true;
   };
-  const boardingListSection =
-    boarding.length > 0 ? (
-      <View style={{ marginTop: 18 }}>
-        <Text style={s.sectionTitle} minPresenceAhead={60}>
-          Boarding Passes
-        </Text>
-        {boardingTable}
-        {pairs.map((pair) => {
+  const smallPasses = (list: typeof boarding) =>
+    pairsOf(list).map((pair) => {
           const scans = pair.filter(showScan);
           return (
             <View key={`pair-${pair[0].id}`}>
@@ -375,7 +379,43 @@ export function ImmigrationPdf({
               )}
             </View>
           );
-        })}
+        });
+  const boardingListSection =
+    boarding.length > 0 ? (
+      <View style={{ marginTop: 18 }}>
+        <Text style={s.sectionTitle} minPresenceAhead={60}>
+          Boarding Passes
+        </Text>
+        {travels.map((tr, ti) => (
+          <View key={`travel-${ti}`} style={{ marginBottom: 12 }}>
+            <View style={{ backgroundColor: NAVY, borderRadius: 6, paddingVertical: 6, paddingHorizontal: 10, marginBottom: 8 }} minPresenceAhead={80} wrap={false}>
+              <Text style={{ color: "#ffffff", fontFamily: "Helvetica-Bold", fontSize: 10 }}>
+                {`Travel ${ti + 1}  ·  ${arrow(tr.title)}`}
+              </Text>
+              <Text style={{ color: "#c9d3e3", fontSize: 7.5, marginTop: 2 }}>
+                {`${tr.from ? formatDate(tr.from) : ""}${tr.to && tr.to !== tr.from ? ` - ${formatDate(tr.to)}` : ""}  ·  ${tr.parts.reduce((n, p) => n + p.flights.length, 0)} flights`}
+              </Text>
+            </View>
+            {tr.parts.map((part, pi) => (
+              <View key={`part-${ti}-${pi}`} style={{ marginBottom: 6 }}>
+                <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 9, color: NAVY, marginBottom: 4 }} minPresenceAhead={60}>
+                  {`${pi + 1}. ${part.label}: ${arrow(part.route)}`}
+                </Text>
+                {flightTable(part.flights)}
+                {smallPasses(part.flights)}
+              </View>
+            ))}
+          </View>
+        ))}
+        {undated.length > 0 && (
+          <View>
+            <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 9, color: NAVY, marginBottom: 4 }} minPresenceAhead={60}>
+              Other boarding passes (no flight date)
+            </Text>
+            {flightTable(undated)}
+            {smallPasses(undated)}
+          </View>
+        )}
       </View>
     ) : null;
   /** The boarding passes PDF on its own: real-size passes for printing. */

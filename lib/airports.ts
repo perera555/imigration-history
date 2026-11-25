@@ -13,6 +13,16 @@ const CITY_FIX: Record<string, string> = {
 };
 
 let byCode: Map<string, string> | null = null;
+let countryByCode: Map<string, string> | null = null;
+
+/** The country of an airport code, e.g. "CMB" → "Sri Lanka"; null when the code isn't known. */
+export function airportCountry(code: string | null | undefined): string | null {
+  const c = (code ?? "").trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(c)) return null;
+  if (c === "SAI") return "Cambodia";
+  countryByCode ??= new Map(airports.filter((a) => a.iata && a.iata.length === 3 && a.country).map((a) => [a.iata!, a.country!]));
+  return countryByCode.get(c) ?? null;
+}
 
 /** The city of an airport code, e.g. "CMB" → "Colombo"; null when the code isn't known. */
 export function airportCity(code: string | null | undefined): string | null {
