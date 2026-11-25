@@ -305,7 +305,17 @@ export function StaySection({
       setTimeout(() => (document.getElementById(stayId ? `stay-${stayId}` : "stays") ?? document.getElementById("stays"))?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     };
     window.addEventListener("open-stay", open);
-    return () => window.removeEventListener("open-stay", open);
+    // A link to a hotel (e.g. "🏨 2" on a visa): open its folded card.
+    const openTarget = () => {
+      const el = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      if (el instanceof HTMLDetailsElement && el.id.startsWith("stay-")) el.open = true;
+    };
+    window.addEventListener("hashchange", openTarget);
+    openTarget();
+    return () => {
+      window.removeEventListener("open-stay", open);
+      window.removeEventListener("hashchange", openTarget);
+    };
   }, []);
   const tripLabel = (id: string | null) => trips.find((t) => t.id === id)?.label;
 
@@ -331,10 +341,43 @@ export function StaySection({
     setSaved(msg);
   };
 
+  /** One hotel, small by default (name, city, dates); "Show ▾" opens the full card. */
   const card = (s: Stay) => {
     const nights = stayNights(s);
     return (
-      <article key={s.id} id={`stay-${s.id}`} className="scroll-mt-24 rounded-2xl border border-line bg-white p-4 transition-shadow target:ring-4 target:ring-gold">
+      <details
+        key={s.id}
+        id={`stay-${s.id}`}
+        className="group scroll-mt-24 rounded-2xl border border-line bg-white transition-shadow target:ring-4 target:ring-gold open:lg:col-span-2"
+        open={editing === s.id || undefined}
+      >
+        <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 p-3 [&::-webkit-details-marker]:hidden">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-navy text-lg" aria-hidden>
+            {STAY_ICON[s.kind] ?? "📍"}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate font-semibold text-navy">{s.name}</span>
+            <span className="block text-xs text-ink-soft">
+              {[s.city, s.countryCode && countryName(s.countryCode)].filter(Boolean).join(", ")}
+              {s.checkIn && s.checkOut ? ` · ${fmt(s.checkIn)} → ${fmt(s.checkOut)}` : s.checkIn ? ` · from ${fmt(s.checkIn)}` : s.checkOut ? ` · until ${fmt(s.checkOut)}` : ""}
+              {nights !== null && ` · ${nights} night${nights === 1 ? "" : "s"}`}
+              {s.hasFile && " · 📎"}
+            </span>
+          </span>
+          <span className="ml-auto rounded-full bg-navy px-3 py-1 text-xs font-semibold text-gold-soft">
+            <span className="group-open:hidden">Show ▾</span>
+            <span className="hidden group-open:inline">Hide ▴</span>
+          </span>
+        </summary>
+        <div className="border-t border-line">{fullCard(s)}</div>
+      </details>
+    );
+  };
+
+  const fullCard = (s: Stay) => {
+    const nights = stayNights(s);
+    return (
+      <article className="p-4">
         <div className="flex items-start gap-3">
           <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-navy text-xl" aria-hidden>
             {STAY_ICON[s.kind] ?? "📍"}

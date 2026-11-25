@@ -1,6 +1,7 @@
 import "server-only";
 import { getDb } from "./db";
 import { countryName, isSchengen } from "./countries";
+import { airportCity } from "./airports";
 
 export type Profile = {
   id: string;
@@ -189,16 +190,20 @@ export type BoardingPass = {
   fileName: string | null;
   mime: string | null;
   hasFile: boolean;
+  /** City of each airport, e.g. "Colombo" for CMB (null when the code isn't known). */
+  fromCity?: string | null;
+  toCity?: string | null;
 };
 
 export async function getBoardingPasses(profileId: string): Promise<BoardingPass[]> {
   if (!isUuid(profileId)) return [];
   const sql = await getDb();
-  return sql<BoardingPass[]>`
+  const rows = await sql<BoardingPass[]>`
     select id, profile_id, trip_id, direction, airline, flight_number, from_airport, to_airport,
            flight_date, seat, booking_ref, notes, checkin_url, checked_in, file_name, mime, (data is not null) as has_file
     from boarding_passes where profile_id = ${profileId}
     order by flight_date desc nulls first, created_at desc`;
+  return rows.map((p) => ({ ...p, fromCity: airportCity(p.fromAirport), toCity: airportCity(p.toAirport) }));
 }
 
 // ---------- scanned passport pages ----------

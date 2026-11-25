@@ -309,23 +309,24 @@ export function ImmigrationPdf({
       <View style={s.thead}>
         <Text style={[s.th, { width: "14%" }]}>DATE</Text>
         <Text style={[s.th, { width: "9%" }]}>FLIGHT</Text>
-        <Text style={[s.th, { width: "16%" }]}>AIRLINE</Text>
-        <Text style={[s.th, { width: "11%" }]}>FROM - TO</Text>
+        <Text style={[s.th, { width: "12%" }]}>AIRLINE</Text>
+        <Text style={[s.th, { width: "22%" }]}>FROM - TO</Text>
         <Text style={[s.th, { width: "6%" }]}>SEAT</Text>
         <Text style={[s.th, { width: "9%" }]}>PNR</Text>
         <Text style={[s.th, { width: "10%" }]}>FLIGHT TYPE</Text>
-        <Text style={[s.th, { width: "25%" }]}>TRIP</Text>
+        <Text style={[s.th, { width: "18%" }]}>TRIP</Text>
       </View>
       {boarding.map((b, i) => (
         <View key={`row-${b.id}`} style={[s.group, i % 2 ? { backgroundColor: PAPER } : {}]} wrap={false}>
           <Text style={[s.cell, { width: "14%" }]}>{b.flightDate ? formatDate(b.flightDate) : "—"}</Text>
           <Text style={[s.cell, { width: "9%", fontFamily: "Courier-Bold" }]}>{b.flightNumber || "—"}</Text>
-          <Text style={[s.cell, { width: "16%" }]}>{b.airline || "—"}</Text>
-          <Text style={[s.cell, { width: "11%" }]}>{`${b.fromAirport || "---"} > ${b.toAirport || "---"}`}</Text>
+          <Text style={[s.cell, { width: "12%" }]}>{b.airline || "—"}</Text>
+          {/* Where from and where to: city and airport code, e.g. Colombo (CMB) > Abu Dhabi (AUH) */}
+          <Text style={[s.cell, { width: "22%" }]}>{`${b.fromCity ? `${b.fromCity} (${b.fromAirport})` : b.fromAirport || "---"} > ${b.toCity ? `${b.toCity} (${b.toAirport})` : b.toAirport || "---"}`}</Text>
           <Text style={[s.cell, { width: "6%" }]}>{b.seat || "—"}</Text>
           <Text style={[s.cell, { width: "9%", fontFamily: "Courier" }]}>{b.bookingRef || "—"}</Text>
           <Text style={[s.cell, { width: "10%" }]}>{b.direction || "—"}</Text>
-          <Text style={[s.cell, { width: "25%" }]}>{b.tripLabel?.replace(/→/g, "to") ?? "Current / upcoming trip"}</Text>
+          <Text style={[s.cell, { width: "18%" }]}>{b.tripLabel?.replace(/→/g, "to") ?? "Current / upcoming trip"}</Text>
         </View>
       ))}
     </View>

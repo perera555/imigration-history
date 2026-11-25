@@ -12,7 +12,7 @@ import { PhotoInput } from "./PhotoInput";
 import { Flag } from "./Flag";
 import { EMPTY_PROFILE } from "@/lib/record";
 import { CountryNameSelect, NationalitySelect } from "./NationalitySelect";
-import { flagSvg, isSchengen } from "@/lib/countries";
+import { countryName, flagSvg, isSchengen } from "@/lib/countries";
 import { useToastOn } from "./Toaster";
 
 const visitDate = (d: string) =>
@@ -269,6 +269,11 @@ export function RecordForm({
   // Visit cards: a filled visit starts as a short row (open it with "Update"); a new, empty one starts open.
   // Decided once per visit, so typing a date doesn't fold the card while it is being filled.
   const visitOpen = useRef(new Map<string | number, boolean>());
+  // Countries: a saved one starts small (one line); a new one (being filled in) starts open.
+  const [blockOpen, setBlockOpenState] = useState<Record<string, boolean>>({});
+  const isBlockOpen = (b: CountryBlock) =>
+    blockOpen[b.key] ?? !(b.visits.length > 0 && b.visits.every((v) => v.id || Object.keys(v.ids ?? {}).length > 0));
+  const setBlockOpen = (key: number, open: boolean) => setBlockOpenState((m) => ({ ...m, [key]: open }));
   const startsOpen = (key: string | number, departure: string) => {
     if (!visitOpen.current.has(key)) visitOpen.current.set(key, !departure);
     return visitOpen.current.get(key);
@@ -494,8 +499,44 @@ export function RecordForm({
 
         <div className="divide-y divide-line">
           {blocks.map((b, bi) => {
+            const open = isBlockOpen(b);
+            if (!open) {
+              // Small: one line per country; "Show ▾" opens its visits.
+              const dates = b.visits.map((v) => v.departureDate).filter(Boolean).sort();
+              const name = b.schengen
+                ? `Schengen Area (${(b.codes ?? []).map((c) => c.code).filter(Boolean).map(countryName).join(", ")})`
+                : b.countryCode
+                  ? countryName(b.countryCode)
+                  : "New country";
+              return (
+                <button
+                  key={b.key}
+                  type="button"
+                  onClick={() => setBlockOpen(b.key, true)}
+                  className={`flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-left hover:bg-gold/5 sm:px-6 ${bi % 2 ? "bg-paper/50" : ""}`}
+                >
+                  {b.schengen ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={flagSvg("eu")} alt="" className="h-6 w-9 rounded object-cover" />
+                  ) : (
+                    b.countryCode && <Flag code={b.countryCode} className="h-6 w-9" />
+                  )}
+                  <span className="font-serif text-lg font-bold text-navy">{name}</span>
+                  <span className="text-xs text-ink-soft">
+                    {b.visits.length} visit{b.visits.length === 1 ? "" : "s"}
+                    {dates.length > 0 && ` · ${visitDate(dates[0])}${dates.length > 1 ? ` → ${visitDate(dates[dates.length - 1])}` : ""}`}
+                  </span>
+                  <span className="ml-auto rounded-full bg-navy px-3 py-1 text-xs font-semibold text-gold-soft">Show ▾</span>
+                </button>
+              );
+            }
             return (
               <div key={b.key} className={`p-5 sm:p-6 ${bi % 2 ? "bg-paper/50" : ""}`}>
+                <div className="mb-2 flex justify-end">
+                  <button type="button" onClick={() => setBlockOpen(b.key, false)} className="rounded-full bg-navy px-3 py-1 text-xs font-semibold text-gold-soft">
+                    Hide ▴
+                  </button>
+                </div>
                 <div className="flex flex-wrap items-end gap-4">
                   {b.schengen ? (
                     <>

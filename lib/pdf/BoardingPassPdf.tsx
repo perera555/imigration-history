@@ -45,11 +45,13 @@ export function BoardingPassView({
           <View>
             <Text style={{ color: SOFT, fontSize: t(7), letterSpacing: k(1.5) }}>FROM</Text>
             <Text style={{ color: "#ffffff", fontSize: k(34), fontFamily: "Times-Bold" }}>{b.fromAirport ?? "---"}</Text>
+            {b.fromCity ? <Text style={{ color: "#dfe6f1", fontSize: t(9), fontFamily: "Helvetica-Bold" }}>{b.fromCity}</Text> : null}
           </View>
           <Text style={{ color: GOLD_SOFT, fontSize: k(16), marginHorizontal: k(18), marginBottom: k(8) }}>&gt;&gt;</Text>
           <View>
             <Text style={{ color: SOFT, fontSize: t(7), letterSpacing: k(1.5) }}>TO</Text>
             <Text style={{ color: "#ffffff", fontSize: k(34), fontFamily: "Times-Bold" }}>{b.toAirport ?? "---"}</Text>
+            {b.toCity ? <Text style={{ color: "#dfe6f1", fontSize: t(9), fontFamily: "Helvetica-Bold" }}>{b.toCity}</Text> : null}
           </View>
         </View>
         <View style={{ flexDirection: "row", marginTop: k(18) }}>

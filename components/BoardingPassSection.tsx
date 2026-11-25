@@ -150,7 +150,13 @@ export function BoardingPassSection({
         const next = g.find((p) => !ordered.includes(p) && p.fromAirport === ordered[ordered.length - 1].toAirport) ?? g.find((p) => !ordered.includes(p))!;
         ordered.push(next);
       }
-      const route = [ordered[0].fromAirport, ...ordered.map((p) => p.toAirport)].map((a) => a || "---").join(" → ");
+      // Whole route by city, e.g. "Colombo → Abu Dhabi → Dublin" (the airport code when the city isn't known).
+      const stops = [
+        { code: ordered[0].fromAirport, city: ordered[0].fromCity },
+        ...ordered.map((p) => ({ code: p.toAirport, city: p.toCity })),
+      ];
+      const route = stops.map((s) => s.city || s.code || "---").join(" → ");
+      const codes = stops.map((s) => s.code || "---").join(" → ");
       return (
         // Small by default: one line with the whole route; click to see every flight.
         <details key={`journey-${g[0].id}`} className="group rounded-2xl border-2 border-gold/50 bg-gold/5 open:p-3 open:lg:col-span-2">
@@ -158,7 +164,7 @@ export function BoardingPassSection({
             <span className="rounded-full bg-navy px-3 py-1 text-xs font-bold text-gold-soft">✈ {g.length} flights</span>
             <span className="font-serif text-lg font-bold text-navy">{route}</span>
             <span className="text-xs text-ink-soft">
-              {fmt(ordered[0].flightDate)}
+              <span className="font-mono">{codes}</span> · {fmt(ordered[0].flightDate)}
               {ordered[0].bookingRef && <span className="font-mono"> · PNR {ordered[0].bookingRef}</span>}
             </span>
             <Toggle />
@@ -197,10 +203,13 @@ export function BoardingPassSection({
           ✈
         </span>
         <span className="font-serif text-lg font-bold text-navy">
-          {p.fromAirport || "---"} → {p.toAirport || "---"}
+          {p.fromCity || p.fromAirport || "---"} → {p.toCity || p.toAirport || "---"}
         </span>
         <span className="text-xs text-ink-soft">
-          <span className="font-mono">{p.flightNumber || "—"}</span> · {fmt(p.flightDate)}
+          <span className="font-mono">
+            {p.fromAirport || "---"} → {p.toAirport || "---"} · {p.flightNumber || "—"}
+          </span>{" "}
+          · {fmt(p.flightDate)}
           {p.seat && ` · seat ${p.seat}`}
           {p.hasFile && " · 📎"}
         </span>
@@ -232,11 +241,13 @@ export function BoardingPassSection({
               <div>
                 <p className="text-[clamp(8px,1.2vw,10px)] uppercase tracking-[0.2em] text-white/50">From</p>
                 <p className="font-serif text-[clamp(20px,5vw,40px)] font-bold leading-none">{p.fromAirport || "---"}</p>
+                {p.fromCity && <p className="mt-0.5 truncate text-[clamp(8px,1.4vw,12px)] font-semibold text-white/80">{p.fromCity}</p>}
               </div>
               <p className="pb-[1%] text-[clamp(14px,3vw,24px)] text-gold-soft">✈</p>
               <div>
                 <p className="text-[clamp(8px,1.2vw,10px)] uppercase tracking-[0.2em] text-white/50">To</p>
                 <p className="font-serif text-[clamp(20px,5vw,40px)] font-bold leading-none">{p.toAirport || "---"}</p>
+                {p.toCity && <p className="mt-0.5 truncate text-[clamp(8px,1.4vw,12px)] font-semibold text-white/80">{p.toCity}</p>}
               </div>
             </div>
             <div className="mt-[3%] grid grid-cols-4 gap-2 text-[clamp(8px,1.3vw,11px)]">
