@@ -5,6 +5,8 @@ export function JumpNav({ items }: { items: { id: string; label: string; primary
   function go(id: string) {
     const el = document.getElementById(id);
     if (!el) return;
+    // A folded section (Show / Hide): open it when jumping to it.
+    if (el instanceof HTMLDetailsElement) el.open = true;
     const header = document.querySelector("header")?.getBoundingClientRect().height ?? 0;
     const top = el.getBoundingClientRect().top + window.scrollY - header - 16;
     window.scrollTo({ top, behavior: "smooth" });

@@ -405,9 +405,22 @@ export function RecordForm({
       )}
 
       {showProfile && (
-        <section id="card" className="panel scroll-mt-24 p-6 sm:p-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Travel card</p>
-          <h2 className="mt-1 font-serif text-2xl font-bold text-navy">Personal details</h2>
+        // Personal details: small on the Update page (Show / Hide); open when making a new record.
+        <details id="card" className="panel group scroll-mt-24" open={!updateId || undefined}>
+          <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-4 gap-y-1 p-6 sm:px-8 [&::-webkit-details-marker]:hidden">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Travel card</p>
+              <h2 className="mt-1 font-serif text-2xl font-bold text-navy">Personal details</h2>
+            </div>
+            <span className="text-sm text-ink-soft">
+              {[profile.fullName, profile.passportNumber && `Passport ${profile.passportNumber}`, profile.nationality].filter(Boolean).join(" · ")}
+            </span>
+            <span className="ml-auto rounded-full bg-navy px-3 py-1 text-xs font-semibold text-gold-soft">
+              <span className="group-open:hidden">Show ▾</span>
+              <span className="hidden group-open:inline">Hide ▴</span>
+            </span>
+          </summary>
+          <div className="border-t border-line px-6 pb-6 sm:px-8 sm:pb-8">
           {saveTo !== "new" && !updateId && (
             <p className="mt-1 text-sm text-ink-soft">Only empty fields of the existing record will be filled.</p>
           )}
@@ -484,7 +497,8 @@ export function RecordForm({
               <PartButton part="card" label="Save travel card" />
             </div>
           )}
-        </section>
+          </div>
+        </details>
       )}
 
       {/* Immigration record, laid out like the paper form: one section per country, visits listed under it */}

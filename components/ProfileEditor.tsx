@@ -43,11 +43,25 @@ export function ProfileEditor({
           { id: "boarding", label: "✈ Boarding passes", primary: true },
         ]}
       />
-      <section id="details" className="panel p-6 sm:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Step 1</p>
-        <h2 className="mb-6 mt-1 font-serif text-2xl font-bold text-navy">Travel card details</h2>
-        <ProfileForm action={updateProfile.bind(null, profile.id)} profile={profile} submitLabel="Save details" />
-      </section>
+      {/* Personal details: small by default (the travel card is shown above); "Show" opens the form. */}
+      <details id="details" className="panel group scroll-mt-24">
+        <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-4 gap-y-1 p-6 sm:px-8 [&::-webkit-details-marker]:hidden">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">Step 1</p>
+            <h2 className="mt-1 font-serif text-2xl font-bold text-navy">Travel card details</h2>
+          </div>
+          <span className="text-sm text-ink-soft">
+            {[profile.fullName, profile.passportNumber && `Passport ${profile.passportNumber}`, profile.nationality].filter(Boolean).join(" · ")}
+          </span>
+          <span className="ml-auto rounded-full bg-navy px-3 py-1 text-xs font-semibold text-gold-soft">
+            <span className="group-open:hidden">Show ▾</span>
+            <span className="hidden group-open:inline">Hide ▴</span>
+          </span>
+        </summary>
+        <div className="border-t border-line p-6 sm:p-8">
+          <ProfileForm action={updateProfile.bind(null, profile.id)} profile={profile} submitLabel="Save details" />
+        </div>
+      </details>
 
       <section id="trips" className="space-y-4">
         <div className="flex flex-wrap items-end gap-3">
