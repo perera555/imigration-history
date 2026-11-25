@@ -109,6 +109,18 @@ export async function saveBoardingPass(
       if (!values.direction) values.direction = match.departureDate === values.flightDate ? "Departure" : "Return";
     }
   }
+  // Still not linked: another flight of the same boarding pass (same booking, within 2 days) is — use its visit
+  // (e.g. the connecting flight home, AUH to CMB, the day after leaving London).
+  if (!values.tripId && values.bookingRef && values.flightDate) {
+    const [partner] = await sql<{ tripId: string; direction: string | null }[]>`select trip_id, direction from boarding_passes
+      where profile_id = ${profileId} and booking_ref = ${values.bookingRef} and trip_id is not null
+        and abs(flight_date - ${values.flightDate}::date) <= 2
+      order by abs(flight_date - ${values.flightDate}::date) limit 1`;
+    if (partner) {
+      values.tripId = partner.tripId;
+      if (!values.direction) values.direction = partner.direction;
+    }
+  }
   // Same flight on the same date = the same boarding pass; don't add it twice.
   if (!passId && values.flightNumber && values.flightDate) {
     const dup = await sql`select 1 from boarding_passes where profile_id = ${profileId}

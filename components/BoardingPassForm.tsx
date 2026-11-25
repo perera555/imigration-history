@@ -5,7 +5,7 @@ import { DateInput } from "./DateInput";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { saveBoardingPass, type BoardingSaveState } from "@/lib/boarding-actions";
 import type { BoardingDetails } from "@/lib/boarding-reader";
-import { dateFromVisits, readBoardingFile, visitForFlight } from "@/lib/boarding-read";
+import { dateFromVisits, journeyDates, readBoardingFile, visitForFlight } from "@/lib/boarding-read";
 import type { BoardingPass } from "@/lib/data";
 import { SubmitButton } from "./SubmitButton";
 import { DocumentPicker, isImageName } from "./DocumentPicker";
@@ -74,10 +74,15 @@ export function BoardingPassForm({
     const visitDates = trips.flatMap((t) => t.date.split("|")).filter(Boolean);
     let saved = 0;
     const problems: string[] = [];
-    for (const leg of legs) {
+    // All flights of one boarding pass belong to one visit: a flight on a day with no visit (e.g. the last
+    // flight home, AUH > CMB the next day) takes the visit of its partner flight.
+    const legDates = journeyDates(legs.map((l) => l.flightDate), visitDates);
+    const legVisits = legDates.map((d) => visitForFlight(trips, d));
+    const journeyVisit = legVisits.find(Boolean) ?? null;
+    for (const [i, leg] of legs.entries()) {
       const fd = new FormData(formRef.current); // the document, passenger and other fields as in the form
-      const date = dateFromVisits(leg.flightDate, visitDates);
-      const visit = visitForFlight(trips, date);
+      const date = legDates[i];
+      const visit = legVisits[i] ?? journeyVisit;
       const values: Record<string, string | null | undefined> = {
         airline: leg.airline,
         flightNumber: leg.flightNumber,

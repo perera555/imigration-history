@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { deleteBoardingPass, saveBoardingPass } from "@/lib/boarding-actions";
-import { dateFromVisits, readBoardingFile } from "@/lib/boarding-read";
+import { journeyDates, readBoardingFile } from "@/lib/boarding-read";
 import { cropScan } from "@/lib/crop-scan";
 import { prepareUpload } from "@/lib/upload-prep";
 import { CountrySearch } from "./CountrySearch";
@@ -23,11 +23,12 @@ async function flightsFrom(profileId: string, file: File, visitDates: string[], 
   try {
     const r = await readBoardingFile(profileId, file, onProgress);
     if (!r) return [{}];
-    return r.legs.map((leg) => {
+    // Each flight's year from its partner flights on the same boarding pass (and the visits).
+    const dates = journeyDates(r.legs.map((l) => l.flightDate), visitDates);
+    return r.legs.map((leg, i) => {
       const out: Record<string, string> = {};
       for (const [k, v] of Object.entries(leg)) if (v) out[k] = String(v);
-      const date = dateFromVisits(leg.flightDate, visitDates);
-      if (date) out.flightDate = date;
+      if (dates[i]) out.flightDate = dates[i]!;
       return out;
     });
   } catch {

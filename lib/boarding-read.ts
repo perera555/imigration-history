@@ -58,6 +58,26 @@ export function visitForFlight<T extends { id: string; date: string }>(trips: T[
   return ends ? { trip: ends, direction: "Return" } : null;
 }
 
+/**
+ * Dates for all flights of one boarding pass. A barcode has only the day of the year, so each flight's
+ * year is taken from its partner flights: the flight that matches a visit sets the year, and the
+ * others get the year that puts them next to it (EY66 2 Nov 2026 → EY390 3 Nov 2026, never 2015).
+ */
+export function journeyDates(dates: (string | null | undefined)[], visitDates: string[]): (string | null)[] {
+  const resolved = dates.map((d) => dateFromVisits(d, visitDates));
+  const anchorAt = resolved.findIndex((d) => !!d && visitDates.includes(d));
+  const anchor = resolved[anchorAt >= 0 ? anchorAt : 0];
+  if (!anchor) return resolved;
+  const a = Date.parse(anchor);
+  return dates.map((d, i) => {
+    if (!d || i === anchorAt) return resolved[i];
+    // Same month and day, in the year nearest to the anchor flight.
+    const md = d.slice(5);
+    const y = Number(anchor.slice(0, 4));
+    return [y - 1, y, y + 1].map((yy) => `${yy}-${md}`).sort((p, q) => Math.abs(Date.parse(p) - a) - Math.abs(Date.parse(q) - a))[0];
+  });
+}
+
 /** A barcode gives only the day of the year: use the year of a visit on that same day, when there is one. */
 export function dateFromVisits(date: string | null | undefined, visitDates: string[]): string | null {
   if (!date) return null;
